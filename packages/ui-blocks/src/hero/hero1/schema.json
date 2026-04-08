@@ -1,0 +1,36 @@
+{
+  "key": "hero1",
+  "name": "Hero 1",
+  "description": "A card-style hero with a title, subtitle, and call-to-action button.",
+  "category": "hero",
+  "pageType": "landing",
+  "allowedPages": ["landing"],
+  "props": [
+    {
+      "name": "title",
+      "type": "string",
+      "label": "Title"
+    },
+    {
+      "name": "subtitle",
+      "type": "string",
+      "label": "Subtitle"
+    },
+    {
+      "name": "buttonText",
+      "type": "string",
+      "label": "Button Text"
+    },
+    {
+      "name": "buttonVariant",
+      "type": "select",
+      "label": "Button Variant",
+      "options": [
+        "default",
+        "outline",
+        "secondary",
+        "ghost"
+      ]
+    }
+  ]
+}

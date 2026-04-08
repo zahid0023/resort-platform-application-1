@@ -1,0 +1,16 @@
+{
+    "name": "resort-platform-application-1",
+    "private": true,
+    "scripts": {
+        "dev:admin": "pnpm --filter resort-admin-platform-application-1 dev",
+        "dev:owner": "pnpm --filter resort-owner-platform-application-1 dev",
+        "dev:user": "pnpm --filter resort-user-platform-application-1 dev",
+        "dev:ui": "pnpm --filter ui-blocks dev",
+        "dev:test": "pnpm --filter ui-block-test dev",
+        "build:all": "pnpm --filter ui-blocks build && pnpm --filter './apps/*' build"
+    },
+    "packageManager": "pnpm@10.30.3+sha512.c961d1e0a2d8e354ecaa5166b822516668b7f44cb5bd95122d590dd81922f606f5473b6d23ec4a5be05e7fcd18e8488d47d978bbe981872f1145d06e9a740017",
+    "devDependencies": {
+        "next": "16.1.6"
+    }
+}

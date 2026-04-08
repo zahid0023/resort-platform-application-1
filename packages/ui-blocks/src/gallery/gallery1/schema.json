@@ -1,0 +1,25 @@
+{
+  "key": "gallery1",
+  "name": "Gallery 1",
+  "description": "A responsive image gallery grid with configurable columns and section header",
+  "category": "gallery",
+  "pageType": "landing",
+  "allowedPages": ["landing"],
+  "props": [
+    { "name": "title", "type": "string", "label": "Title" },
+    { "name": "subtitle", "type": "string", "label": "Subtitle" },
+    {
+      "name": "columns",
+      "type": "select",
+      "label": "Columns",
+      "options": ["2", "3", "4"]
+    },
+    { "name": "image1", "type": "string", "label": "Image 1 URL" },
+    { "name": "image2", "type": "string", "label": "Image 2 URL" },
+    { "name": "image3", "type": "string", "label": "Image 3 URL" },
+    { "name": "image4", "type": "string", "label": "Image 4 URL" },
+    { "name": "image5", "type": "string", "label": "Image 5 URL" },
+    { "name": "image6", "type": "string", "label": "Image 6 URL" },
+    { "name": "backgroundColor", "type": "color", "label": "Background Color" }
+  ]
+}

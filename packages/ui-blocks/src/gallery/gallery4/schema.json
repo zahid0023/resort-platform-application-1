@@ -1,0 +1,20 @@
+{
+  "key": "gallery4",
+  "name": "Gallery 4",
+  "description": "A bento-style mosaic gallery with a large featured image and a 2×2 grid of supporting images",
+  "category": "gallery",
+  "pageType": "landing",
+  "allowedPages": ["landing"],
+  "props": [
+    { "name": "title", "type": "string", "label": "Title" },
+    { "name": "subtitle", "type": "string", "label": "Subtitle" },
+    { "name": "featuredImage", "type": "string", "label": "Featured Image URL" },
+    { "name": "featuredCaption", "type": "string", "label": "Featured Image Caption" },
+    { "name": "image1", "type": "string", "label": "Image 1 URL" },
+    { "name": "image2", "type": "string", "label": "Image 2 URL" },
+    { "name": "image3", "type": "string", "label": "Image 3 URL" },
+    { "name": "image4", "type": "string", "label": "Image 4 URL" },
+    { "name": "backgroundColor", "type": "color", "label": "Background Color" },
+    { "name": "accentColor", "type": "color", "label": "Caption Overlay Color" }
+  ]
+}

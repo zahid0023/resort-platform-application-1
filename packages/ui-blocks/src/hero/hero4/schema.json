@@ -1,0 +1,40 @@
+{
+  "key": "hero4",
+  "name": "Hero 4",
+  "description": "A centered full-width hero with a badge, headline, description, and two action buttons.",
+  "category": "hero",
+  "pageType": "landing",
+  "allowedPages": ["landing"],
+  "props": [
+    {
+      "name": "badge",
+      "type": "string",
+      "label": "Badge Text"
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "label": "Title"
+    },
+    {
+      "name": "description",
+      "type": "string",
+      "label": "Description"
+    },
+    {
+      "name": "primaryButtonText",
+      "type": "string",
+      "label": "Primary Button Text"
+    },
+    {
+      "name": "secondaryButtonText",
+      "type": "string",
+      "label": "Secondary Button Text"
+    },
+    {
+      "name": "backgroundColor",
+      "type": "color",
+      "label": "Background Color"
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+{
+  "installCommand": "pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm --filter=resort-admin-platform-application-1 build",
+  "outputDirectory": "apps/resort-admin-platform-application-1/.next",
+  "framework": "nextjs"
+}

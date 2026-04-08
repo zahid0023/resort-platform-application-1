@@ -1,0 +1,12 @@
+{
+  "title": "Discover Our Resort",
+  "subtitle": "A glimpse into the world of luxury and relaxation",
+  "featuredImage": "https://picsum.photos/seed/resort-feat/1200/900",
+  "featuredCaption": "The Grand Terrace",
+  "image1": "https://picsum.photos/seed/resort-g4a/600/400",
+  "image2": "https://picsum.photos/seed/resort-g4b/600/400",
+  "image3": "https://picsum.photos/seed/resort-g4c/600/400",
+  "image4": "https://picsum.photos/seed/resort-g4d/600/400",
+  "backgroundColor": "#ffffff",
+  "accentColor": "#1a1a1a"
+}

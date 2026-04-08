@@ -1,0 +1,12 @@
+{
+  "title": "Resort Gallery",
+  "subtitle": "Explore our stunning facilities and breathtaking surroundings",
+  "columns": "3",
+  "image1": "https://picsum.photos/seed/resort1/800/600",
+  "image2": "https://picsum.photos/seed/resort2/800/600",
+  "image3": "https://picsum.photos/seed/resort3/800/600",
+  "image4": "https://picsum.photos/seed/resort4/800/600",
+  "image5": "https://picsum.photos/seed/resort5/800/600",
+  "image6": "https://picsum.photos/seed/resort6/800/600",
+  "backgroundColor": "#ffffff"
+}
