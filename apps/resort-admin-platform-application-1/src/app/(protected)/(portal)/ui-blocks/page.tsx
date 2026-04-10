@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { UI_BLOCKS_INDEX, type UiBlockMeta } from "ui-blocks";
 import { listUiBlockDefinitions, type UiBlockDefinitionSummary } from "@/services/ui-block-definitions";
 import { ApproveUiBlockDialog } from "@/components/ui-blocks/approve-ui-block-dialog";
+import { UiBlockPreview } from "@/components/ui-blocks/ui-block-preview";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -23,16 +24,13 @@ function BlockCard({
   onPreview: () => void;
   onApprove?: () => void;
 }) {
-  const UIBlock = meta.component;
   return (
     <div className="flex flex-col rounded-xl border bg-card ring-1 ring-foreground/10 overflow-hidden">
       <div
         onClick={onPreview}
-        className="h-48 overflow-hidden cursor-pointer transition-all hover:ring-2 hover:ring-primary"
+        className="overflow-hidden cursor-pointer transition-all hover:ring-2 hover:ring-primary"
       >
-        <div className="pointer-events-none w-full origin-top scale-90 p-3">
-          <UIBlock {...meta.defaults} />
-        </div>
+        <UiBlockPreview uiBlockKey={meta.key} />
       </div>
       {onApprove && (
         <div className="flex justify-end px-3 py-2 border-t bg-muted/30">

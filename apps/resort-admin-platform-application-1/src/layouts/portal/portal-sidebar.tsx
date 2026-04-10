@@ -1,13 +1,14 @@
 "use client";
 
 import {
-  BarChart3Icon,
+  BlocksIcon,
   CreditCardIcon,
+  FileTextIcon,
+  LayersIcon,
   LayoutDashboard,
-  Link2Icon,
+  LayoutTemplateIcon,
   LogOut,
   SettingsIcon,
-  WebhookIcon,
   ZapIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -37,22 +38,22 @@ const mainNavItems = [
   {
     title: "Page Types",
     url: "/page-types",
-    icon: Link2Icon,
+    icon: FileTextIcon,
   },
   {
     title: "UI Block Categories",
     url: "/ui-block-categories",
-    icon: WebhookIcon,
+    icon: LayersIcon,
   },
   {
     title: "UI Blocks",
     url: "/ui-blocks",
-    icon: BarChart3Icon,
+    icon: BlocksIcon,
   },
   {
     title: "Templates",
     url: "/templates",
-    icon: BarChart3Icon,
+    icon: LayoutTemplateIcon,
   },
 ];
 
