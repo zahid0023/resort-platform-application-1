@@ -34,3 +34,6 @@ export {
 export { UIBlockRenderer } from "./components/ui-block-renderer";
 export { UIBlockGallery } from "./components/ui-block-gallery";
 export { UIBlockPreviewPage } from "./components/ui-block-preview-page";
+export { TemplatePageBlockSlotRenderer, type TemplatePageBlockSlotData, type SlotVariant } from "./components/template-page-block-slot-renderer";
+export { TemplatePageRenderer, type TemplatePageData } from "./components/template-page-renderer";
+export { TemplateRenderer, type TemplateData } from "./components/template-renderer";
