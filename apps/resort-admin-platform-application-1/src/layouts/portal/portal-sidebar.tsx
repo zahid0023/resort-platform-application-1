@@ -4,6 +4,8 @@ import {
   BlocksIcon,
   CreditCardIcon,
   FileTextIcon,
+  FolderIcon,
+  GlobeIcon,
   LayersIcon,
   LayoutDashboard,
   LayoutTemplateIcon,
@@ -57,9 +59,16 @@ const mainNavItems = [
   },
 ];
 
-const accountNavItems = [
-  { title: "Billing", url: "/portal/billing", icon: CreditCardIcon },
-  { title: "Settings", url: "/portal/settings", icon: SettingsIcon },
+const resortNavItems = [
+  { title: "Access Types", url: "/access-types", icon: CreditCardIcon },
+  { title: "Room Categories", url: "/room-categories", icon: SettingsIcon },
+];
+
+const commonNavItems = [
+  { title: "Countries", url: "/countries", icon: GlobeIcon },
+  { title: "Cities", url: "/cities", icon: GlobeIcon },
+  { title: "Facility Groups", url: "/facility-groups", icon: FolderIcon },
+    { title: "Facilities", url: "/facilities", icon: FolderIcon },
 ];
 
 export function PortalSidebar() {
@@ -98,11 +107,29 @@ export function PortalSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarGroupLabel>Account</SidebarGroupLabel>
+            <SidebarGroupLabel>Resort</SidebarGroupLabel>
             <SidebarMenu className="gap-2">
-              {accountNavItems.map((item) => (
+              {resortNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButtonActive
+                    icon={<item.icon />}
+                    title={item.title}
+                    url={item.url}
+                  />
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarGroupLabel>Common</SidebarGroupLabel>
+            <SidebarMenu className="gap-2">
+              {commonNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButtonActive
                     icon={<item.icon />}
@@ -115,6 +142,7 @@ export function PortalSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+
       <SidebarFooter className="border-t border-t-sidebar-border">
         <SidebarMenu>
           <SidebarMenuItem>

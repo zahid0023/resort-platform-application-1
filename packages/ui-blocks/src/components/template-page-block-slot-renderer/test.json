@@ -1,0 +1,8 @@
+SELECT ura.*, rat.code
+FROM user_resort_access ura
+JOIN resort_access_types rat 
+    ON ura.access_type_id = rat.id
+WHERE ura.user_id = :userId
+  AND ura.resort_id = :resortId
+  AND ura.is_active = TRUE
+  AND ura.is_deleted = FALSE;
