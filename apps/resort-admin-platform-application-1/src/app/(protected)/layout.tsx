@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { SidebarProvider } from "@/components/ui/sidebar"
 import { PortalHeader } from "@/layouts/portal/portal-header"
 import { PortalSidebar } from "@/layouts/portal/portal-sidebar"
-import { getToken } from "@/services/api"
+import { getToken } from "../../services/api"
 
 export default function PortalLayout({
   children,
