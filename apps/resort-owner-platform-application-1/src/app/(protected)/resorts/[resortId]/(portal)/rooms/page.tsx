@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { toast } from "sonner"
-import { BedDoubleIcon, PencilIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { BedDoubleIcon, CalendarDaysIcon, PencilIcon, PlusIcon, Trash2Icon, UsersIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { ResortRoomCategoryDialog } from "@/components/resort-room-category/resort-room-category-dialog"
 import { RoomDialog } from "@/components/room/room-dialog"
+import { RoomPricePeriodsSheet } from "@/components/room-price-period/room-price-periods-sheet"
 import {
   listResortRoomCategories,
   getResortRoomCategory,
@@ -41,10 +42,12 @@ function RoomTile({
   room,
   onEdit,
   onDelete,
+  onPricing,
 }: {
   room: RoomSummary
   onEdit: () => void
   onDelete: () => Promise<void>
+  onPricing: () => void
 }) {
   const [confirming, setConfirming] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -57,65 +60,52 @@ function RoomTile({
   }
 
   return (
-    <div className="relative flex flex-col gap-1.5 rounded-xl border bg-card p-3 text-sm ring-1 ring-foreground/10">
-      <div className="flex items-start justify-between gap-1">
-        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="truncate font-medium leading-tight">{room.name}</span>
+    <div className="flex items-center gap-4 rounded-xl border bg-card px-4 py-3 text-sm ring-1 ring-foreground/10">
+      {/* Room info */}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <span className="font-medium leading-tight truncate">{room.name}</span>
           {room.room_number && (
-            <span className="font-mono text-[10px] text-muted-foreground">#{room.room_number}</span>
+            <span className="shrink-0 font-mono text-xs text-muted-foreground">#{room.room_number}</span>
+          )}
+          {room.floor != null && (
+            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+              Floor {room.floor}
+            </span>
           )}
         </div>
-        {confirming ? (
-          <div className="flex shrink-0 items-center gap-1">
-            <span className="text-[10px] text-muted-foreground">Sure?</span>
-            <button
-              type="button"
-              disabled={deleting}
-              onClick={handleDelete}
-              className="flex size-5 items-center justify-center rounded bg-destructive text-[10px] text-white"
-            >
-              {deleting ? <Spinner className="size-3" /> : "✓"}
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirming(false)}
-              className="flex size-5 items-center justify-center rounded border text-[10px]"
-            >
-              ✕
-            </button>
-          </div>
-        ) : (
-          <div className="flex shrink-0 items-center gap-0.5">
-            <button
-              type="button"
-              onClick={onEdit}
-              className="flex size-5 items-center justify-center rounded text-muted-foreground/50 hover:text-foreground"
-            >
-              <PencilIcon className="size-3" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirming(true)}
-              className="flex size-5 items-center justify-center rounded text-muted-foreground/50 hover:text-destructive"
-            >
-              <Trash2Icon className="size-3" />
-            </button>
-          </div>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-1.5">
-        {room.floor != null && (
-          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-            Floor {room.floor}
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span className="flex items-center gap-1">
+            <UsersIcon className="size-3" />{room.max_occupancy} guests
           </span>
-        )}
-        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-          {room.max_occupancy} guests
-        </span>
-        <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-          ${room.base_price}
-        </span>
+          <span className="font-semibold text-foreground">${room.base_price}<span className="font-normal text-muted-foreground">/night base</span></span>
+        </div>
       </div>
+
+      {/* Pricing button — primary action */}
+      {!confirming && (
+        <Button size="sm" variant="outline" className="shrink-0 text-xs" onClick={onPricing}>
+          <CalendarDaysIcon className="size-3" />Set Pricing
+        </Button>
+      )}
+
+      {/* Edit / Delete */}
+      {confirming ? (
+        <div className="flex shrink-0 items-center gap-1">
+          <span className="text-xs text-muted-foreground">Delete?</span>
+          <Button size="icon-sm" variant="destructive" disabled={deleting} onClick={handleDelete}>
+            {deleting ? <Spinner className="size-3" /> : "✓"}
+          </Button>
+          <Button size="icon-sm" variant="outline" onClick={() => setConfirming(false)}>✕</Button>
+        </div>
+      ) : (
+        <div className="flex shrink-0 items-center gap-0.5">
+          <Button size="icon-sm" variant="ghost" onClick={onEdit}><PencilIcon /></Button>
+          <Button size="icon-sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setConfirming(true)}>
+            <Trash2Icon />
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
@@ -134,6 +124,9 @@ export default function RoomsPage() {
   const [roomDialogOpen, setRoomDialogOpen] = useState(false)
   const [roomDialogCategoryId, setRoomDialogCategoryId] = useState<number | null>(null)
   const [editingRoom, setEditingRoom] = useState<RoomSummary | null>(null)
+
+  const [pricingSheetOpen, setPricingSheetOpen] = useState(false)
+  const [pricingRoom, setPricingRoom] = useState<{ categoryId: number; room: RoomSummary } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -201,6 +194,11 @@ export default function RoomsPage() {
     } catch {
       toast.error("Failed to load room.")
     }
+  }
+
+  const openPricing = (categoryId: number, room: RoomSummary) => {
+    setPricingRoom({ categoryId, room })
+    setPricingSheetOpen(true)
   }
 
   const handleDeleteRoom = async (categoryId: number, roomId: number) => {
@@ -283,11 +281,12 @@ export default function RoomsPage() {
                   </Button>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                <div className="flex flex-col gap-2 p-3">
                   {rooms.map((room) => (
                     <RoomTile
                       key={room.id}
                       room={room}
+                      onPricing={() => openPricing(cat.id, room)}
                       onEdit={() => handleEditRoom(cat.id, room)}
                       onDelete={() => handleDeleteRoom(cat.id, room.id)}
                     />
@@ -316,6 +315,17 @@ export default function RoomsPage() {
           onOpenChange={setRoomDialogOpen}
           editing={editingRoom}
           onSuccess={load}
+        />
+      )}
+
+      {pricingRoom !== null && (
+        <RoomPricePeriodsSheet
+          open={pricingSheetOpen}
+          onOpenChange={setPricingSheetOpen}
+          resortId={resortId}
+          categoryId={pricingRoom.categoryId}
+          roomId={pricingRoom.room.id}
+          roomName={pricingRoom.room.name}
         />
       )}
     </div>

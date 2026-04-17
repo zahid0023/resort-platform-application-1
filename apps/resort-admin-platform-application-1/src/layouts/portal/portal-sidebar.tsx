@@ -62,13 +62,14 @@ const mainNavItems = [
 const resortNavItems = [
   { title: "Access Types", url: "/access-types", icon: CreditCardIcon },
   { title: "Room Categories", url: "/room-categories", icon: SettingsIcon },
+  { title: "Price Types", url: "/price-types", icon: CreditCardIcon },
 ];
 
 const commonNavItems = [
   { title: "Countries", url: "/countries", icon: GlobeIcon },
   { title: "Cities", url: "/cities", icon: GlobeIcon },
   { title: "Facility Groups", url: "/facility-groups", icon: FolderIcon },
-    { title: "Facilities", url: "/facilities", icon: FolderIcon },
+  { title: "Facilities", url: "/facilities", icon: FolderIcon },
 ];
 
 export function PortalSidebar() {
