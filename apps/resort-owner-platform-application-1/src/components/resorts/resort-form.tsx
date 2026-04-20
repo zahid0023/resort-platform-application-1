@@ -42,10 +42,10 @@ export function clearDraft(key: string) {
 }
 
 const selectClass =
-  "border-input focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full rounded-lg border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
+  "flex h-11 w-full rounded-xl border border-border bg-muted/40 px-4 py-2 text-sm outline-none transition-all duration-200 placeholder:text-muted-foreground/50 hover:border-foreground/20 hover:bg-muted/60 focus-visible:border-foreground/30 focus-visible:bg-background focus-visible:ring-4 focus-visible:ring-foreground/[0.06] disabled:cursor-not-allowed disabled:opacity-40 dark:bg-white/[0.04] dark:hover:bg-white/[0.07] dark:focus-visible:bg-white/[0.03]"
 
 const textareaClass =
-  "border-input focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-lg border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+  "flex w-full rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm outline-none transition-all duration-200 placeholder:text-muted-foreground/50 hover:border-foreground/20 hover:bg-muted/60 focus-visible:border-foreground/30 focus-visible:bg-background focus-visible:ring-4 focus-visible:ring-foreground/[0.06] disabled:cursor-not-allowed disabled:opacity-40 resize-none dark:bg-white/[0.04] dark:hover:bg-white/[0.07] dark:focus-visible:bg-white/[0.03]"
 
 function SectionCard({ icon, title, children }: {
   icon: React.ReactNode
@@ -53,14 +53,14 @@ function SectionCard({ icon, title, children }: {
   children: React.ReactNode
 }) {
   return (
-    <div className="rounded-xl border bg-card shadow-xs overflow-hidden">
-      <div className="flex items-center gap-2 border-b bg-muted/30 px-5 py-3">
+    <div className="rounded-2xl border bg-card shadow-xs overflow-hidden">
+      <div className="flex items-center gap-2.5 border-b bg-muted/20 px-5 py-3.5">
         <span className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary">
           {icon}
         </span>
-        <span className="text-sm font-medium">{title}</span>
+        <span className="text-sm font-medium tracking-wide">{title}</span>
       </div>
-      <div className="flex flex-col gap-4 p-5">{children}</div>
+      <div className="flex flex-col gap-5 p-5">{children}</div>
     </div>
   )
 }

@@ -4,7 +4,6 @@ import {
   BuildingIcon,
   GalleryHorizontalEndIcon,
   LayoutDashboardIcon,
-  LogOut,
   MapIcon,
   MapPinIcon,
   SparklesIcon,
@@ -12,7 +11,7 @@ import {
   ZapIcon,
 } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { LogoutButton } from "@/components/auth/logout-button"
 import {
   Sidebar,
   SidebarContent,
@@ -23,19 +22,15 @@ import {
   SidebarHeader,
   SidebarMenu,
   SidebarMenuItem,
-  SidebarMenuButton,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { SidebarMenuButtonActive } from "@/layouts/portal/sidebar-menu-button-active"
-import { logout } from "@/services/auth"
 
 interface ResortSidebarProps {
   resortId: string
 }
 
 export function ResortSidebar({ resortId }: ResortSidebarProps) {
-  const router = useRouter()
-
   const base = `/resorts/${resortId}`
 
   const mainNavItems = [
@@ -49,11 +44,6 @@ export function ResortSidebar({ resortId }: ResortSidebarProps) {
     { title: "Rooms", url: `${base}/rooms`, icon: BedDoubleIcon },
     { title: "Media", url: `${base}/media`, icon: GalleryHorizontalEndIcon },
   ]
-
-  const handleLogout = () => {
-    logout()
-    router.push("/login")
-  }
 
   return (
     <Sidebar collapsible="icon">
@@ -118,17 +108,7 @@ export function ResortSidebar({ resortId }: ResortSidebarProps) {
       </SidebarContent>
 
       <SidebarFooter className="border-t border-t-sidebar-border">
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={handleLogout}
-              className="text-destructive hover:text-destructive"
-            >
-              <LogOut />
-              <span>Log out</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <LogoutButton className="w-full text-destructive hover:text-destructive" />
       </SidebarFooter>
     </Sidebar>
   )

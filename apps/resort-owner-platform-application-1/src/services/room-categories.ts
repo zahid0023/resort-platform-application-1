@@ -18,6 +18,18 @@ export interface RoomCategoryListResponse {
   has_previous: boolean;
 }
 
+export interface CreateRoomCategoryRequest {
+  code: string;
+  name: string;
+  description?: string;
+  sort_order?: number;
+}
+
+export interface MutationResponse {
+  success: boolean;
+  id: number;
+}
+
 export const listRoomCategories = (
   params: { page?: number; size?: number } = {}
 ): Promise<RoomCategoryListResponse> => {
@@ -28,3 +40,8 @@ export const listRoomCategories = (
   query.set("sort_dir", "ASC");
   return api.get<RoomCategoryListResponse>(`/room-categories?${query.toString()}`);
 };
+
+export const createRoomCategory = (
+  body: CreateRoomCategoryRequest
+): Promise<MutationResponse> =>
+  api.post<MutationResponse>("/room-categories", body);
