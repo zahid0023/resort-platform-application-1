@@ -1,4 +1,7 @@
-import { api } from "./api";
+import { api, getToken } from "./api";
+import type { ImageHostingProvider } from "./resort-image-storage-configs";
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 export interface ResortSummary {
   id: number;
@@ -49,6 +52,11 @@ export interface CreateResortRequest {
   city_id?: number;
   contact_email?: string;
   contact_phone?: string;
+  storage_config: {
+    provider: ImageHostingProvider;
+    config: Record<string, string>;
+  };
+  images: Array<{ file: File; caption?: string; is_default: boolean; sort_order: number }>;
 }
 
 export interface UpdateResortRequest {
@@ -66,8 +74,58 @@ export interface MutationResponse {
   id: number;
 }
 
-export const createResort = (body: CreateResortRequest): Promise<Resort> =>
-  api.post<Resort>("/resorts", body);
+export const createResort = async (req: CreateResortRequest): Promise<MutationResponse> => {
+  const token = getToken();
+  const form = new FormData();
+
+  const data = {
+    name: req.name,
+    description: req.description,
+    country_id: req.country_id,
+    ...(req.city_id !== undefined ? { city_id: req.city_id } : {}),
+    ...(req.address ? { address: req.address } : {}),
+    ...(req.contact_email ? { contact_email: req.contact_email } : {}),
+    ...(req.contact_phone ? { contact_phone: req.contact_phone } : {}),
+    config_request: {
+      provider: req.storage_config.provider,
+      config: req.storage_config.config,
+    },
+    images: req.images.map(({ file, caption, is_default, sort_order }) => ({
+      client_image_id: file.name,
+      ...(caption ? { caption } : {}),
+      is_default,
+      sort_order,
+    })),
+  };
+
+  form.append("data", new Blob([JSON.stringify(data)], { type: "application/json" }));
+
+  req.images.forEach(({ file }) => {
+    form.append("images", file, file.name);
+  });
+
+  const res = await fetch(`${BASE_URL}/resorts`, {
+    method: "POST",
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: form,
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    let message = res.statusText;
+    try {
+      const json = JSON.parse(text);
+      message = json.message || json.error || text || res.statusText;
+    } catch {
+      message = text || res.statusText;
+    }
+    throw new Error(message || `Request failed: ${res.status}`);
+  }
+
+  return res.json();
+};
 
 export const listResorts = (params: ListParams = {}): Promise<ResortListResponse> => {
   const query = new URLSearchParams();

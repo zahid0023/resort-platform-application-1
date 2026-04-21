@@ -12,13 +12,17 @@ import {
   Check, CheckCircle2, ChevronLeft, ChevronRight,
   CircleDashed, MapPin, Sparkles, Mail, Phone,
   Home, Globe2, Building2, Trash2, ImagePlus, X, Images,
+  HardDrive, Cloud, Loader2,
 } from "lucide-react"
 import { createResort } from "@/services/resorts"
 import { listCountries, type CountrySummary } from "@/services/countries"
 import { listCities, type CitySummary } from "@/services/cities"
+import {
+  PROVIDER_FIELDS,
+  type ImageHostingProvider,
+} from "@/services/resort-image-storage-configs"
 import hero from "@/assets/hero-resort.jpg"
 
-const STEPS = ["Essence", "Location", "Contact"] as const
 const DRAFT_KEY = "resort_create_dialog_draft"
 
 type DraftState = {
@@ -41,37 +45,62 @@ interface ResortDialogProps {
 export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProps) {
   const router = useRouter()
   const [step, setStep] = useState(0)
+
+  // Step 0 — Essence
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
-  const [address, setAddress] = useState("")
-  const [countryId, setCountryId] = useState("")
-  const [cityId, setCityId] = useState("")
-  const [contactEmail, setContactEmail] = useState("")
-  const [contactPhone, setContactPhone] = useState("")
   const [images, setImages] = useState<File[]>([])
   const [imageUrls, setImageUrls] = useState<string[]>([])
   const [coverIndex, setCoverIndex] = useState(0)
   const [dragOver, setDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const [submitting, setSubmitting] = useState(false)
+
+  // Step 1 — Location
+  const [address, setAddress] = useState("")
+  const [countryId, setCountryId] = useState("")
+  const [cityId, setCityId] = useState("")
+
+  // Step 2 — Contact
+  const [contactEmail, setContactEmail] = useState("")
+  const [contactPhone, setContactPhone] = useState("")
+
+  // Step 3 — Image Storage (only when images uploaded)
+  const [storageProvider, setStorageProvider] = useState<ImageHostingProvider | "">("")
+  const [storageConfig, setStorageConfig] = useState<Record<string, string>>({})
+
+  // Submission
+  const [submitProgress, setSubmitProgress] = useState("")
+
+  // Data
   const [countries, setCountries] = useState<CountrySummary[]>([])
   const [allCities, setAllCities] = useState<CitySummary[]>([])
   const [citiesLoading, setCitiesLoading] = useState(false)
+
+  // Draft
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null)
   const [draftFlash, setDraftFlash] = useState(false)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstRender = useRef(true)
 
-  // Revoke object URLs when images change to avoid memory leaks
+  const steps = ["Essence", "Location", "Contact", "Storage"]
+
+  // Object URLs
   useEffect(() => {
     const urls = images.map((f) => URL.createObjectURL(f))
     setImageUrls(urls)
     return () => { urls.forEach((u) => URL.revokeObjectURL(u)) }
   }, [images])
 
-  // Load draft when dialog opens
+  // Reset state and load draft when dialog opens
   useEffect(() => {
     if (!open) return
+    // Always reset to clean slate first
+    setStep(0); setName(""); setDescription(""); setAddress("")
+    setCountryId(""); setCityId(""); setContactEmail(""); setContactPhone("")
+    setImages([]); setCoverIndex(0)
+    setStorageProvider(""); setStorageConfig({})
+    setDraftSavedAt(null)
+    // Then restore draft if one exists
     try {
       const raw = localStorage.getItem(DRAFT_KEY)
       if (raw) {
@@ -90,7 +119,7 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
     isFirstRender.current = true
   }, [open])
 
-  // Auto-save draft on field changes (images are not saved to localStorage)
+  // Auto-save draft
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return }
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
@@ -127,38 +156,26 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
   const countryName = countries.find((c) => String(c.id) === countryId)?.name
   const cityName = availableCities.find((c) => String(c.id) === cityId)?.name
   const previewLocation = [cityName, countryName].filter(Boolean).join(", ")
-
   const hasDraft = !!(name || description || address || countryId || contactEmail || contactPhone)
 
   const discardDraft = () => {
     localStorage.removeItem(DRAFT_KEY)
     setDraftSavedAt(null)
     isFirstRender.current = true
-    setStep(0)
-    setName("")
-    setDescription("")
-    setAddress("")
-    setCountryId("")
-    setCityId("")
-    setContactEmail("")
-    setContactPhone("")
-    setImages([])
-    setCoverIndex(0)
+    setStep(0); setName(""); setDescription(""); setAddress("")
+    setCountryId(""); setCityId(""); setContactEmail(""); setContactPhone("")
+    setImages([]); setCoverIndex(0)
+    setStorageProvider(""); setStorageConfig({})
   }
 
   const reset = () => {
     localStorage.removeItem(DRAFT_KEY)
     setDraftSavedAt(null)
-    setStep(0)
-    setName("")
-    setDescription("")
-    setAddress("")
-    setCountryId("")
-    setCityId("")
-    setContactEmail("")
-    setContactPhone("")
-    setImages([])
-    setCoverIndex(0)
+    setStep(0); setName(""); setDescription(""); setAddress("")
+    setCountryId(""); setCityId(""); setContactEmail(""); setContactPhone("")
+    setImages([]); setCoverIndex(0)
+    setStorageProvider(""); setStorageConfig({})
+    setSubmitProgress("")
   }
 
   const MAX_IMAGES = 4
@@ -187,39 +204,55 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
   }, [])
 
   const close = (v: boolean) => {
-    if (!v) reset()
     onOpenChange(v)
   }
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)
 
+  const storageConfigValid = useMemo(() => {
+    if (!storageProvider) return false
+    const fields = PROVIDER_FIELDS[storageProvider]
+    return fields.every((f) => (storageConfig[f.key] ?? "").trim() !== "")
+  }, [storageProvider, storageConfig])
+
   const canNext =
-    (step === 0 && name.trim() && description.trim()) ||
-    (step === 1 && address.trim() && countryId && cityId) ||
-    (step === 2 && emailValid && contactPhone.trim())
+    (step === 0 && !!name.trim() && !!description.trim() && images.length > 0) ||
+    (step === 1 && !!address.trim() && !!countryId && !!cityId) ||
+    (step === 2 && emailValid && !!contactPhone.trim()) ||
+    (step === 3 && storageConfigValid)
+
+  const isLastStep = step === steps.length - 1
+  const submitting = !!submitProgress
 
   const handleSubmit = async () => {
     if (!canNext) return
-    setSubmitting(true)
+
     try {
-      const resort = await createResort({
+      setSubmitProgress("Creating resort…")
+      const result = await createResort({
         name: name.trim(),
         description: description.trim(),
         country_id: Number(countryId),
         ...(cityId ? { city_id: Number(cityId) } : {}),
-        ...(address ? { address } : {}),
+        ...(address ? { address: address.trim() } : {}),
         ...(contactEmail ? { contact_email: contactEmail.trim() } : {}),
         ...(contactPhone ? { contact_phone: contactPhone.trim() } : {}),
+        storage_config: {
+          provider: storageProvider as ImageHostingProvider,
+          config: storageConfig,
+        },
+        images: images.map((file, i) => ({ file, is_default: i === coverIndex, sort_order: i })),
       })
+
       localStorage.removeItem(DRAFT_KEY)
       toast.success("Resort created!")
       onSuccess()
       close(false)
-      router.push(`/resorts/${resort.id}/dashboard`)
+      router.push(`/resorts/${result.id}/dashboard`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong.")
     } finally {
-      setSubmitting(false)
+      setSubmitProgress("")
     }
   }
 
@@ -241,30 +274,22 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
               alt="Resort cover preview"
               className="absolute inset-0 h-full w-full object-cover transition-all duration-700 ease-in-out"
             />
-
             <div className="absolute inset-0 bg-gradient-to-b from-primary/30 via-primary/40 to-primary/90" />
-
             <div className="relative h-full flex flex-col justify-between p-6 text-primary-foreground">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.3em] opacity-80">New destination</p>
               </div>
-
               <div className="space-y-3">
                 <p className="text-xl font-semibold leading-tight line-clamp-2">
                   {name || "Resort name"}
                 </p>
-
-                {(description) && (
-                  <p className="text-xs opacity-75 line-clamp-3 leading-relaxed">
-                    {description}
-                  </p>
+                {description && (
+                  <p className="text-xs opacity-75 line-clamp-3 leading-relaxed">{description}</p>
                 )}
-
                 <div className="flex items-center gap-1.5 text-xs opacity-80">
                   <MapPin className="h-3 w-3 shrink-0" />
                   <span className="line-clamp-1">{previewLocation || "Location"}</span>
                 </div>
-
                 {(contactEmail || contactPhone) && (
                   <div className="flex flex-col gap-1">
                     {contactEmail && (
@@ -281,11 +306,10 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                     )}
                   </div>
                 )}
-
                 <div className="pt-3 border-t border-primary-foreground/20 flex items-center justify-between text-xs">
                   <span className="opacity-70">Step</span>
                   <span className="text-base font-semibold">
-                    {step + 1}<span className="opacity-50">/{STEPS.length}</span>
+                    {step + 1}<span className="opacity-50">/{steps.length}</span>
                   </span>
                 </div>
               </div>
@@ -298,7 +322,7 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
             {/* Progress */}
             <div className="px-8 pt-7">
               <div className="flex items-center gap-2 mb-6">
-                {STEPS.map((label, i) => (
+                {steps.map((label, i) => (
                   <div key={label} className="flex items-center gap-2 flex-1">
                     <div className={cn(
                       "h-7 w-7 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-500 shrink-0",
@@ -308,7 +332,7 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                     )}>
                       {i < step ? <Check className="h-3.5 w-3.5" /> : i + 1}
                     </div>
-                    {i < STEPS.length - 1 && (
+                    {i < steps.length - 1 && (
                       <div className={cn(
                         "h-px flex-1 transition-colors duration-500",
                         i < step ? "bg-primary" : "bg-border",
@@ -317,19 +341,19 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                   </div>
                 ))}
               </div>
-
-              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">{STEPS[step]}</p>
-
+              <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground">{steps[step]}</p>
               <h2 className="text-3xl font-semibold mt-1">
                 {step === 0 && "Name your sanctuary"}
                 {step === 1 && "Where to find it"}
                 {step === 2 && "How guests reach you"}
+                {step === 3 && "Secure your images"}
               </h2>
             </div>
 
             {/* Body */}
             <div className="px-8 py-6 flex-1 overflow-y-auto">
 
+              {/* ── Step 0: Essence ── */}
               {step === 0 && (
                 <div className="space-y-5">
                   <div className="space-y-2">
@@ -340,7 +364,6 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                       className="h-12 text-base"
                     />
                   </div>
-
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <Label htmlFor="description" className="flex items-center gap-2">
@@ -351,7 +374,6 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                         {description.length} / 280
                       </span>
                     </div>
-                    
                     <textarea
                       id="description" value={description}
                       onChange={(e) => setDescription(e.target.value)}
@@ -359,75 +381,49 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                       maxLength={280} rows={4} className={textareaClass}
                     />
                   </div>
-
                   <div className="space-y-3">
                     <Label className="flex items-center gap-2">
                       <Images className="h-3.5 w-3.5 text-muted-foreground" />
-                      Photos
+                      Photos <span className="text-destructive">*</span>
                     </Label>
-
-                    {/* Upload zone — only shown when no images yet */}
                     {images.length === 0 && (
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      aria-label="Upload images"
-                      onClick={() => fileInputRef.current?.click()}
-                      onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
-                      onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-                      onDragLeave={() => setDragOver(false)}
-                      onDrop={(e) => {
-                        e.preventDefault()
-                        setDragOver(false)
-                        addFiles(e.dataTransfer.files)
-                      }}
-                      className={cn(
-                        "flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 cursor-pointer transition-colors duration-200",
-                        dragOver
-                          ? "border-primary bg-primary/5"
-                          : "border-border hover:border-foreground/30 hover:bg-muted/40",
-                      )}
-                    >
-                      <ImagePlus className="h-6 w-6 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground text-center">
-                        <span className="font-medium text-foreground">Click to upload</span>{" "}
-                        or drag &amp; drop
-                      </p>
-                      <p className="text-xs text-muted-foreground/60">PNG, JPG, WEBP · up to {MAX_IMAGES} photos</p>
-                    </div>
+                      <div
+                        role="button" tabIndex={0} aria-label="Upload images"
+                        onClick={() => fileInputRef.current?.click()}
+                        onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
+                        onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                        onDragLeave={() => setDragOver(false)}
+                        onDrop={(e) => { e.preventDefault(); setDragOver(false); addFiles(e.dataTransfer.files) }}
+                        className={cn(
+                          "flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 cursor-pointer transition-colors duration-200",
+                          dragOver ? "border-primary bg-primary/5" : "border-border hover:border-foreground/30 hover:bg-muted/40",
+                        )}
+                      >
+                        <ImagePlus className="h-6 w-6 text-muted-foreground" />
+                        <p className="text-sm text-muted-foreground text-center">
+                          <span className="font-medium text-foreground">Click to upload</span>{" "}or drag &amp; drop
+                        </p>
+                        <p className="text-xs text-muted-foreground/60">PNG, JPG, WEBP · up to {MAX_IMAGES} photos</p>
+                      </div>
                     )}
                     <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      className="sr-only"
+                      ref={fileInputRef} type="file" accept="image/*" multiple className="sr-only"
                       onChange={(e) => addFiles(e.target.files)}
                     />
-
-                    {/* Thumbnails */}
                     {imageUrls.length > 0 && (
                       <div className="grid grid-cols-4 gap-2">
                         {imageUrls.map((url, i) => (
                           <div
-                            key={url}
-                            role="button"
-                            tabIndex={0}
+                            key={url} role="button" tabIndex={0}
                             aria-label={`Select as cover${i === coverIndex ? " (current cover)" : ""}`}
                             onClick={() => setCoverIndex(i)}
                             onKeyDown={(e) => e.key === "Enter" && setCoverIndex(i)}
                             className={cn(
                               "group relative aspect-square rounded-lg overflow-hidden cursor-pointer transition-all duration-200",
-                              i === coverIndex
-                                ? "ring-2 ring-primary ring-offset-2"
-                                : "ring-1 ring-border hover:ring-foreground/30",
+                              i === coverIndex ? "ring-2 ring-primary ring-offset-2" : "ring-1 ring-border hover:ring-foreground/30",
                             )}
                           >
-                            <img
-                              src={url}
-                              alt={images[i]?.name}
-                              className="absolute inset-0 h-full w-full object-cover"
-                            />
+                            <img src={url} alt={images[i]?.name} className="absolute inset-0 h-full w-full object-cover" />
                             {i === coverIndex && (
                               <div className="absolute bottom-0 inset-x-0 bg-primary/80 text-primary-foreground text-[9px] uppercase tracking-[0.2em] text-center py-0.5">
                                 Cover
@@ -443,7 +439,6 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                             </button>
                           </div>
                         ))}
-                        {/* Add more button */}
                         {images.length < MAX_IMAGES && (
                           <button
                             type="button"
@@ -460,6 +455,7 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                 </div>
               )}
 
+              {/* ── Step 1: Location ── */}
               {step === 1 && (
                 <div className="space-y-5">
                   <div className="grid sm:grid-cols-2 gap-4">
@@ -468,8 +464,7 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                         <Globe2 className="h-3.5 w-3.5 text-muted-foreground" />
                         Country
                       </Label>
-                      <select
-                        id="country" value={countryId}
+                      <select id="country" value={countryId}
                         onChange={(e) => { setCountryId(e.target.value); setCityId("") }}
                         className={selectClass}
                       >
@@ -484,8 +479,7 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                         <Building2 className="h-3.5 w-3.5 text-muted-foreground" />
                         City
                       </Label>
-                      <select
-                        id="city" value={cityId}
+                      <select id="city" value={cityId}
                         onChange={(e) => setCityId(e.target.value)}
                         disabled={!countryId || citiesLoading}
                         className={selectClass}
@@ -499,7 +493,6 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                       </select>
                     </div>
                   </div>
-
                   <div className="space-y-2">
                     <Label htmlFor="address" className="flex items-center gap-2">
                       <Home className="h-3.5 w-3.5 text-muted-foreground" />
@@ -510,21 +503,19 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                       placeholder="123 Lagoon Road, Beachfront" maxLength={160} className="h-12"
                     />
                   </div>
-
                   {previewLocation && (
                     <div className="p-4 rounded-xl bg-muted/50 border border-border/50 flex items-start gap-3">
                       <MapPin className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
                       <div className="text-sm">
                         <p className="font-medium">{previewLocation}</p>
-                        {address && (
-                          <p className="text-muted-foreground text-xs mt-0.5">{address}</p>
-                        )}
+                        {address && <p className="text-muted-foreground text-xs mt-0.5">{address}</p>}
                       </div>
                     </div>
                   )}
                 </div>
               )}
 
+              {/* ── Step 2: Contact ── */}
               {step === 2 && (
                 <div className="space-y-5">
                   <div className="space-y-2">
@@ -552,7 +543,72 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                       placeholder="+1 555 123 4567" className="h-12"
                     />
                   </div>
+                </div>
+              )}
 
+              {/* ── Step 3: Image Storage ── */}
+              {step === 3 && (
+                <div className="space-y-6">
+                  <p className="text-sm text-muted-foreground">
+                    Choose where your resort images will be stored. This configuration is saved per resort.
+                  </p>
+
+                  {/* Provider picker */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {(["S3", "CLOUDINARY"] as ImageHostingProvider[]).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => {
+                          setStorageProvider(p)
+                          setStorageConfig({})
+                        }}
+                        className={cn(
+                          "flex flex-col items-center gap-3 rounded-xl border-2 p-5 transition-all duration-200",
+                          storageProvider === p
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:border-foreground/20 hover:bg-muted/40",
+                        )}
+                      >
+                        {p === "S3"
+                          ? <HardDrive className={cn("h-7 w-7", storageProvider === p ? "text-primary" : "text-muted-foreground")} />
+                          : <Cloud className={cn("h-7 w-7", storageProvider === p ? "text-primary" : "text-muted-foreground")} />
+                        }
+                        <div className="text-center">
+                          <p className={cn("text-sm font-semibold", storageProvider === p ? "text-primary" : "text-foreground")}>
+                            {p === "S3" ? "Amazon S3" : "Cloudinary"}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {p === "S3" ? "S3-compatible storage" : "Cloud media platform"}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Config fields */}
+                  {storageProvider && (
+                    <div className="space-y-4">
+                      <p className="text-xs uppercase tracking-[0.25em] text-muted-foreground">
+                        {storageProvider === "S3" ? "Amazon S3 configuration" : "Cloudinary configuration"}
+                      </p>
+                      {PROVIDER_FIELDS[storageProvider].map((field) => (
+                        <div key={field.key} className="space-y-1.5">
+                          <Label htmlFor={`cfg-${field.key}`}>{field.label}</Label>
+                          <Input
+                            id={`cfg-${field.key}`}
+                            type={field.secret ? "password" : "text"}
+                            value={storageConfig[field.key] ?? ""}
+                            onChange={(e) =>
+                              setStorageConfig((prev) => ({ ...prev, [field.key]: e.target.value }))
+                            }
+                            className="h-11 font-mono text-sm"
+                            autoComplete="off"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -563,6 +619,7 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
               <Button
                 type="button" variant="ghost"
                 onClick={() => step === 0 ? close(false) : setStep(step - 1)}
+                disabled={submitting}
                 className="text-muted-foreground hover:text-foreground shrink-0"
               >
                 <ChevronLeft className="h-4 w-4 mr-1" />
@@ -570,7 +627,7 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
               </Button>
 
               {/* Draft indicator */}
-              {hasDraft && draftSavedAt && (
+              {hasDraft && draftSavedAt && !submitting && (
                 <div className="flex items-center gap-2 min-w-0">
                   <div className={cn(
                     "flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-all duration-500 shrink-0",
@@ -586,17 +643,23 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                     }
                   </div>
                   <button
-                    type="button"
-                    onClick={discardDraft}
+                    type="button" onClick={discardDraft}
                     className="shrink-0 flex items-center gap-1 text-xs text-muted-foreground/60 hover:text-destructive transition-colors"
                   >
-                    <Trash2 className="size-3" />
-                    Discard
+                    <Trash2 className="size-3" /> Discard
                   </button>
                 </div>
               )}
 
-              {step < STEPS.length - 1 ? (
+              {/* Submit progress indicator */}
+              {submitting && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground min-w-0">
+                  <Loader2 className="size-4 animate-spin shrink-0" />
+                  <span className="truncate">{submitProgress}</span>
+                </div>
+              )}
+
+              {!isLastStep ? (
                 <Button
                   type="button"
                   onClick={() => canNext && setStep(step + 1)}
@@ -613,8 +676,10 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                   disabled={!canNext || submitting}
                   className="min-w-[140px] shrink-0"
                 >
-                  <Sparkles className="h-4 w-4 mr-1" />
-                  {submitting ? "Creating…" : "Add resort"}
+                  {submitting
+                    ? <Loader2 className="h-4 w-4 animate-spin" />
+                    : <><Sparkles className="h-4 w-4 mr-1" /> Add resort</>
+                  }
                 </Button>
               )}
             </div>
