@@ -68,8 +68,7 @@ const resortNavItems = [
 const commonNavItems = [
   { title: "Countries", url: "/countries", icon: GlobeIcon },
   { title: "Cities", url: "/cities", icon: GlobeIcon },
-  { title: "Facility Groups", url: "/facility-groups", icon: FolderIcon },
-  { title: "Facilities", url: "/facilities", icon: FolderIcon },
+  { title: "Facilities", url: "/facility-groups", icon: FolderIcon },
 ];
 
 export function PortalSidebar() {

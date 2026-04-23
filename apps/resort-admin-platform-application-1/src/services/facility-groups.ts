@@ -1,19 +1,27 @@
 import { api } from "./api";
 
+export type IconType = "LUCIDE" | "IMAGE" | "SVG" | "EXTERNAL";
+
 export interface FacilityGroupSummary {
   id: number;
   code: string;
   name: string;
-  description: string;
+  description?: string;
   sort_order: number;
+  icon_type: IconType;
+  icon_value: string;
+  icon_meta?: Record<string, unknown>;
 }
 
 export interface FacilityGroup {
   id: number;
   code: string;
   name: string;
-  description: string;
+  description?: string;
   sort_order: number;
+  icon_type: IconType;
+  icon_value: string;
+  icon_meta?: Record<string, unknown>;
 }
 
 export interface FacilityGroupListResponse {
@@ -31,6 +39,9 @@ export interface CreateFacilityGroupRequest {
   name: string;
   description?: string;
   sort_order?: number;
+  icon_type: IconType;
+  icon_value: string;
+  icon_meta?: Record<string, unknown>;
 }
 
 export interface UpdateFacilityGroupRequest {
@@ -38,6 +49,9 @@ export interface UpdateFacilityGroupRequest {
   name?: string;
   description?: string;
   sort_order?: number;
+  icon_type?: IconType;
+  icon_value?: string;
+  icon_meta?: Record<string, unknown>;
 }
 
 export interface MutationResponse {
@@ -67,8 +81,11 @@ export const getFacilityGroup = (id: number): Promise<{ data: FacilityGroup }> =
 export const createFacilityGroup = (body: CreateFacilityGroupRequest): Promise<MutationResponse> =>
   api.post<MutationResponse>("/facility-groups", body);
 
-export const updateFacilityGroup = (id: number, body: UpdateFacilityGroupRequest): Promise<{ data: FacilityGroup }> =>
-  api.put<{ data: FacilityGroup }>(`/facility-groups/${id}`, body);
+export const updateFacilityGroup = (id: number, body: UpdateFacilityGroupRequest): Promise<MutationResponse> =>
+  api.put<MutationResponse>(`/facility-groups/${id}`, body);
 
 export const deleteFacilityGroup = (id: number): Promise<MutationResponse> =>
   api.delete<MutationResponse>(`/facility-groups/${id}`);
+
+export const getIconTypes = (): Promise<IconType[]> =>
+  api.get<IconType[]>("/facility-groups/icon-types");

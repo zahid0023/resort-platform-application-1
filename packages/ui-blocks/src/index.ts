@@ -30,6 +30,11 @@ export {
   type AllowedPageKey,
 } from "./registry";
 
+// Icon renderers
+export { LucideIconRenderer } from "./components/lucide-icon-renderer.tsx";
+export type { LucideIconProps as LucideIconRendererProps } from "./components/lucide-icon-renderer.tsx";
+export { default as LucideIconPicker } from "./components/lucide-icon-picker";
+
 // Renderers — usable in any Next.js app
 export { UIBlockRenderer } from "./components/ui-block-renderer";
 export { UIBlockGallery } from "./components/ui-block-gallery";

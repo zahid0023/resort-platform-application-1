@@ -42,7 +42,7 @@ export default function ResortsPage() {
 
       {/* ── Sticky header ── */}
       <header className="border-b border-border bg-background/60 backdrop-blur-md sticky top-0 z-30">
-        <div className="container flex items-center justify-between py-5">
+        <div className="container flex items-center justify-between py-5 px-5">
 
           <div className="flex items-center gap-3">
             <div className="h-2 w-2 rounded-full bg-accent" />
@@ -51,7 +51,7 @@ export default function ResortsPage() {
             </span>
           </div>
 
-            <LogoutButton className="text-muted-foreground hover:text-foreground" />
+          <LogoutButton className="text-muted-foreground hover:text-foreground" />
 
         </div>
       </header>
@@ -67,7 +67,7 @@ export default function ResortsPage() {
           <em className="font-normal italic text-muted-foreground">extraordinary</em>{" "}
           places.
         </h1>
-        
+
         {!loading && (
           <p className="mt-5 text-sm text-muted-foreground">
             {total} {total === 1 ? "destination" : "destinations"} in your portfolio.

@@ -4,69 +4,96 @@ import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Field, FieldGroup, FieldLabel, FieldDescription } from "@/components/ui/field"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
 } from "@/components/ui/dialog"
-import { createFacility, updateFacility, type Facility } from "@/services/facilities"
-import { listFacilityGroups, type FacilityGroupSummary } from "@/services/facility-groups"
+import { createFacility, updateFacility, type Facility, type IconType } from "@/services/facilities"
+import { EntityCardPreview } from "@/components/shared/entity-card-preview"
+import { EntityIconFields, type IconFormState } from "@/components/shared/entity-icon-fields"
 
 interface FacilityDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  facilityGroupId: number
   editing: Facility | null
   onSuccess: () => void
 }
 
-const empty = { facility_group_id: "", code: "", name: "", description: "", type: "", icon: "" }
+interface FormState extends IconFormState {
+  code: string
+  name: string
+  description: string
+  sort_order: number
+}
 
-export function FacilityDialog({ open, onOpenChange, editing, onSuccess }: FacilityDialogProps) {
-  const [form, setForm] = useState(empty)
-  const [loading, setLoading] = useState(false)
-  const [groups, setGroups] = useState<FacilityGroupSummary[]>([])
+const emptyForm: FormState = {
+  code: "", name: "", description: "", sort_order: 0,
+  icon_type: "", icon_value: "", icon_color: "", icon_size: "",
+}
 
-  useEffect(() => {
-    listFacilityGroups({ size: 50, sort_by: "name", sort_dir: "ASC" })
-      .then((res) => setGroups(res.data))
-      .catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    if (editing) {
-      setForm({
-        facility_group_id: String(editing.facility_group_id),
-        code: editing.code,
-        name: editing.name,
-        description: editing.description ?? "",
-        type: editing.type,
-        icon: editing.icon ?? "",
-      })
-    } else {
-      setForm(empty)
-    }
-  }, [editing, open])
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+const toFormState = (item: Facility | null): FormState => {
+  if (!item) return emptyForm
+  const meta = item.icon_meta ?? {}
+  const color = typeof meta.color === "string" ? meta.color : ""
+  const sizeRaw = meta.size
+  const size = typeof sizeRaw === "number" ? String(sizeRaw) : typeof sizeRaw === "string" ? sizeRaw : ""
+  return {
+    code: item.code,
+    name: item.name,
+    description: item.description ?? "",
+    sort_order: item.sort_order ?? 0,
+    icon_type: item.icon_type,
+    icon_value: item.icon_value,
+    icon_color: color,
+    icon_size: size,
   }
+}
+
+export function FacilityDialog({ open, onOpenChange, facilityGroupId, editing, onSuccess }: FacilityDialogProps) {
+  const [form, setForm] = useState<FormState>(() => toFormState(editing))
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (open) {
+      setForm(toFormState(editing))
+      setLoading(false)
+    }
+  }, [open, editing])
+
+  const set = (patch: Partial<FormState>) => setForm((prev) => ({ ...prev, ...patch }))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!form.icon_type) {
+      toast.error("Select an icon type", { description: "Please choose an icon type before saving." })
+      return
+    }
+    if (!form.icon_value) {
+      toast.error(
+        form.icon_type === "LUCIDE" ? "Pick an icon" : "Icon value required",
+        { description: form.icon_type === "LUCIDE" ? "Please select a Lucide icon below." : "Please enter an icon value." },
+      )
+      return
+    }
+    let icon_meta: Record<string, unknown> | undefined
+    if (form.icon_color || form.icon_size) {
+      icon_meta = {}
+      if (form.icon_color) icon_meta.color = form.icon_color
+      if (form.icon_size) icon_meta.size = Number(form.icon_size)
+    }
     setLoading(true)
     try {
       const payload = {
-        facility_group_id: Number(form.facility_group_id),
+        facility_group_id: facilityGroupId,
         code: form.code,
         name: form.name,
-        type: form.type,
-        ...(form.description && { description: form.description }),
-        ...(form.icon && { icon: form.icon }),
+        description: form.description || undefined,
+        sort_order: form.sort_order,
+        icon_type: form.icon_type as IconType,
+        icon_value: form.icon_value,
+        icon_meta,
       }
       if (editing) {
         await updateFacility(editing.id, payload)
@@ -86,113 +113,80 @@ export function FacilityDialog({ open, onOpenChange, editing, onSuccess }: Facil
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{editing ? "Edit Facility" : "Create Facility"}</DialogTitle>
-          <DialogDescription>
-            {editing
-              ? "Update the details of this facility."
-              : "Add a new facility to the system."}
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="gap-0 p-0 sm:max-w-lg overflow-hidden">
+        <form onSubmit={handleSubmit} className="flex flex-col max-h-[90vh]">
+          <DialogHeader className="shrink-0 space-y-3 border-b border-border/50 bg-background/95 px-6 pt-6 pb-4 backdrop-blur-md">
+            <DialogTitle>{editing ? "Edit Facility" : "New Facility"}</DialogTitle>
+            <DialogDescription>
+              {editing ? "Update the details of this facility." : "Create a new facility within this group."}
+            </DialogDescription>
+            <EntityCardPreview
+              name={form.name}
+              code={form.code}
+              description={form.description}
+              sort_order={form.sort_order}
+              icon_type={form.icon_type}
+              icon_value={form.icon_value}
+              icon_color={form.icon_color}
+              id={editing?.id}
+              namePlaceholder="Untitled facility"
+            />
+          </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <FieldGroup>
-            <Field>
-              <FieldLabel htmlFor="facility_group_id">Facility Group</FieldLabel>
-              <select
-                id="facility_group_id"
-                name="facility_group_id"
-                value={form.facility_group_id}
-                onChange={handleChange}
-                required
-                className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-lg border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">Select a group…</option>
-                {groups.map((g) => (
-                  <option key={g.id} value={g.id}>{g.name}</option>
-                ))}
-              </select>
-            </Field>
+          <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-6 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="code">Code</Label>
+                <Input
+                  id="code"
+                  value={form.code}
+                  onChange={(e) => set({ code: e.target.value.toUpperCase().replace(/[^A-Z0-9_\s]/g, "").replace(/\s+/g, "_").replace(/_+/g, "_") })}
+                  placeholder="POOL_OUTDOOR"
+                  maxLength={100}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sort_order">Sort Order</Label>
+                <Input
+                  id="sort_order"
+                  type="number"
+                  value={form.sort_order}
+                  onChange={(e) => set({ sort_order: Number(e.target.value) })}
+                />
+              </div>
+            </div>
 
-            <Field>
-              <FieldLabel htmlFor="code">Code</FieldLabel>
-              <Input
-                id="code"
-                name="code"
-                value={form.code}
-                onChange={handleChange}
-                placeholder="POOL_OUTDOOR"
-                maxLength={50}
-                required
-              />
-              <FieldDescription>Short identifier code (e.g. POOL_OUTDOOR, GYM, SPA).</FieldDescription>
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor="name">Name</FieldLabel>
+            <div className="space-y-2">
+              <Label htmlFor="name">Name</Label>
               <Input
                 id="name"
-                name="name"
                 value={form.name}
-                onChange={handleChange}
+                onChange={(e) => set({ name: e.target.value })}
                 placeholder="Outdoor Pool"
                 maxLength={255}
                 required
               />
-            </Field>
+            </div>
 
-            <Field>
-              <FieldLabel htmlFor="type">Type</FieldLabel>
-              <Input
-                id="type"
-                name="type"
-                value={form.type}
-                onChange={handleChange}
-                placeholder="OUTDOOR"
-                maxLength={30}
-                required
-              />
-              <FieldDescription>Category type (e.g. INDOOR, OUTDOOR).</FieldDescription>
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor="description">Description</FieldLabel>
-              <textarea
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
                 id="description"
-                name="description"
                 value={form.description}
-                onChange={handleChange}
-                placeholder="e.g. A large outdoor swimming pool with sun loungers."
+                onChange={(e) => set({ description: e.target.value })}
+                placeholder="Optional description..."
                 rows={3}
-                className="border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex w-full rounded-lg border bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50"
               />
-            </Field>
+            </div>
 
-            <Field>
-              <FieldLabel htmlFor="icon">Icon</FieldLabel>
-              <Input
-                id="icon"
-                name="icon"
-                value={form.icon}
-                onChange={handleChange}
-                placeholder="icon-pool"
-                maxLength={255}
-              />
-              <FieldDescription>Icon identifier or URL for the facility.</FieldDescription>
-            </Field>
-          </FieldGroup>
+            <EntityIconFields value={form} onChange={set} />
+          </div>
 
-          <DialogFooter>
-            <DialogClose asChild>
-              <Button type="button" variant="outline" disabled={loading}>
-                Cancel
-              </Button>
-            </DialogClose>
+          <DialogFooter className="shrink-0 border-t border-border/50 bg-background/95 px-6 py-4 backdrop-blur-md">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button type="submit" disabled={loading}>
-              {loading
-                ? editing ? "Saving..." : "Creating..."
-                : editing ? "Save Changes" : "Create"}
+              {loading ? (editing ? "Saving..." : "Creating...") : (editing ? "Save changes" : "Create")}
             </Button>
           </DialogFooter>
         </form>

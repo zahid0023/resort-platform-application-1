@@ -1,69 +1,113 @@
-"use client"
+"use client";
 
-import { useCallback, useEffect, useState } from "react"
-import { toast } from "sonner"
-import { PlusIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
-import { FacilityGroupDialog } from "@/components/facility-groups/facility-group-dialog"
-import { FacilityGroupCard } from "@/components/facility-groups/facility-group-card"
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
+import { PlusIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import { FacilityGroupCard } from "@/components/facility-groups/facility-group-card";
+import {
+  FacilityGroupDialog,
+  type FacilityGroupDialogMode,
+  type FacilityGroupFormPayload,
+} from "@/components/facility-groups/facility-group-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   listFacilityGroups,
   getFacilityGroup,
+  createFacilityGroup,
+  updateFacilityGroup,
   deleteFacilityGroup,
   type FacilityGroupSummary,
-  type FacilityGroup,
   type FacilityGroupListResponse,
-} from "@/services/facility-groups"
+} from "@/services/facility-groups";
 
 export default function FacilityGroupsPage() {
-  const [data, setData] = useState<FacilityGroupListResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(0)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editing, setEditing] = useState<FacilityGroup | null>(null)
+  const [data, setData] = useState<FacilityGroupListResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(0);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<FacilityGroupDialogMode>("create");
+  const [activeItem, setActiveItem] = useState<FacilityGroupSummary | null>(null);
+  const [deleteId, setDeleteId] = useState<number | null>(null);
 
   const fetchList = useCallback(async () => {
-    setLoading(true)
+    setLoading(true);
     try {
-      setData(await listFacilityGroups({ page, size: 10, sort_by: "id", sort_dir: "ASC" }))
+      setData(await listFacilityGroups({ page, size: 10, sort_by: "id", sort_dir: "ASC" }));
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load.")
+      toast.error(err instanceof Error ? err.message : "Failed to load.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [page])
+  }, [page]);
 
-  useEffect(() => { fetchList() }, [fetchList])
+  useEffect(() => { fetchList(); }, [fetchList]);
 
-  const handleEdit = async (row: FacilityGroupSummary) => {
+  const handleCreate = () => {
+    setActiveItem(null);
+    setDialogMode("create");
+    setDialogOpen(true);
+  };
+
+  const handleView = (item: FacilityGroupSummary) => {
+    setActiveItem(item);
+    setDialogMode("view");
+    setDialogOpen(true);
+  };
+
+  const handleEdit = async (item: FacilityGroupSummary) => {
     try {
-      const res = await getFacilityGroup(row.id)
-      setEditing(res.data)
-      setDialogOpen(true)
+      const res = await getFacilityGroup(item.id);
+      setActiveItem(res.data);
+      setDialogMode("edit");
+      setDialogOpen(true);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load.")
+      toast.error(err instanceof Error ? err.message : "Failed to load.");
     }
-  }
+  };
 
-  const handleDelete = async (id: number) => {
-    try {
-      await deleteFacilityGroup(id)
-      toast.success("Facility group deleted.")
-      fetchList()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete.")
+  const handleDialogSubmit = async (payload: FacilityGroupFormPayload) => {
+    if (dialogMode === "edit" && activeItem) {
+      await updateFacilityGroup(activeItem.id, payload);
+      toast.success("Facility group updated.");
+    } else {
+      await createFacilityGroup(payload);
+      toast.success("Facility group created.");
     }
-  }
+    setDialogOpen(false);
+    fetchList();
+  };
+
+  const handleDelete = async () => {
+    if (deleteId === null) return;
+    try {
+      await deleteFacilityGroup(deleteId);
+      toast.success("Facility group deleted.");
+      setDeleteId(null);
+      fetchList();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete.");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold">Facility Groups</h1>
-          <p className="text-sm text-muted-foreground">Manage facility group records.</p>
+          <p className="text-sm text-muted-foreground">Organize facilities into logical groups.</p>
         </div>
-        <Button onClick={() => { setEditing(null); setDialogOpen(true) }}>
+        <Button onClick={handleCreate}>
           <PlusIcon />New Facility Group
         </Button>
       </div>
@@ -71,11 +115,18 @@ export default function FacilityGroupsPage() {
       {loading ? (
         <div className="flex justify-center py-20"><Spinner className="size-6" /></div>
       ) : data?.data.length === 0 ? (
-        <div className="flex justify-center py-20 text-sm text-muted-foreground">No records found.</div>
+        <div className="flex justify-center py-20 text-sm text-muted-foreground">No facility groups found.</div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data?.data.map(row => (
-            <FacilityGroupCard key={row.id} data={row} onEdit={handleEdit} onDelete={handleDelete} />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {data?.data.map((item, i) => (
+            <FacilityGroupCard
+              key={item.id}
+              item={item}
+              index={i}
+              onView={handleView}
+              onEdit={handleEdit}
+              onDelete={(it) => setDeleteId(it.id)}
+            />
           ))}
         </div>
       )}
@@ -97,9 +148,31 @@ export default function FacilityGroupsPage() {
       <FacilityGroupDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
-        editing={editing}
-        onSuccess={fetchList}
+        mode={dialogMode}
+        initialItem={activeItem}
+        onSubmit={handleDialogSubmit}
+        onSwitchToEdit={() => setDialogMode("edit")}
       />
+
+      <AlertDialog open={deleteId !== null} onOpenChange={(o) => !o && setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this facility group?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The group will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
-  )
+  );
 }

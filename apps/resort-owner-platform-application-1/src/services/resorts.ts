@@ -13,6 +13,7 @@ export interface ResortSummary {
   city_id: number | null;
   contact_email: string | null;
   contact_phone: string | null;
+  display_image_url: string | null;
 }
 
 export interface Resort {

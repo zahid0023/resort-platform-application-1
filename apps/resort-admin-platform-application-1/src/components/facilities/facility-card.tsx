@@ -1,77 +1,69 @@
 "use client"
 
-import { useState } from "react"
-import { FolderIcon, PencilIcon, Trash2Icon } from "lucide-react"
+import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
+import { Badge } from "@/components/ui/badge"
+import { Pencil, Trash2 } from "lucide-react"
+import { LucideIconRenderer } from "ui-blocks"
 import type { FacilitySummary } from "@/services/facilities"
 
-interface FacilityCardProps {
+interface Props {
   data: FacilitySummary
-  onEdit: (data: FacilitySummary) => void
-  onDelete: (id: number) => Promise<void>
+  onEdit?: (row: FacilitySummary) => void
+  onDelete?: (id: number) => void
 }
 
-export function FacilityCard({ data, onEdit, onDelete }: FacilityCardProps) {
-  const [confirming, setConfirming] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-
-  const handleDelete = async () => {
-    setDeleting(true)
-    await onDelete(data.id)
-    setDeleting(false)
-    setConfirming(false)
-  }
+export function FacilityCard({ data, onEdit, onDelete }: Props) {
+  const iconColor = data.icon_meta?.color as string | undefined
+  const iconName = data.icon_type === "LUCIDE" ? data.icon_value : undefined
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border bg-card p-4 text-sm ring-1 ring-foreground/10">
-      <div className="flex items-center gap-3">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <FolderIcon className="size-4" />
-        </div>
-
-        <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate font-medium">{data.name}</span>
-          <span className="truncate font-mono text-xs text-muted-foreground">{data.code}</span>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1">
-          {confirming ? (
-            <>
-              <span className="mr-1 text-xs text-muted-foreground">Sure?</span>
-              <Button size="icon-sm" variant="destructive" disabled={deleting} onClick={handleDelete}>
-                {deleting ? <Spinner className="size-3" /> : <Trash2Icon />}
-              </Button>
-              <Button size="icon-sm" variant="outline" onClick={() => setConfirming(false)}>
-                ✕
-              </Button>
-            </>
+    <Card className="group relative p-5 shadow-card hover:shadow-elegant transition-all hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-2">
+      <div className="flex items-start justify-between mb-4">
+        <div
+          className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-primary"
+          style={iconColor ? {
+            background: `linear-gradient(135deg, ${iconColor}, ${iconColor}cc)`,
+            boxShadow: `0 8px 24px -8px ${iconColor}80`,
+          } : undefined}
+        >
+          {data.icon_type === "LUCIDE" && data.icon_value ? (
+            <LucideIconRenderer name={iconName} className="w-6 h-6 text-white" />
+          ) : data.icon_type === "IMAGE" && data.icon_value ? (
+            <img src={data.icon_value} alt="" className="w-6 h-6 object-contain" />
           ) : (
-            <>
-              <Button size="icon-sm" variant="ghost" onClick={() => onEdit(data)}>
-                <PencilIcon />
-              </Button>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                className="text-destructive hover:text-destructive"
-                onClick={() => setConfirming(true)}
-              >
-                <Trash2Icon />
-              </Button>
-            </>
+            <span className="text-xs font-medium text-white/80">{data.name.charAt(0).toUpperCase()}</span>
+          )}
+        </div>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {onEdit && (
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onEdit(data)}>
+              <Pencil className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          {onDelete && (
+            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(data.id)}>
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-2 pl-12">
-        <span className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs text-muted-foreground">{data.type}</span>
-        {data.icon && <span className="truncate text-xs text-muted-foreground">{data.icon}</span>}
+      <div className="flex items-center gap-2 mb-1">
+        <h3 className="font-semibold text-base truncate">{data.name}</h3>
       </div>
+      <Badge variant="secondary" className="mb-3 font-mono text-[10px]">{data.code}</Badge>
+      <p className="text-sm text-muted-foreground line-clamp-2 min-h-10">
+        {data.description || "No description"}
+      </p>
 
-      {data.description && (
-        <p className="line-clamp-2 pl-12 text-xs text-muted-foreground">{data.description}</p>
-      )}
-    </div>
+      <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
+        <span className="font-mono">#{data.id}</span>
+        <span>Order: {data.sort_order ?? 0}</span>
+        <span className="font-mono truncate max-w-[40%] text-right">{data.icon_value || "—"}</span>
+      </div>
+    </Card>
   )
 }
+
+export default FacilityCard
