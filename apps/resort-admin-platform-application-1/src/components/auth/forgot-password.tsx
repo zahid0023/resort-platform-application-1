@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 
 export function ForgotPasswordForm() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -70,7 +72,7 @@ export function ForgotPasswordForm() {
         className="mt-4 w-full"
       >
         {isSubmitting && <Spinner />}
-        Send reset link
+        {t("auth.forgotPassword.submit")}
       </Button>
     </form>
   );

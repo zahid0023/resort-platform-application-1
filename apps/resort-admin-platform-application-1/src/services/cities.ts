@@ -1,19 +1,23 @@
 import { api } from "./api";
 
-export interface CitySummary {
+export interface CityLocale {
   id: number;
+  locale_id: number;
   name: string;
-  country_id: number;
+  description?: string;
+  sort_order: number;
 }
 
 export interface City {
   id: number;
-  name: string;
   country_id: number;
+  code?: string;
+  sort_order: number;
+  locales: CityLocale[];
 }
 
 export interface CityListResponse {
-  data: CitySummary[];
+  data: City[];
   current_page: number;
   total_pages: number;
   total_elements: number;
@@ -22,14 +26,27 @@ export interface CityListResponse {
   has_previous: boolean;
 }
 
-export interface CreateCityRequest {
+export interface CreateCityLocaleRequest {
+  locale_id: number;
   name: string;
-  country_id: number;
+  description?: string;
+  sort_order: number;
+}
+
+export interface CreateCityRequest {
+  code?: string;
+  sort_order: number;
+  locales?: CreateCityLocaleRequest[];
 }
 
 export interface UpdateCityRequest {
-  name?: string;
-  country_id?: number;
+  sort_order: number;
+}
+
+export interface UpdateCityLocaleRequest {
+  name: string;
+  description?: string;
+  sort_order: number;
 }
 
 export interface MutationResponse {
@@ -37,30 +54,50 @@ export interface MutationResponse {
   id: number;
 }
 
-export interface ListParams {
+export interface ListCitiesParams {
   page?: number;
   size?: number;
-  sort_by?: "id" | "name";
+  sort_by?: string;
   sort_dir?: "ASC" | "DESC";
 }
 
-export const listCities = (params: ListParams = {}): Promise<CityListResponse> => {
-  const query = new URLSearchParams();
-  if (params.page !== undefined) query.set("page", String(params.page));
-  if (params.size !== undefined) query.set("size", String(params.size));
-  if (params.sort_by) query.set("sort_by", params.sort_by);
-  if (params.sort_dir) query.set("sort_dir", params.sort_dir);
-  return api.get<CityListResponse>(`/cities?${query.toString()}`);
+export const citiesService = {
+  async list(countryId: number, params: ListCitiesParams = {}): Promise<CityListResponse> {
+    const { page = 0, size = 50, sort_by = "sortOrder", sort_dir = "ASC" } = params;
+    const query = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+      sort_by,
+      sort_dir,
+    });
+    return api.get<CityListResponse>(`/countries/${countryId}/cities?${query}`);
+  },
+
+  async get(countryId: number, id: number): Promise<{ city: City }> {
+    return api.get<{ city: City }>(`/countries/${countryId}/cities/${id}`);
+  },
+
+  async create(countryId: number, body: CreateCityRequest): Promise<MutationResponse> {
+    return api.post<MutationResponse>(`/countries/${countryId}/cities`, body);
+  },
+
+  async update(countryId: number, id: number, body: UpdateCityRequest): Promise<MutationResponse> {
+    return api.put<MutationResponse>(`/countries/${countryId}/cities/${id}`, body);
+  },
+
+  async remove(countryId: number, id: number): Promise<MutationResponse> {
+    return api.delete<MutationResponse>(`/countries/${countryId}/cities/${id}`);
+  },
+
+  async addLocale(countryId: number, cityId: number, body: CreateCityLocaleRequest): Promise<MutationResponse> {
+    return api.post<MutationResponse>(`/countries/${countryId}/cities/${cityId}/locales`, body);
+  },
+
+  async updateLocale(countryId: number, cityId: number, localeId: number, body: UpdateCityLocaleRequest): Promise<MutationResponse> {
+    return api.put<MutationResponse>(`/countries/${countryId}/cities/${cityId}/locales/${localeId}`, body);
+  },
+
+  async removeLocale(countryId: number, cityId: number, localeId: number): Promise<MutationResponse> {
+    return api.delete<MutationResponse>(`/countries/${countryId}/cities/${cityId}/locales/${localeId}`);
+  },
 };
-
-export const getCity = (id: number) =>
-  api.get<{ data: City }>(`/cities/${id}`);
-
-export const createCity = (body: CreateCityRequest) =>
-  api.post<MutationResponse>("/cities", body);
-
-export const updateCity = (id: number, body: UpdateCityRequest) =>
-  api.put<MutationResponse>(`/cities/${id}`, body);
-
-export const deleteCity = (id: number) =>
-  api.delete<MutationResponse>(`/cities/${id}`);

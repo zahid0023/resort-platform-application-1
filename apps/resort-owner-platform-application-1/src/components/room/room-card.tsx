@@ -42,7 +42,7 @@ const RoomCard = ({
   <button type="button"
     onClick={onOpenDetails}
     className="text-left rounded-lg bg-muted/40 hover:bg-muted/70 hover:ring-1 hover:ring-primary/30 transition-all p-4 flex flex-col focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-    <div className="flex items-center gap-1.5 text-[11px] font-mono text-accent">
+    <div className="flex items-center gap-1.5 text-[11px]">
       <Hash className="h-2.5 w-2.5" />
       {room.room_number || "—"}
     </div>

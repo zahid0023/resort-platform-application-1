@@ -1,4 +1,5 @@
 import { ThemeToggle } from "@/components/theme-toggle";
+import { LocaleToggle } from "@/components/locale-toggle";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 
 export function PortalHeader() {
@@ -8,7 +9,10 @@ export function PortalHeader() {
         <SidebarTrigger />
         {/* <h1 className="font-medium">{title}</h1> */}
       </div>
-      <ThemeToggle />
+      <div className="flex items-center gap-1">
+        <LocaleToggle />
+        <ThemeToggle />
+      </div>
     </header>
   );
 }

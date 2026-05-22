@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,7 +11,6 @@ import type { FacilityGroupSummary } from "@/services/facility-groups";
 
 interface Props {
   item: FacilityGroupSummary;
-  /** Optional index used to stagger the entrance animation. */
   index?: number;
   onView?: (item: FacilityGroupSummary) => void;
   onEdit?: (item: FacilityGroupSummary) => void;
@@ -18,22 +18,18 @@ interface Props {
 }
 
 export const FacilityGroupCard = ({ item, index = 0, onView, onEdit, onDelete }: Props) => {
+  const { t } = useTranslation();
   const router = useRouter();
   const color = (item.icon_meta?.color as string | undefined) ?? undefined;
   const iconName = item.icon_type === "LUCIDE" ? item.icon_value : undefined;
+  const displayName = item.locales[0]?.name ?? item.code;
+  const displayDescription = item.locales[0]?.description;
 
-  const goToFacilities = () =>
-    router.push(`/facility-groups/${item.id}/facilities`);
+  const goToFacilities = () => router.push(`/facility-groups/${item.id}/facilities`);
   const handleCardKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      goToFacilities();
-    }
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); goToFacilities(); }
   };
-  const handleAction = (
-    e: React.MouseEvent,
-    handler?: (item: FacilityGroupSummary) => void,
-  ) => {
+  const handleAction = (e: React.MouseEvent, handler?: (item: FacilityGroupSummary) => void) => {
     e.stopPropagation();
     e.preventDefault();
     handler?.(item);
@@ -45,9 +41,7 @@ export const FacilityGroupCard = ({ item, index = 0, onView, onEdit, onDelete }:
       tabIndex={0}
       onClick={goToFacilities}
       onKeyDown={handleCardKeyDown}
-      className={
-        "group relative p-5 shadow-card hover:shadow-elegant transition-all hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer"
-      }
+      className="group relative p-5 shadow-card hover:shadow-elegant transition-all hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 cursor-pointer"
       style={{ animationDelay: `${index * 40}ms`, animationFillMode: "backwards" }}
     >
       <div className="flex items-start justify-between mb-4">
@@ -68,32 +62,17 @@ export const FacilityGroupCard = ({ item, index = 0, onView, onEdit, onDelete }:
           onPointerDown={(e) => e.stopPropagation()}
         >
           {onView && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              onClick={(e) => handleAction(e, onView)}
-            >
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => handleAction(e, onView)}>
               <Eye className="w-3.5 h-3.5" />
             </Button>
           )}
           {onEdit && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8"
-              onClick={(e) => handleAction(e, onEdit)}
-            >
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => handleAction(e, onEdit)}>
               <Pencil className="w-3.5 h-3.5" />
             </Button>
           )}
           {onDelete && (
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 text-destructive hover:text-destructive"
-              onClick={(e) => handleAction(e, onDelete)}
-            >
+            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={(e) => handleAction(e, onDelete)}>
               <Trash2 className="w-3.5 h-3.5" />
             </Button>
           )}
@@ -101,19 +80,19 @@ export const FacilityGroupCard = ({ item, index = 0, onView, onEdit, onDelete }:
       </div>
 
       <div className="flex items-center gap-2 mb-1">
-        <h3 className="font-semibold text-base truncate">{item.name}</h3>
+        <h3 className="font-semibold text-base truncate">{displayName}</h3>
       </div>
       <Badge variant="secondary" className="font-mono text-[10px] mb-3">
         {item.code}
       </Badge>
       <p className="text-sm text-muted-foreground line-clamp-2 min-h-[2.5rem]">
-        {item.description ?? "No description"}
+        {displayDescription ?? t("facilityGroup.noDescription")}
       </p>
 
       <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
         <span className="font-mono">#{item.id}</span>
-        <span>Order: {item.sort_order}</span>
-        <span className="font-mono">{item.icon_value}</span>
+        <span>{t("facilityGroup.order", { n: item.sort_order })}</span>
+        <span className="text-xs text-muted-foreground">{item.locales.length} locale{item.locales.length !== 1 ? "s" : ""}</span>
       </div>
     </Card>
   );

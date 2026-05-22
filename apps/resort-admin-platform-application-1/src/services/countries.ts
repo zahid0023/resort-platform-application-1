@@ -1,19 +1,24 @@
 import { api } from "./api";
 
-export interface CountrySummary {
+export interface CountryLocale {
   id: number;
-  code: string;
+  locale_id: number;
   name: string;
+  description?: string;
+  sort_order: number;
 }
 
 export interface Country {
   id: number;
   code: string;
-  name: string;
+  iso3_code?: string;
+  phone_code?: string;
+  sort_order: number;
+  locales: CountryLocale[];
 }
 
 export interface CountryListResponse {
-  data: CountrySummary[];
+  data: Country[];
   current_page: number;
   total_pages: number;
   total_elements: number;
@@ -22,14 +27,31 @@ export interface CountryListResponse {
   has_previous: boolean;
 }
 
+export interface CreateCountryLocaleRequest {
+  locale_id: number;
+  name: string;
+  description?: string;
+  sort_order: number;
+}
+
 export interface CreateCountryRequest {
-  code?: string;
-  name?: string;
+  code: string;
+  iso3_code?: string;
+  phone_code?: string;
+  sort_order: number;
+  locales?: CreateCountryLocaleRequest[];
 }
 
 export interface UpdateCountryRequest {
-  code?: string;
-  name?: string;
+  iso3_code?: string;
+  phone_code?: string;
+  sort_order: number;
+}
+
+export interface UpdateCountryLocaleRequest {
+  name: string;
+  description?: string;
+  sort_order: number;
 }
 
 export interface MutationResponse {
@@ -40,27 +62,47 @@ export interface MutationResponse {
 export interface ListParams {
   page?: number;
   size?: number;
-  sort_by?: "id" | "code" | "name";
+  sort_by?: string;
   sort_dir?: "ASC" | "DESC";
 }
 
-export const listCountries = (params: ListParams = {}): Promise<CountryListResponse> => {
-  const query = new URLSearchParams();
-  if (params.page !== undefined) query.set("page", String(params.page));
-  if (params.size !== undefined) query.set("size", String(params.size));
-  if (params.sort_by) query.set("sort_by", params.sort_by);
-  if (params.sort_dir) query.set("sort_dir", params.sort_dir);
-  return api.get<CountryListResponse>(`/countries?${query.toString()}`);
+export const countriesService = {
+  async list(params: ListParams = {}): Promise<CountryListResponse> {
+    const { page = 0, size = 10, sort_by = "id", sort_dir = "ASC" } = params;
+    const query = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+      sort_by,
+      sort_dir,
+    });
+    return api.get<CountryListResponse>(`/countries?${query}`);
+  },
+
+  async get(id: number): Promise<{ country: Country }> {
+    return api.get<{ country: Country }>(`/countries/${id}`);
+  },
+
+  async create(body: CreateCountryRequest): Promise<MutationResponse> {
+    return api.post<MutationResponse>("/countries", body);
+  },
+
+  async update(id: number, body: UpdateCountryRequest): Promise<MutationResponse> {
+    return api.put<MutationResponse>(`/countries/${id}`, body);
+  },
+
+  async remove(id: number): Promise<MutationResponse> {
+    return api.delete<MutationResponse>(`/countries/${id}`);
+  },
+
+  async addLocale(countryId: number, body: CreateCountryLocaleRequest): Promise<MutationResponse> {
+    return api.post<MutationResponse>(`/countries/${countryId}/locales`, body);
+  },
+
+  async updateLocale(countryId: number, localeId: number, body: UpdateCountryLocaleRequest): Promise<MutationResponse> {
+    return api.put<MutationResponse>(`/countries/${countryId}/locales/${localeId}`, body);
+  },
+
+  async removeLocale(countryId: number, localeId: number): Promise<MutationResponse> {
+    return api.delete<MutationResponse>(`/countries/${countryId}/locales/${localeId}`);
+  },
 };
-
-export const getCountry = (id: number) =>
-  api.get<{ data: Country }>(`/countries/${id}`);
-
-export const createCountry = (body: CreateCountryRequest) =>
-  api.post<MutationResponse>("/countries", body);
-
-export const updateCountry = (id: number, body: UpdateCountryRequest) =>
-  api.put<MutationResponse>(`/countries/${id}`, body);
-
-export const deleteCountry = (id: number) =>
-  api.delete<MutationResponse>(`/countries/${id}`);

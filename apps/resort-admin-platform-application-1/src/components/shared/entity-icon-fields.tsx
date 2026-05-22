@@ -1,5 +1,6 @@
 "use client"
 
+import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -31,30 +32,31 @@ const PRESET_COLORS = [
 ]
 const HEX_RE = /^#([0-9a-fA-F]{6})$/
 
-const ICON_SIZE_OPTIONS = [
-  { label: "Default", value: "" },
-  { label: "16", value: "16" },
-  { label: "20", value: "20" },
-  { label: "24", value: "24" },
-  { label: "32", value: "32" },
-  { label: "40", value: "40" },
-]
-
 export function EntityIconFields({ value, onChange, readOnly = false }: EntityIconFieldsProps) {
+  const { t } = useTranslation()
   const { icon_type, icon_value, icon_color, icon_size } = value
+
+  const ICON_SIZE_OPTIONS = [
+    { label: t("iconFields.defaultSize"), value: "" },
+    { label: "16", value: "16" },
+    { label: "20", value: "20" },
+    { label: "24", value: "24" },
+    { label: "32", value: "32" },
+    { label: "40", value: "40" },
+  ]
 
   return (
     <>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="icon_type">Icon Type</Label>
+          <Label htmlFor="icon_type">{t("iconFields.iconType")}</Label>
           <Select
             value={icon_type}
             onValueChange={(v) => onChange({ icon_type: v as IconType, icon_value: "" })}
             disabled={readOnly}
           >
             <SelectTrigger id="icon_type">
-              <SelectValue placeholder="Select icon type..." />
+              <SelectValue placeholder={t("iconFields.selectType")} />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="LUCIDE">Lucide</SelectItem>
@@ -66,7 +68,7 @@ export function EntityIconFields({ value, onChange, readOnly = false }: EntityIc
         </div>
         {icon_type && icon_type !== "LUCIDE" && (
           <div className="space-y-2">
-            <Label htmlFor="icon_value">Icon Value</Label>
+            <Label htmlFor="icon_value">{t("iconFields.iconValue")}</Label>
             <Input
               id="icon_value"
               value={icon_value}
@@ -85,7 +87,7 @@ export function EntityIconFields({ value, onChange, readOnly = false }: EntityIc
 
       {icon_type === "LUCIDE" && (
         <div className="space-y-2">
-          <Label>Pick an icon</Label>
+          <Label>{t("iconFields.pickIcon")}</Label>
           {readOnly ? (
             <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3">
               <span className="font-mono text-sm">{icon_value || "—"}</span>
@@ -103,12 +105,12 @@ export function EntityIconFields({ value, onChange, readOnly = false }: EntityIc
       {icon_type === "LUCIDE" && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <Label>Icon Meta</Label>
-            <span className="text-xs text-muted-foreground">optional</span>
+            <Label>{t("iconFields.iconMeta")}</Label>
+            <span className="text-xs text-muted-foreground">{t("iconFields.optional")}</span>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="icon_color" className="text-xs text-muted-foreground">Color</Label>
+              <Label htmlFor="icon_color" className="text-xs text-muted-foreground">{t("iconFields.color")}</Label>
               <Popover>
                 <PopoverTrigger asChild disabled={readOnly}>
                   <button
@@ -124,7 +126,7 @@ export function EntityIconFields({ value, onChange, readOnly = false }: EntityIc
                     {icon_color
                       ? <span className="h-4 w-4 rounded-full border border-border/60" style={{ backgroundColor: icon_color }} />
                       : <span className="h-4 w-4 rounded-full border border-dashed border-border" />}
-                    <span className="font-mono text-xs">{icon_color || "None"}</span>
+                    <span className="font-mono text-xs">{icon_color || t("iconFields.none")}</span>
                   </button>
                 </PopoverTrigger>
                 <PopoverContent className="w-64 space-y-3" align="start">
@@ -162,14 +164,14 @@ export function EntityIconFields({ value, onChange, readOnly = false }: EntityIc
                   </div>
                   {icon_color && (
                     <Button type="button" variant="ghost" size="sm" className="w-full" onClick={() => onChange({ icon_color: "" })}>
-                      Clear color
+                      {t("iconFields.clearColor")}
                     </Button>
                   )}
                 </PopoverContent>
               </Popover>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="icon_size" className="text-xs text-muted-foreground">Size</Label>
+              <Label htmlFor="icon_size" className="text-xs text-muted-foreground">{t("iconFields.size")}</Label>
               <Select
                 value={icon_size || "__none"}
                 onValueChange={(v) => onChange({ icon_size: v === "__none" ? "" : v })}

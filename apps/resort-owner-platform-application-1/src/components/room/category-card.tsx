@@ -24,7 +24,7 @@ const CategoryCard = ({
       </div>
 
       <div className="min-w-0 flex-1">
-        <h3 className="font-display text-2xl md:text-3xl text-primary leading-tight">
+        <h3 className="text-2xl md:text-3xl leading-tight">
           {cat.name}
         </h3>
         

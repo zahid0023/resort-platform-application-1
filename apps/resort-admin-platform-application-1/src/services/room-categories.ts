@@ -1,19 +1,25 @@
 import { api } from "./api";
 
+export interface RoomCategoryLocale {
+  id: number;
+  locale_id: number;
+  name: string;
+  description?: string;
+  sort_order: number;
+}
+
 export interface RoomCategorySummary {
   id: number;
   code: string;
-  name: string;
-  description: string;
   sort_order: number;
+  locales: RoomCategoryLocale[];
 }
 
 export interface RoomCategory {
   id: number;
   code: string;
-  name: string;
-  description: string;
   sort_order: number;
+  locales: RoomCategoryLocale[];
 }
 
 export interface RoomCategoryListResponse {
@@ -26,18 +32,27 @@ export interface RoomCategoryListResponse {
   has_previous: boolean;
 }
 
+export interface CreateRoomCategoryLocaleRequest {
+  locale_id: number;
+  name: string;
+  description?: string;
+  sort_order: number;
+}
+
 export interface CreateRoomCategoryRequest {
   code: string;
-  name: string;
-  description: string;
-  sort_order?: number;
+  sort_order: number;
+  locales?: CreateRoomCategoryLocaleRequest[];
 }
 
 export interface UpdateRoomCategoryRequest {
-  code?: string;
-  name?: string;
+  sort_order: number;
+}
+
+export interface UpdateRoomCategoryLocaleRequest {
+  name: string;
   description?: string;
-  sort_order?: number;
+  sort_order: number;
 }
 
 export interface MutationResponse {
@@ -48,7 +63,7 @@ export interface MutationResponse {
 export interface ListParams {
   page?: number;
   size?: number;
-  sort_by?: "id" | "code" | "name";
+  sort_by?: "id" | "code" | "sortOrder" | "createdAt";
   sort_dir?: "ASC" | "DESC";
 }
 
@@ -61,14 +76,23 @@ export const listRoomCategories = (params: ListParams = {}): Promise<RoomCategor
   return api.get<RoomCategoryListResponse>(`/room-categories?${query.toString()}`);
 };
 
-export const getRoomCategory = (id: number): Promise<{ data: RoomCategory }> =>
-  api.get<{ data: RoomCategory }>(`/room-categories/${id}`);
+export const getRoomCategory = (id: number): Promise<{ room_category: RoomCategory }> =>
+  api.get<{ room_category: RoomCategory }>(`/room-categories/${id}`);
 
 export const createRoomCategory = (body: CreateRoomCategoryRequest): Promise<MutationResponse> =>
   api.post<MutationResponse>("/room-categories", body);
 
-export const updateRoomCategory = (id: number, body: UpdateRoomCategoryRequest): Promise<{ data: RoomCategory }> =>
-  api.put<{ data: RoomCategory }>(`/room-categories/${id}`, body);
+export const updateRoomCategory = (id: number, body: UpdateRoomCategoryRequest): Promise<MutationResponse> =>
+  api.put<MutationResponse>(`/room-categories/${id}`, body);
 
 export const deleteRoomCategory = (id: number): Promise<MutationResponse> =>
   api.delete<MutationResponse>(`/room-categories/${id}`);
+
+export const addRoomCategoryLocale = (categoryId: number, body: CreateRoomCategoryLocaleRequest): Promise<MutationResponse> =>
+  api.post<MutationResponse>(`/room-categories/${categoryId}/locales`, body);
+
+export const updateRoomCategoryLocale = (categoryId: number, localeId: number, body: UpdateRoomCategoryLocaleRequest): Promise<MutationResponse> =>
+  api.put<MutationResponse>(`/room-categories/${categoryId}/locales/${localeId}`, body);
+
+export const removeRoomCategoryLocale = (categoryId: number, localeId: number): Promise<MutationResponse> =>
+  api.delete<MutationResponse>(`/room-categories/${categoryId}/locales/${localeId}`);

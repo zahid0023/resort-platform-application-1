@@ -12,7 +12,7 @@ import {
   DialogDescription, DialogFooter,
 } from "@/components/ui/dialog"
 import { bulkCreateResortFacilities, type CreateResortFacilityRequest } from "@/services/resort-facilities"
-import { listFacilities, type FacilitySummary } from "@/services/facilities"
+import { listFacilitiesByGroup, type FacilitySummary } from "@/services/facilities"
 import type { ResortFacilityGroupSummary } from "@/services/resort-facility-groups"
 
 interface SelectedFacility extends CreateResortFacilityRequest {
@@ -34,12 +34,12 @@ interface Props {
   onSuccess: () => void
 }
 
-async function fetchAllPlatformFacilities(): Promise<FacilitySummary[]> {
+async function fetchFacilitiesByGroup(facilityGroupId: number): Promise<FacilitySummary[]> {
   const results: FacilitySummary[] = []
   let page = 0
   let hasNext = true
   while (hasNext) {
-    const res = await listFacilities({ page, size: 50 })
+    const res = await listFacilitiesByGroup(facilityGroupId, { page, size: 50 })
     results.push(...res.data)
     hasNext = res.has_next
     page++
@@ -58,7 +58,7 @@ export function ResortFacilitiesWizard({
 }: Props) {
   const [step, setStep] = useState<1 | 2>(1)
   const [selectedGroupId, setSelectedGroupId] = useState<number | "">(preselectedGroupId ?? "")
-  const [allFacilities, setAllFacilities] = useState<FacilitySummary[]>([])
+  const [groupFacilities, setGroupFacilities] = useState<FacilitySummary[]>([])
   const [facilitiesLoading, setFacilitiesLoading] = useState(false)
   const [selected, setSelected] = useState<Map<number, SelectedFacility>>(new Map())
   const [submitting, setSubmitting] = useState(false)
@@ -69,23 +69,22 @@ export function ResortFacilitiesWizard({
     const initialGroup = preselectedGroupId ?? ""
     setSelectedGroupId(initialGroup)
     setSelected(new Map())
+    setGroupFacilities([])
     setStep(preselectedGroupId ? 2 : 1)
   }, [open, preselectedGroupId])
 
-  // Load platform facilities when reaching step 2
+  // Load platform facilities for the selected group when reaching step 2
+  const selectedGroup = resortFacilityGroups.find((g) => g.id === selectedGroupId)
+
   useEffect(() => {
-    if (step !== 2 || allFacilities.length > 0) return
+    if (step !== 2 || !selectedGroup) return
     setFacilitiesLoading(true)
-    fetchAllPlatformFacilities()
-      .then(setAllFacilities)
+    setGroupFacilities([])
+    fetchFacilitiesByGroup(selectedGroup.facility_group_id)
+      .then(setGroupFacilities)
       .catch(() => toast.error("Failed to load platform facilities."))
       .finally(() => setFacilitiesLoading(false))
-  }, [step, allFacilities.length])
-
-  const selectedGroup = resortFacilityGroups.find((g) => g.id === selectedGroupId)
-  const groupFacilities = selectedGroup
-    ? allFacilities.filter((f) => f.facility_group_id === selectedGroup.facility_group_id)
-    : []
+  }, [step, selectedGroup?.facility_group_id])
   const assignedIds: number[] = selectedGroupId ? (assignedFacilityIdsByGroup[selectedGroupId as number] ?? []) : []
 
   const toggleFacility = (f: FacilitySummary) => {

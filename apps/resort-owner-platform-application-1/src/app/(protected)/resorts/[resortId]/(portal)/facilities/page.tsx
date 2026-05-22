@@ -199,9 +199,6 @@ export default function FacilitiesPage() {
           <p className="text-sm text-muted-foreground">Manage facility groups and their facilities for this resort.</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => openWizard()}>
-            <PlusIcon />Add Facilities
-          </Button>
           <Button onClick={() => { setEditingGroup(null); setGroupDialogOpen(true) }}>
             <PlusIcon />Add Facility Group
           </Button>

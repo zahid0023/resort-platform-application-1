@@ -6,6 +6,7 @@ import {
   FileTextIcon,
   FolderIcon,
   GlobeIcon,
+  LanguagesIcon,
   LayersIcon,
   LayoutDashboard,
   LayoutTemplateIcon,
@@ -69,6 +70,7 @@ const commonNavItems = [
   { title: "Countries", url: "/countries", icon: GlobeIcon },
   { title: "Cities", url: "/cities", icon: GlobeIcon },
   { title: "Facilities", url: "/facility-groups", icon: FolderIcon },
+  { title: "Locales", url: "/locales", icon: LanguagesIcon },
 ];
 
 export function PortalSidebar() {

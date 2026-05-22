@@ -1,0 +1,272 @@
+{
+  "common": {
+    "admin": "Admin",
+    "cancel": "Cancel",
+    "close": "Close",
+    "save": "Save Changes",
+    "saving": "Saving...",
+    "create": "Create",
+    "creating": "Creating...",
+    "edit": "Edit",
+    "delete": "Delete",
+    "view": "View",
+    "code": "Code",
+    "name": "Name",
+    "description": "Description",
+    "sortOrder": "Sort Order",
+    "allFields": "All Fields",
+    "search": "Search",
+    "localizedName": "Localized Name",
+    "noDescription": "No description",
+    "optional": "optional"
+  },
+  "auth": {
+    "login": {
+      "title": "Login to your account",
+      "desc": "Enter your email below to login to your account",
+      "email": "Email",
+      "password": "Password",
+      "forgotPassword": "Forgot your password?",
+      "submit": "Login",
+      "submitting": "Logging in...",
+      "successToast": "Logged in successfully!",
+      "failToast": "Login failed. Please try again."
+    },
+    "register": {
+      "title": "Create an account",
+      "desc": "Enter your information below to create your account",
+      "emailDesc": "We'll use this to contact you. We will not share your email with anyone else.",
+      "passwordDesc": "Must be at least 8 characters long.",
+      "confirmPassword": "Confirm Password",
+      "confirmPasswordDesc": "Please confirm your password.",
+      "submit": "Create Account",
+      "submitting": "Creating Account...",
+      "successToast": "User registered successfully!",
+      "failToast": "Registration failed. Please try again."
+    },
+    "forgotPassword": {
+      "submit": "Send reset link"
+    }
+  },
+  "field": {
+    "iso3": "ISO3 Code",
+    "phone": "Phone Code",
+    "sort": "Sort Order",
+    "language": "Language"
+  },
+  "toast": {
+    "codeRequired": "Code is required.",
+    "localeSelectLang": "Locale row {{n}}: please select a language.",
+    "localeNameRequired": "Locale row {{n}}: name is required."
+  },
+  "locale": {
+    "translations": "Translations",
+    "add": "Add",
+    "help": {
+      "create": "Optionally add locale-specific names.",
+      "edit": "Add, update, or remove locale translations.",
+      "view": {
+        "country": "Locale-specific names for this country."
+      }
+    },
+    "empty": {
+      "create": "No translations added yet.",
+      "country": "No locale translations for this country.",
+      "city": "No locale translations for this city."
+    },
+    "row": {
+      "label": "Locale {{n}}",
+      "new": "New"
+    }
+  },
+  "placeholder": {
+    "selectLanguage": "Select language...",
+    "countryName": "Country name in this language",
+    "countryDescription": "Optional description...",
+    "cityName": "City name in this language",
+    "cityDescription": "Optional description...",
+    "cityCode": "DHAKA"
+  },
+  "dialog": {
+    "city": {
+      "new": "New City",
+      "edit": "Edit City",
+      "view": "View City",
+      "desc": {
+        "create": "Add a new city with locale translations.",
+        "edit": "Update city details and locale translations.",
+        "view": "City details and locale translations."
+      }
+    },
+    "country": {
+      "new": "New Country",
+      "edit": "Edit Country",
+      "view": "View Country",
+      "desc": {
+        "create": "Add a new country with locale translations.",
+        "edit": "Update country details and locale translations.",
+        "view": "Country details and locale translations."
+      }
+    }
+  },
+  "cities": {
+    "title": "Cities",
+    "subtitle": "Manage cities for countries in the resort application.",
+    "new": "New City",
+    "loading": "Loading cities…",
+    "empty": "No cities found.",
+    "deleted": "City deleted.",
+    "created": "City created.",
+    "selectCountry": "Select a country to view its cities.",
+    "showingFor": "Showing cities for {{country}}"
+  },
+  "countries": {
+    "title": "Countries",
+    "subtitle": "Manage countries available in the resort application.",
+    "new": "New Country",
+    "loading": "Loading countries…",
+    "empty": "No countries found."
+  },
+  "country": {
+    "back": "Back to Countries",
+    "loading": "Loading country…",
+    "notFound": "Country not found.",
+    "cities": "Cities",
+    "noCities": "No cities in this country."
+  },
+  "delete": {
+    "city": {
+      "title": "Delete City",
+      "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+    },
+    "country": {
+      "title": "Delete Country",
+      "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+    }
+  },
+  "locales": {
+    "title": "Locales",
+    "subtitle": "Manage language and regional locales used across the platform.",
+    "new": "New Locale",
+    "empty": "No locales found.",
+    "sure": "Sure?",
+    "errLoad": "Failed to load locales.",
+    "errLoadOne": "Failed to load locale.",
+    "errDelete": "Failed to delete locale.",
+    "deleted": "Locale deleted."
+  },
+  "localeDialog": {
+    "create": "Create Locale",
+    "edit": "Edit Locale",
+    "descCreate": "Add a new locale.",
+    "descEdit": "Update locale details.",
+    "codePlaceholder": "en",
+    "namePlaceholder": "English",
+    "descPlaceholder": "Optional description…",
+    "created": "Locale created successfully!",
+    "updated": "Locale updated successfully!",
+    "errSubmit": "Something went wrong."
+  },
+  "facilityGroup": {
+    "title": "Facility Groups",
+    "subtitle": "Organize facilities into logical groups.",
+    "new": "New Facility Group",
+    "empty": "No facility groups found.",
+    "errLoad": "Failed to load.",
+    "errDelete": "Failed to delete.",
+    "created": "Facility group created.",
+    "updated": "Facility group updated.",
+    "deleted": "Facility group deleted.",
+    "deleteTitle": "Delete this facility group?",
+    "deleteDesc": "This action cannot be undone. The group will be permanently removed.",
+    "noDescription": "No description",
+    "order": "Order: {{n}}"
+  },
+  "facilityGroupDialog": {
+    "create": "New Facility Group",
+    "edit": "Edit Facility Group",
+    "view": "Facility Group Details",
+    "descCreate": "Create a new group to organize facilities.",
+    "descEdit": "Update the details below.",
+    "descView": "View the facility group details.",
+    "namePlaceholder": "Untitled group",
+    "errIconType": "Select an icon type",
+    "errIconTypeDesc": "Please choose an icon type before saving.",
+    "errLucideIcon": "Pick an icon",
+    "errLucideIconDesc": "Please select a Lucide icon below.",
+    "errIconValue": "Icon value required",
+    "errIconValueDesc": "Please enter an icon value."
+  },
+  "facility": {
+    "title": "Facilities",
+    "subtitle": "Facilities in this group.",
+    "new": "New Facility",
+    "empty": "No facilities yet.",
+    "errLoad": "Failed to load.",
+    "errLoadGroup": "Failed to load group.",
+    "errDelete": "Failed to delete.",
+    "deleted": "Facility deleted.",
+    "created": "Facility created successfully!",
+    "updated": "Facility updated successfully!",
+    "errSubmit": "Something went wrong.",
+    "backToGroups": "Back to Facilities",
+    "groupNotFound": "Facility group not found.",
+    "countOne": "{{n}} facility",
+    "countMany": "{{n}} facilities",
+    "sortOrderLabel": "Sort order: {{n}}",
+    "noDescription": "No description",
+    "order": "Order: {{n}}"
+  },
+  "facilityDialog": {
+    "create": "New Facility",
+    "edit": "Edit Facility",
+    "descCreate": "Create a new facility within this group.",
+    "descEdit": "Update the details of this facility.",
+    "namePlaceholder": "Untitled facility",
+    "errIconType": "Select an icon type",
+    "errIconTypeDesc": "Please choose an icon type before saving.",
+    "errLucideIcon": "Pick an icon",
+    "errLucideIconDesc": "Please select a Lucide icon below.",
+    "errIconValue": "Icon value required",
+    "errIconValueDesc": "Please enter an icon value."
+  },
+  "iconFields": {
+    "iconType": "Icon Type",
+    "iconValue": "Icon Value",
+    "pickIcon": "Pick an icon",
+    "iconMeta": "Icon Meta",
+    "optional": "optional",
+    "color": "Color",
+    "size": "Size",
+    "clearColor": "Clear color",
+    "selectType": "Select icon type...",
+    "none": "None",
+    "defaultSize": "Default"
+  },
+  "roomCategory": {
+    "title": "Room Categories",
+    "subtitle": "Manage room categories used across resorts in the platform.",
+    "new": "New Room Category",
+    "empty": "No room categories found.",
+    "errLoad": "Failed to load room categories.",
+    "errDelete": "Failed to delete room category.",
+    "deleted": "Room category deleted.",
+    "created": "Room category created successfully!",
+    "updated": "Room category updated successfully!",
+    "noDescription": "No description",
+    "deleteTitle": "Delete Room Category",
+    "deleteDesc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+  },
+  "roomCategoryDialog": {
+    "create": "New Room Category",
+    "edit": "Edit Room Category",
+    "view": "Room Category Details",
+    "descCreate": "Add a new room category with locale translations.",
+    "descEdit": "Update room category details and locale translations.",
+    "descView": "Room category details and locale translations.",
+    "namePlaceholder": "Category name in this language"
+  },
+  "pagination": {
+    "info": "Page {{current}} of {{total}} — {{elements}} total"
+  }
+}

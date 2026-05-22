@@ -19,7 +19,6 @@ export interface RoomCategoryListResponse {
 }
 
 export interface CreateRoomCategoryRequest {
-  code: string;
   name: string;
   description?: string;
   sort_order?: number;

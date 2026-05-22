@@ -1,72 +1,58 @@
 "use client"
 
-import { useState } from "react"
-import { SettingsIcon, PencilIcon, Trash2Icon } from "lucide-react"
+import { useTranslation } from "react-i18next"
+import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
+import { Badge } from "@/components/ui/badge"
+import { Eye, Trash2 } from "lucide-react"
 import type { RoomCategorySummary } from "@/services/room-categories"
 
-interface RoomCategoryCardProps {
+interface Props {
   data: RoomCategorySummary
-  onEdit: (data: RoomCategorySummary) => void
-  onDelete: (id: number) => Promise<void>
+  onView?: (row: RoomCategorySummary) => void
+  onDelete?: (id: number) => void
 }
 
-export function RoomCategoryCard({ data, onEdit, onDelete }: RoomCategoryCardProps) {
-  const [confirming, setConfirming] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-
-  const handleDelete = async () => {
-    setDeleting(true)
-    await onDelete(data.id)
-    setDeleting(false)
-    setConfirming(false)
-  }
+export function RoomCategoryCard({ data, onView, onDelete }: Props) {
+  const { t } = useTranslation()
+  const displayName = data.locales[0]?.name ?? data.code
+  const displayDescription = data.locales[0]?.description
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border bg-card p-4 text-sm ring-1 ring-foreground/10">
-      <div className="flex items-center gap-3">
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <SettingsIcon className="size-4" />
+    <Card className="group relative p-5 shadow-card hover:shadow-elegant transition-all hover:-translate-y-1 animate-in fade-in slide-in-from-bottom-2">
+      <div className="flex items-start justify-between mb-4">
+        <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-primary/10 text-primary font-bold text-lg">
+          {displayName.charAt(0).toUpperCase()}
         </div>
-
-        <div className="flex min-w-0 flex-1 flex-col">
-          <span className="truncate font-medium">{data.name}</span>
-          <span className="truncate font-mono text-xs text-muted-foreground">{data.code}</span>
-        </div>
-
-        <div className="flex shrink-0 items-center gap-1">
-          {confirming ? (
-            <>
-              <span className="mr-1 text-xs text-muted-foreground">Sure?</span>
-              <Button size="icon-sm" variant="destructive" disabled={deleting} onClick={handleDelete}>
-                {deleting ? <Spinner className="size-3" /> : <Trash2Icon />}
-              </Button>
-              <Button size="icon-sm" variant="outline" onClick={() => setConfirming(false)}>
-                ✕
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button size="icon-sm" variant="ghost" onClick={() => onEdit(data)}>
-                <PencilIcon />
-              </Button>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                className="text-destructive hover:text-destructive"
-                onClick={() => setConfirming(true)}
-              >
-                <Trash2Icon />
-              </Button>
-            </>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {onView && (
+            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => onView(data)}>
+              <Eye className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          {onDelete && (
+            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => onDelete(data.id)}>
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
           )}
         </div>
       </div>
 
-      {data.description && (
-        <p className="line-clamp-2 pl-12 text-xs text-muted-foreground">{data.description}</p>
-      )}
-    </div>
+      <div className="flex items-center gap-2 mb-1">
+        <h3 className="font-semibold text-base truncate">{displayName}</h3>
+      </div>
+      <Badge variant="secondary" className="mb-3 font-mono text-[10px]">{data.code}</Badge>
+      <p className="text-sm text-muted-foreground line-clamp-2 min-h-10">
+        {displayDescription || t("roomCategory.noDescription")}
+      </p>
+
+      <div className="mt-4 pt-4 border-t border-border/50 flex items-center justify-between text-xs text-muted-foreground">
+        <span className="font-mono">#{data.id}</span>
+        <span>{t("facility.order", { n: data.sort_order })}</span>
+        <span>{data.locales.length} locale{data.locales.length !== 1 ? "s" : ""}</span>
+      </div>
+    </Card>
   )
 }
+
+export default RoomCategoryCard

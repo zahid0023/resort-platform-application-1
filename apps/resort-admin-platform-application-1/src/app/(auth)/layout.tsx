@@ -1,5 +1,6 @@
 import { ZapIcon } from "lucide-react";
 import Link from "next/link";
+import { LocaleToggle } from "@/components/locale-toggle";
 
 export default function AuthLayout({
   children,
@@ -29,6 +30,9 @@ export default function AuthLayout({
 
       {/* Right side - Auth forms */}
       <div className="flex w-full flex-col justify-center px-8 lg:w-1/2 lg:px-16">
+        <div className="absolute top-4 right-4">
+          <LocaleToggle />
+        </div>
         <div className="mb-8 lg:hidden">
           <Link href="/" className="flex items-center gap-2 text-foreground">
             <ZapIcon className="h-8 w-8 text-primary" />

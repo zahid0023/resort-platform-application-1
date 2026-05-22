@@ -28,3 +28,12 @@ export const listFacilities = (params: { page?: number; size?: number } = {}): P
   query.set("sort_dir", "ASC");
   return api.get<FacilityListResponse>(`/facilities?${query.toString()}`);
 };
+
+export const listFacilitiesByGroup = (facilityGroupId: number, params: { page?: number; size?: number } = {}): Promise<FacilityListResponse> => {
+  const query = new URLSearchParams();
+  if (params.page !== undefined) query.set("page", String(params.page));
+  if (params.size !== undefined) query.set("size", String(params.size));
+  query.set("sort_by", "name");
+  query.set("sort_dir", "ASC");
+  return api.get<FacilityListResponse>(`/facility-groups/${facilityGroupId}/facilities?${query.toString()}`);
+};

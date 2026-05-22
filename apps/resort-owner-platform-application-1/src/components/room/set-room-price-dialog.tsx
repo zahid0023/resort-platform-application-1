@@ -96,8 +96,8 @@ const SetRoomPriceDialog = ({
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
       <DialogContent className="max-w-xl p-0 overflow-hidden bg-card border-border">
-        <div className="relative bg-gradient-ocean text-primary-foreground p-8">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-primary-foreground/70 mb-3">
+        <div className="relative p-8">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] mb-3">
             <Sparkles className="h-3 w-3" /> Set price · {room.name}
           </div>
           <h2 className="font-display text-3xl">Compose a rate</h2>
@@ -162,7 +162,7 @@ const SetRoomPriceDialog = ({
               Cancel
             </Button>
             <Button type="submit" disabled={submitting}
-              className="bg-gradient-ocean text-primary-foreground hover:opacity-95">
+              className="hover:cursor-pointer">
               {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save price
             </Button>

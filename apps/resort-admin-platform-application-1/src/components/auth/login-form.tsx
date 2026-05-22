@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -25,6 +26,7 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
+  const { t } = useTranslation()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({ user_name: "", password: "" })
@@ -38,10 +40,10 @@ export function LoginForm({
     setLoading(true)
     try {
       await login(form)
-      toast.success("Logged in successfully!")
+      toast.success(t("auth.login.successToast"))
       router.push("/dashboard")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Login failed. Please try again.")
+      toast.error(err instanceof Error ? err.message : t("auth.login.failToast"))
     } finally {
       setLoading(false)
     }
@@ -51,16 +53,16 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle>Login to your account</CardTitle>
+          <CardTitle>{t("auth.login.title")}</CardTitle>
           <CardDescription>
-            Enter your email below to login to your account
+            {t("auth.login.desc")}
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit}>
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="user_name">Email</FieldLabel>
+                <FieldLabel htmlFor="user_name">{t("auth.login.email")}</FieldLabel>
                 <Input
                   id="user_name"
                   name="user_name"
@@ -74,9 +76,9 @@ export function LoginForm({
 
               <Field>
                 <div className="flex items-center justify-between">
-                  <FieldLabel htmlFor="password">Password</FieldLabel>
+                  <FieldLabel htmlFor="password">{t("auth.login.password")}</FieldLabel>
                   <Link href="/forgot-password" className="text-primary hover:underline">
-                    Forgot your password?
+                    {t("auth.login.forgotPassword")}
                   </Link>
                 </div>
                 <Input
@@ -91,7 +93,7 @@ export function LoginForm({
 
               <Field>
                 <Button type="submit" disabled={loading}>
-                  {loading ? "Logging in..." : "Login"}
+                  {loading ? t("auth.login.submitting") : t("auth.login.submit")}
                 </Button>
               </Field>
             </FieldGroup>

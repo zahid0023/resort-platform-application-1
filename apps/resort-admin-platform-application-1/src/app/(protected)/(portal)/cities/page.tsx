@@ -1,78 +1,269 @@
-"use client"
+"use client";
 
-import { useCallback, useEffect, useState } from "react"
-import { toast } from "sonner"
-import { PlusIcon, ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
-import { CityDialog } from "@/components/cities/city-dialog"
-import { CityCard } from "@/components/cities/city-card"
+import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import { MapPin, Plus, Search, X } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  listCities, getCity, deleteCity,
-  type CitySummary, type City, type CityListResponse,
-} from "@/services/cities"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { CityCard } from "@/components/cities/city-card";
+import { CityDialog, emptyCityForm } from "@/components/cities/city-dialog";
+import type { CityDialogMode, CityFormState } from "@/components/cities/types";
+import { citiesService, type City } from "@/services/cities";
+import { countriesService, type Country } from "@/services/countries";
+import { localesService, type Locale } from "@/services/locales";
+import { toast } from "sonner";
 
 export default function CitiesPage() {
-  const [data, setData] = useState<CityListResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(0)
-  const [dialogOpen, setDialogOpen] = useState(false)
-  const [editing, setEditing] = useState<City | null>(null)
+  const { t } = useTranslation();
 
-  const fetchList = useCallback(async () => {
-    setLoading(true)
-    try { setData(await listCities({ page, size: 10, sort_by: "name", sort_dir: "ASC" })) }
-    catch (err) { toast.error(err instanceof Error ? err.message : "Failed to load cities.") }
-    finally { setLoading(false) }
-  }, [page])
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [selectedCountryId, setSelectedCountryId] = useState<number | null>(null);
+  const [cities, setCities] = useState<City[]>([]);
+  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState("");
 
-  useEffect(() => { fetchList() }, [fetchList])
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [mode, setMode] = useState<CityDialogMode>("create");
+  const [activeCityId, setActiveCityId] = useState<number | undefined>(undefined);
+  const [form, setForm] = useState<CityFormState>(emptyCityForm);
 
-  const handleEdit = async (row: CitySummary) => {
-    try { const res = await getCity(row.id); setEditing(res.data); setDialogOpen(true) }
-    catch (err) { toast.error(err instanceof Error ? err.message : "Failed to load city.") }
+  const [deleteTarget, setDeleteTarget] = useState<City | null>(null);
+
+  useEffect(() => {
+    countriesService
+      .list({ size: 50, sort_by: "sortOrder" })
+      .then((res) => setCountries(res.data))
+      .catch(() => {});
+    localesService
+      .list({ size: 50, sort_by: "sortOrder" })
+      .then((res) => setAvailableLocales(res.data))
+      .catch(() => {});
+  }, []);
+
+  async function refresh(countryId: number) {
+    setLoading(true);
+    try {
+      const res = await citiesService.list(countryId, { size: 50 });
+      setCities(res.data);
+      setForm((prev) => {
+        if (!dialogOpen || activeCityId == null) return prev;
+        const updated = res.data.find((c) => c.id === activeCityId);
+        if (!updated) return prev;
+        return {
+          ...prev,
+          locales: updated.locales.map((l) => ({
+            id: l.id,
+            locale_id: l.locale_id,
+            name: l.name,
+            description: l.description ?? "",
+            sort_order: l.sort_order,
+          })),
+        };
+      });
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const handleDelete = async (id: number) => {
-    try { await deleteCity(id); toast.success("City deleted."); fetchList() }
-    catch (err) { toast.error(err instanceof Error ? err.message : "Failed to delete city.") }
+  function handleCountryChange(val: string) {
+    const id = Number(val);
+    setSelectedCountryId(id);
+    setCities([]);
+    setSearch("");
+    refresh(id);
   }
+
+  const cityNames = useMemo(() => {
+    const out: Record<number, string> = {};
+    for (const c of cities) {
+      out[c.id] = c.locales[0]?.name ?? "";
+    }
+    return out;
+  }, [cities]);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return cities;
+    return cities.filter((c) => {
+      const code = (c.code ?? "").toLowerCase();
+      const name = (cityNames[c.id] ?? "").toLowerCase();
+      return code.includes(q) || name.includes(q);
+    });
+  }, [cities, cityNames, search]);
+
+  function openCreate() {
+    setMode("create");
+    setActiveCityId(undefined);
+    setForm(emptyCityForm);
+    setDialogOpen(true);
+  }
+
+  function openDialog(c: City) {
+    setMode("view");
+    setActiveCityId(c.id);
+    setForm({
+      code: c.code ?? "",
+      sort_order: c.sort_order,
+      locales: c.locales.map((l) => ({
+        id: l.id,
+        locale_id: l.locale_id,
+        name: l.name,
+        description: l.description ?? "",
+        sort_order: l.sort_order,
+      })),
+    });
+    setDialogOpen(true);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget || selectedCountryId == null) return;
+    try {
+      await citiesService.remove(selectedCountryId, deleteTarget.id);
+      toast.success(t("cities.deleted"));
+      setDeleteTarget(null);
+      await refresh(selectedCountryId);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+
+  const selectedCountry = countries.find((c) => c.id === selectedCountryId);
+  const selectedCountryName = selectedCountry
+    ? (selectedCountry.locales[0]?.name ?? selectedCountry.code)
+    : null;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+    <div className="max-w-6xl mx-auto space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold">Cities</h1>
-          <p className="text-sm text-muted-foreground">Manage cities linked to countries.</p>
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("common.admin")}</p>
+          <h1 className="text-3xl font-semibold tracking-tight">{t("cities.title")}</h1>
+          <p className="text-muted-foreground text-sm mt-1">{t("cities.subtitle")}</p>
         </div>
-        <Button onClick={() => { setEditing(null); setDialogOpen(true) }}>
-          <PlusIcon />New City
-        </Button>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={selectedCountryId ? String(selectedCountryId) : ""} onValueChange={handleCountryChange}>
+            <SelectTrigger className="w-52 h-10">
+              <SelectValue placeholder={t("cities.selectCountry")} />
+            </SelectTrigger>
+            <SelectContent>
+              {countries.map((c) => (
+                <SelectItem key={c.id} value={String(c.id)}>
+                  {c.locales[0]?.name ?? c.code} ({c.code})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {selectedCountryId != null && (
+            <>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={`${t("common.search")}…`}
+                  className="pl-9 pr-9 w-56 h-10"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    aria-label="Clear search"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <Button onClick={openCreate}>
+                <Plus className="h-4 w-4 mr-1.5" /> {t("cities.new")}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-20"><Spinner className="size-6" /></div>
-      ) : data?.data.length === 0 ? (
-        <div className="flex justify-center py-20 text-sm text-muted-foreground">No cities found.</div>
+      {selectedCountryId == null ? (
+        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground border rounded-xl border-dashed gap-3">
+          <MapPin className="h-8 w-8 opacity-30" />
+          <p className="text-sm">{t("cities.selectCountry")}</p>
+        </div>
+      ) : loading ? (
+        <div className="text-center py-16 text-muted-foreground">{t("cities.loading")}</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16 text-muted-foreground border rounded-xl border-dashed">
+          {t("cities.empty")}
+        </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {data?.data.map(row => (
-            <CityCard key={row.id} data={row} onEdit={handleEdit} onDelete={handleDelete} />
-          ))}
-        </div>
-      )}
-
-      {data && data.total_pages > 1 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>Page {data.current_page + 1} of {data.total_pages} — {data.total_elements} total</span>
-          <div className="flex gap-2">
-            <Button size="icon-sm" variant="outline" disabled={!data.has_previous} onClick={() => setPage(p => p - 1)}><ChevronLeftIcon /></Button>
-            <Button size="icon-sm" variant="outline" disabled={!data.has_next} onClick={() => setPage(p => p + 1)}><ChevronRightIcon /></Button>
+        <>
+          {selectedCountryName && (
+            <p className="text-sm text-muted-foreground">
+              {t("cities.showingFor", { country: selectedCountryName })}
+            </p>
+          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map((c) => (
+              <CityCard
+                key={c.id}
+                city={c}
+                defaultName={cityNames[c.id]}
+                onView={(city) => openDialog(city)}
+                onDelete={(city) => setDeleteTarget(city)}
+              />
+            ))}
           </div>
-        </div>
+        </>
       )}
 
-      <CityDialog open={dialogOpen} onOpenChange={setDialogOpen} editing={editing} onSuccess={fetchList} />
+      {selectedCountryId != null && (
+        <CityDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          mode={mode}
+          countryId={selectedCountryId}
+          cityId={activeCityId}
+          form={form}
+          onFormChange={setForm}
+          availableLocales={availableLocales}
+          onSaved={() => refresh(selectedCountryId)}
+        />
+      )}
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("delete.city.title")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("delete.city.desc", { code: deleteTarget?.code ?? `#${deleteTarget?.id}` })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>{t("common.delete")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
-  )
+  );
 }

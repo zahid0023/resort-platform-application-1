@@ -1,81 +1,263 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { toast } from "sonner"
+import { useState, useRef, useEffect } from "react"
+import { useTranslation } from "react-i18next"
+import { Pencil, Plus, X, Languages, Check, Trash2, Wrench } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog"
-import { createFacility, updateFacility, type Facility, type IconType } from "@/services/facilities"
-import { EntityCardPreview } from "@/components/shared/entity-card-preview"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
+import {
+  createFacility,
+  updateFacility,
+  addFacilityLocale,
+  updateFacilityLocale,
+  removeFacilityLocale,
+  type IconType,
+} from "@/services/facilities"
 import { EntityIconFields, type IconFormState } from "@/components/shared/entity-icon-fields"
+import type { Locale } from "@/services/locales"
+import { toast } from "sonner"
 
-interface FacilityDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  facilityGroupId: number
-  editing: Facility | null
-  onSuccess: () => void
-}
+export type FacilityDialogMode = "create" | "view"
 
-interface FormState extends IconFormState {
-  code: string
+interface LocaleRow {
+  id?: number
+  locale_id: number | ""
   name: string
   description: string
   sort_order: number
+  _new?: boolean
 }
 
-const emptyForm: FormState = {
-  code: "", name: "", description: "", sort_order: 0,
+type NewLocaleRow = LocaleRow & { _rkey: string }
+
+export interface FacilityFormState extends IconFormState {
+  code: string
+  sort_order: number
+  locales: LocaleRow[]
+}
+
+export const emptyFacilityForm: FacilityFormState = {
+  code: "", sort_order: 0, locales: [],
   icon_type: "", icon_value: "", icon_color: "", icon_size: "",
 }
 
-const toFormState = (item: Facility | null): FormState => {
-  if (!item) return emptyForm
-  const meta = item.icon_meta ?? {}
-  const color = typeof meta.color === "string" ? meta.color : ""
-  const sizeRaw = meta.size
-  const size = typeof sizeRaw === "number" ? String(sizeRaw) : typeof sizeRaw === "string" ? sizeRaw : ""
-  return {
-    code: item.code,
-    name: item.name,
-    description: item.description ?? "",
-    sort_order: item.sort_order ?? 0,
-    icon_type: item.icon_type,
-    icon_value: item.icon_value,
-    icon_color: color,
-    icon_size: size,
-  }
+interface Props {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  mode: FacilityDialogMode
+  facilityGroupId: number
+  facilityId?: number
+  form: FacilityFormState
+  onFormChange: (form: FacilityFormState) => void
+  availableLocales: Locale[]
+  onSaved?: () => void | Promise<void>
 }
 
-export function FacilityDialog({ open, onOpenChange, facilityGroupId, editing, onSuccess }: FacilityDialogProps) {
-  const [form, setForm] = useState<FormState>(() => toFormState(editing))
-  const [loading, setLoading] = useState(false)
+type LocalGeneralState = { sort_order: number } & IconFormState
+
+export function FacilityDialog({
+  open, onOpenChange, mode, facilityGroupId, facilityId, form, onFormChange, availableLocales, onSaved,
+}: Props) {
+  const { t } = useTranslation()
+
+  const [submitting, setSubmitting] = useState(false)
+
+  const [generalEditing, setGeneralEditing] = useState(false)
+  const [localGeneral, setLocalGeneral] = useState<LocalGeneralState>({
+    sort_order: 0, icon_type: "", icon_value: "", icon_color: "", icon_size: "",
+  })
+  const [submittingGeneral, setSubmittingGeneral] = useState(false)
+
+  const [translationsEditing, setTranslationsEditing] = useState(false)
+  const [newLocaleRows, setNewLocaleRows] = useState<NewLocaleRow[]>([])
+  const [rowEditData, setRowEditData] = useState<Record<string, LocaleRow>>({})
+  const [busyRowKeys, setBusyRowKeys] = useState<Set<string>>(new Set())
+  const rKeyCounter = useRef(0)
 
   useEffect(() => {
-    if (open) {
-      setForm(toFormState(editing))
-      setLoading(false)
+    if (!open) {
+      setGeneralEditing(false)
+      setTranslationsEditing(false)
+      setNewLocaleRows([])
+      setRowEditData({})
+      setBusyRowKeys(new Set())
     }
-  }, [open, editing])
+  }, [open])
 
-  const set = (patch: Partial<FormState>) => setForm((prev) => ({ ...prev, ...patch }))
+  // ── General section ──
+  function startEditGeneral() {
+    setLocalGeneral({
+      sort_order: form.sort_order,
+      icon_type: form.icon_type,
+      icon_value: form.icon_value,
+      icon_color: form.icon_color,
+      icon_size: form.icon_size,
+    })
+    setGeneralEditing(true)
+  }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function saveGeneral() {
+    if (facilityId == null) return
+    if (!localGeneral.icon_type) { toast.error(t("facilityDialog.errIconType")); return }
+    let icon_meta: Record<string, unknown> | undefined
+    if (localGeneral.icon_color || localGeneral.icon_size) {
+      icon_meta = {}
+      if (localGeneral.icon_color) icon_meta.color = localGeneral.icon_color
+      if (localGeneral.icon_size) icon_meta.size = Number(localGeneral.icon_size)
+    }
+    setSubmittingGeneral(true)
+    try {
+      await updateFacility(facilityGroupId, facilityId, {
+        sort_order: Number(localGeneral.sort_order) || 0,
+        icon_type: localGeneral.icon_type as IconType,
+        icon_value: localGeneral.icon_value || undefined,
+        icon_meta,
+      })
+      toast.success(t("facility.updated"))
+      setGeneralEditing(false)
+      onFormChange({ ...form, ...localGeneral })
+      await onSaved?.()
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      setSubmittingGeneral(false)
+    }
+  }
+
+  // ── Per-row locale helpers ──
+  function rowKey(row: LocaleRow): string {
+    return row.id != null ? `e_${row.id}` : (row as NewLocaleRow)._rkey ?? ""
+  }
+  function isRowEditing(key: string) { return key in rowEditData }
+  function isRowBusy(key: string) { return busyRowKeys.has(key) }
+
+  function startEditRow(key: string, row: LocaleRow) {
+    setRowEditData((prev) => ({ ...prev, [key]: { ...row } }))
+  }
+
+  function cancelEditRow(key: string, isNew: boolean) {
+    setRowEditData((prev) => { const n = { ...prev }; delete n[key]; return n })
+    if (isNew) setNewLocaleRows((prev) => prev.filter((r) => r._rkey !== key))
+  }
+
+  function patchRowEdit(key: string, patch: Partial<LocaleRow>) {
+    setRowEditData((prev) => prev[key] ? { ...prev, [key]: { ...prev[key], ...patch } } : prev)
+  }
+
+  function setBusy(key: string, busy: boolean) {
+    setBusyRowKeys((prev) => {
+      const n = new Set(prev)
+      busy ? n.add(key) : n.delete(key)
+      return n
+    })
+  }
+
+  async function saveRow(key: string, row: LocaleRow, isNew: boolean) {
+    if (facilityId == null) return
+    const data = rowEditData[key]
+    if (!data) return
+    if (!data.locale_id) { toast.error(t("toast.localeSelectLang", { n: 1 })); return }
+    if (!data.name.trim()) { toast.error(t("toast.localeNameRequired", { n: 1 })); return }
+    setBusy(key, true)
+    try {
+      if (isNew) {
+        await addFacilityLocale(facilityGroupId, facilityId, {
+          locale_id: Number(data.locale_id),
+          name: data.name.trim(),
+          description: data.description?.trim() || undefined,
+          sort_order: Number(data.sort_order) || 0,
+        })
+        setNewLocaleRows((prev) => prev.filter((r) => r._rkey !== key))
+      } else {
+        await updateFacilityLocale(facilityGroupId, facilityId, row.id!, {
+          name: data.name.trim(),
+          description: data.description?.trim() || undefined,
+          sort_order: Number(data.sort_order) || 0,
+        })
+      }
+      setRowEditData((prev) => { const n = { ...prev }; delete n[key]; return n })
+      toast.success(t("common.save"))
+      await onSaved?.()
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      setBusy(key, false)
+    }
+  }
+
+  async function deleteRow(row: LocaleRow) {
+    if (facilityId == null || !row.id) return
+    const key = rowKey(row)
+    setBusy(key, true)
+    try {
+      await removeFacilityLocale(facilityGroupId, facilityId, row.id)
+      toast.success("Locale removed")
+      await onSaved?.()
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      setBusy(key, false)
+    }
+  }
+
+  function addNewLocaleRow() {
+    const usedIds = new Set([
+      ...form.locales.map((r) => r.locale_id),
+      ...newLocaleRows.map((r) => r.locale_id),
+    ].filter((v): v is number => typeof v === "number"))
+    const nextLocale = availableLocales.find((l) => !usedIds.has(l.id))
+    const _rkey = `n_${rKeyCounter.current++}`
+    const newRow: NewLocaleRow = {
+      _rkey, locale_id: nextLocale?.id ?? "", name: "", description: "",
+      sort_order: form.locales.length + newLocaleRows.length + 1, _new: true,
+    }
+    setNewLocaleRows((prev) => [...prev, newRow])
+    setRowEditData((prev) => ({ ...prev, [_rkey]: { ...newRow } }))
+  }
+
+  // ── Create mode helpers ──
+  function setForm(patch: Partial<FacilityFormState>) {
+    onFormChange({ ...form, ...patch })
+  }
+
+  function addLocaleRow() {
+    const usedIds = new Set(
+      form.locales.map((r) => r.locale_id).filter((v): v is number => typeof v === "number"),
+    )
+    const nextLocale = availableLocales.find((l) => !usedIds.has(l.id))
+    onFormChange({
+      ...form,
+      locales: [
+        ...form.locales,
+        { locale_id: nextLocale ? nextLocale.id : "", name: "", description: "", sort_order: form.locales.length + 1, _new: true },
+      ],
+    })
+  }
+
+  function updateLocaleRow(idx: number, patch: Partial<LocaleRow>) {
+    onFormChange({ ...form, locales: form.locales.map((row, i) => (i === idx ? { ...row, ...patch } : row)) })
+  }
+
+  function removeLocaleRow(idx: number) {
+    onFormChange({ ...form, locales: form.locales.filter((_, i) => i !== idx) })
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.icon_type) {
-      toast.error("Select an icon type", { description: "Please choose an icon type before saving." })
-      return
-    }
-    if (!form.icon_value) {
-      toast.error(
-        form.icon_type === "LUCIDE" ? "Pick an icon" : "Icon value required",
-        { description: form.icon_type === "LUCIDE" ? "Please select a Lucide icon below." : "Please enter an icon value." },
-      )
-      return
+    if (mode !== "create") return
+    if (!form.code.trim()) { toast.error(t("toast.codeRequired")); return }
+    if (!form.icon_type) { toast.error(t("facilityDialog.errIconType")); return }
+    for (const [i, row] of form.locales.entries()) {
+      if (!row.locale_id) { toast.error(t("toast.localeSelectLang", { n: i + 1 })); return }
+      if (!row.name.trim()) { toast.error(t("toast.localeNameRequired", { n: i + 1 })); return }
     }
     let icon_meta: Record<string, unknown> | undefined
     if (form.icon_color || form.icon_size) {
@@ -83,114 +265,396 @@ export function FacilityDialog({ open, onOpenChange, facilityGroupId, editing, o
       if (form.icon_color) icon_meta.color = form.icon_color
       if (form.icon_size) icon_meta.size = Number(form.icon_size)
     }
-    setLoading(true)
+    setSubmitting(true)
     try {
-      const payload = {
-        facility_group_id: facilityGroupId,
-        code: form.code,
-        name: form.name,
-        description: form.description || undefined,
-        sort_order: form.sort_order,
+      await createFacility(facilityGroupId, {
+        code: form.code.trim().toUpperCase(),
+        sort_order: Number(form.sort_order) || 0,
         icon_type: form.icon_type as IconType,
-        icon_value: form.icon_value,
+        icon_value: form.icon_value || undefined,
         icon_meta,
-      }
-      if (editing) {
-        await updateFacility(editing.id, payload)
-        toast.success("Facility updated successfully!")
-      } else {
-        await createFacility(payload)
-        toast.success("Facility created successfully!")
-      }
-      onSuccess()
+        locales: form.locales.map((row) => ({
+          locale_id: Number(row.locale_id),
+          name: row.name.trim(),
+          description: row.description.trim() || undefined,
+          sort_order: Number(row.sort_order) || 0,
+        })),
+      })
+      toast.success(t("facility.created"))
       onOpenChange(false)
+      await onSaved?.()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Something went wrong.")
+      toast.error((err as Error).message)
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
+  const allLocaleRows: Array<LocaleRow & { _rkey: string }> = [
+    ...form.locales.map((l) => ({ ...l, _rkey: `e_${l.id}` })),
+    ...newLocaleRows,
+  ]
+
+  const isEditing = generalEditing || translationsEditing
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="gap-0 p-0 sm:max-w-lg overflow-hidden">
-        <form onSubmit={handleSubmit} className="flex flex-col max-h-[90vh]">
-          <DialogHeader className="shrink-0 space-y-3 border-b border-border/50 bg-background/95 px-6 pt-6 pb-4 backdrop-blur-md">
-            <DialogTitle>{editing ? "Edit Facility" : "New Facility"}</DialogTitle>
-            <DialogDescription>
-              {editing ? "Update the details of this facility." : "Create a new facility within this group."}
-            </DialogDescription>
-            <EntityCardPreview
-              name={form.name}
-              code={form.code}
-              description={form.description}
-              sort_order={form.sort_order}
-              icon_type={form.icon_type}
-              icon_value={form.icon_value}
-              icon_color={form.icon_color}
-              id={editing?.id}
-              namePlaceholder="Untitled facility"
-            />
+      <DialogContent className="max-w-2xl p-0 gap-0 overflow-hidden flex flex-col max-h-[90vh]">
+        <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
+
+          {/* ── HEADER ── */}
+          <DialogHeader className="shrink-0 px-6 py-5 border-b bg-muted/40">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                <Wrench className="h-4 w-4" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-semibold leading-tight">
+                  {mode === "create" ? t("facilityDialog.create")
+                    : isEditing ? t("facilityDialog.edit")
+                    : t("facilityDialog.view")}
+                </DialogTitle>
+                <DialogDescription className="text-xs mt-0.5">
+                  {mode === "create" ? t("facilityDialog.descCreate")
+                    : isEditing ? t("facilityDialog.descEdit")
+                    : t("facilityDialog.descView")}
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
 
-          <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-6 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="code">Code</Label>
-                <Input
-                  id="code"
-                  value={form.code}
-                  onChange={(e) => set({ code: e.target.value.toUpperCase().replace(/[^A-Z0-9_\s]/g, "").replace(/\s+/g, "_").replace(/_+/g, "_") })}
-                  placeholder="POOL_OUTDOOR"
-                  maxLength={100}
-                  required
+          {/* ── CONTENT ── */}
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+
+            {/* General Information */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-1 w-1 rounded-full bg-primary" />
+                  <h3 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+                    General Information
+                  </h3>
+                </div>
+
+                {mode !== "create" && !generalEditing && (
+                  <Button type="button" size="sm" variant="outline" onClick={startEditGeneral} className="h-7 text-xs px-2.5 gap-1.5">
+                    <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                  </Button>
+                )}
+                {generalEditing && (
+                  <div className="flex items-center gap-1.5">
+                    <Button type="button" size="sm" variant="outline" onClick={() => setGeneralEditing(false)} disabled={submittingGeneral} className="h-7 text-xs px-2.5 gap-1.5">
+                      <X className="h-3.5 w-3.5" /> {t("common.cancel")}
+                    </Button>
+                    <Button type="button" size="sm" onClick={saveGeneral} disabled={submittingGeneral} className="h-7 text-xs px-2.5 gap-1.5">
+                      <Check className="h-3.5 w-3.5" />
+                      {submittingGeneral ? t("common.saving") : t("common.save")}
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl border bg-card p-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="f-code" className="text-xs font-medium">{t("common.code")} *</Label>
+                    <Input
+                      id="f-code"
+                      value={form.code}
+                      onChange={(e) => setForm({ code: e.target.value.toUpperCase().replace(/[^A-Z0-9_\s]/g, "").replace(/\s+/g, "_").replace(/_+/g, "_") })}
+                      placeholder="POOL_OUTDOOR"
+                      maxLength={100}
+                      required
+                      disabled={mode !== "create"}
+                      className="font-mono"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="f-sort" className="text-xs font-medium">{t("field.sort")}</Label>
+                    <Input
+                      id="f-sort"
+                      type="number"
+                      value={generalEditing ? localGeneral.sort_order : form.sort_order}
+                      onChange={(e) => {
+                        if (generalEditing) setLocalGeneral((prev) => ({ ...prev, sort_order: Number(e.target.value) }))
+                        else setForm({ sort_order: Number(e.target.value) })
+                      }}
+                      disabled={!generalEditing && mode !== "create"}
+                    />
+                  </div>
+                </div>
+
+                <EntityIconFields
+                  value={generalEditing ? localGeneral : form}
+                  onChange={(patch) => {
+                    if (generalEditing) setLocalGeneral((prev) => ({ ...prev, ...patch }))
+                    else setForm(patch)
+                  }}
+                  readOnly={!generalEditing && mode !== "create"}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="sort_order">Sort Order</Label>
-                <Input
-                  id="sort_order"
-                  type="number"
-                  value={form.sort_order}
-                  onChange={(e) => set({ sort_order: Number(e.target.value) })}
-                />
+            </div>
+
+            {/* Locale Translations */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="h-1 w-1 rounded-full bg-primary" />
+                  <h3 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+                    {t("locale.translations")}
+                  </h3>
+                </div>
+
+                {mode !== "create" && !translationsEditing && (
+                  <Button type="button" size="sm" variant="outline" onClick={() => setTranslationsEditing(true)} className="h-7 text-xs px-2.5 gap-1.5">
+                    <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+                  </Button>
+                )}
+                {translationsEditing && (
+                  <div className="flex items-center gap-1.5">
+                    <Button type="button" size="sm" variant="outline" onClick={() => setTranslationsEditing(false)} className="h-7 text-xs px-2.5 gap-1.5">
+                      <X className="h-3.5 w-3.5" /> {t("common.cancel")}
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" onClick={addNewLocaleRow}
+                      disabled={(form.locales.length + newLocaleRows.length) >= availableLocales.length}
+                      className="h-7 text-xs px-2.5"
+                    >
+                      <Plus className="h-3.5 w-3.5 mr-1" /> {t("locale.add")}
+                    </Button>
+                  </div>
+                )}
+                {mode === "create" && (
+                  <Button type="button" size="sm" variant="outline" onClick={addLocaleRow}
+                    disabled={form.locales.length >= availableLocales.length}
+                    className="h-7 text-xs px-2.5"
+                  >
+                    <Plus className="h-3.5 w-3.5 mr-1" /> {t("locale.add")}
+                  </Button>
+                )}
+              </div>
+
+              <div className="rounded-xl border bg-card overflow-hidden">
+
+                {/* VIEW mode */}
+                {!translationsEditing && mode !== "create" && (
+                  form.locales.length === 0 ? (
+                    <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                      <Languages className="h-4 w-4 mr-2 opacity-40" />
+                      {t("locale.empty.country")}
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {form.locales.map((row, idx) => {
+                        const localeMeta = availableLocales.find((l) => l.id === row.locale_id)
+                        return (
+                          <div key={`e_${row.id}`} className="p-4 space-y-3">
+                            <div className="flex items-center gap-2 text-sm font-medium">
+                              <Languages className="h-3.5 w-3.5 text-muted-foreground" />
+                              {localeMeta ? `${localeMeta.name} (${localeMeta.code})` : t("locale.row.label", { n: idx + 1 })}
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div className="space-y-1.5 sm:col-span-2">
+                                <Label className="text-xs text-muted-foreground">{t("common.name")}</Label>
+                                <p className="text-sm font-medium">{row.name}</p>
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">{t("field.sort")}</Label>
+                                <p className="text-sm">{row.sort_order}</p>
+                              </div>
+                            </div>
+                            {row.description && (
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">{t("common.description")}</Label>
+                                <p className="text-sm text-muted-foreground">{row.description}</p>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                )}
+
+                {/* CREATE mode */}
+                {mode === "create" && (
+                  form.locales.length === 0 ? (
+                    <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                      <Languages className="h-4 w-4 mr-2 opacity-40" />
+                      {t("locale.empty.create")}
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {form.locales.map((row, idx) => {
+                        const usedIds = form.locales.map((r, i) => i !== idx ? r.locale_id : null).filter((v): v is number => typeof v === "number")
+                        return (
+                          <div key={idx} className="p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-sm font-medium">
+                                <Languages className="h-3.5 w-3.5 text-muted-foreground" />
+                                {t("locale.row.label", { n: idx + 1 })}
+                                <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-medium">{t("locale.row.new")}</span>
+                              </div>
+                              <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => removeLocaleRow(idx)}>
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div className="space-y-1.5 sm:col-span-2">
+                                <Label className="text-xs text-muted-foreground">{t("field.language")} *</Label>
+                                <Select
+                                  value={row.locale_id ? String(row.locale_id) : ""}
+                                  onValueChange={(v) => updateLocaleRow(idx, { locale_id: Number(v) })}
+                                >
+                                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder={t("placeholder.selectLanguage")} /></SelectTrigger>
+                                  <SelectContent>
+                                    {availableLocales.map((l) => (
+                                      <SelectItem key={l.id} value={String(l.id)} disabled={usedIds.includes(l.id)}>
+                                        {l.name} ({l.code})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">{t("field.sort")} *</Label>
+                                <Input type="number" value={row.sort_order} onChange={(e) => updateLocaleRow(idx, { sort_order: Number(e.target.value) })} className="h-9 text-sm" />
+                              </div>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">{t("common.name")} *</Label>
+                              <Input value={row.name} onChange={(e) => updateLocaleRow(idx, { name: e.target.value })} placeholder={t("facilityDialog.namePlaceholder")} className="h-9 text-sm" />
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">{t("common.description")}</Label>
+                              <Textarea value={row.description} onChange={(e) => updateLocaleRow(idx, { description: e.target.value })} rows={2} className="text-sm resize-none" />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                )}
+
+                {/* TRANSLATIONS EDITING mode */}
+                {translationsEditing && (
+                  allLocaleRows.length === 0 ? (
+                    <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                      <Languages className="h-4 w-4 mr-2 opacity-40" />
+                      {t("locale.empty.country")}
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {allLocaleRows.map((row) => {
+                        const key = row._rkey
+                        const isNew = !!row._new
+                        const editing = isRowEditing(key)
+                        const busy = isRowBusy(key)
+                        const editData = rowEditData[key] ?? row
+                        const localeMeta = availableLocales.find((l) => l.id === row.locale_id)
+                        const usedIds = allLocaleRows.filter((r) => r._rkey !== key).map((r) => r.locale_id).filter((v): v is number => typeof v === "number")
+
+                        return (
+                          <div key={key} className="p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2 text-sm font-medium">
+                                <Languages className="h-3.5 w-3.5 text-muted-foreground" />
+                                {!editing && localeMeta
+                                  ? `${localeMeta.name} (${localeMeta.code})`
+                                  : t("locale.row.label", { n: allLocaleRows.indexOf(row) + 1 })}
+                                {isNew && (
+                                  <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-medium">
+                                    {t("locale.row.new")}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                {!editing && (
+                                  <>
+                                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditRow(key, row)} disabled={busy}>
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                    {!isNew && (
+                                      <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => deleteRow(row)} disabled={busy}>
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
+                                  </>
+                                )}
+                                {editing && (
+                                  <>
+                                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => cancelEditRow(key, isNew)} disabled={busy}>
+                                      <X className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button type="button" size="icon" variant="ghost" className="h-7 w-7 text-primary" onClick={() => saveRow(key, row, isNew)} disabled={busy}>
+                                      <Check className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div className="space-y-1.5 sm:col-span-2">
+                                <Label className="text-xs text-muted-foreground">{t("field.language")} *</Label>
+                                <Select
+                                  value={editData.locale_id ? String(editData.locale_id) : ""}
+                                  onValueChange={(v) => patchRowEdit(key, { locale_id: Number(v) })}
+                                  disabled={!editing || !isNew}
+                                >
+                                  <SelectTrigger className="h-9 text-sm"><SelectValue placeholder={t("placeholder.selectLanguage")} /></SelectTrigger>
+                                  <SelectContent>
+                                    {availableLocales.map((l) => (
+                                      <SelectItem key={l.id} value={String(l.id)} disabled={usedIds.includes(l.id)}>
+                                        {l.name} ({l.code})
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-xs text-muted-foreground">{t("field.sort")} *</Label>
+                                <Input type="number" value={editData.sort_order} onChange={(e) => patchRowEdit(key, { sort_order: Number(e.target.value) })} disabled={!editing} className="h-9 text-sm" />
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">{t("common.name")} *</Label>
+                              <Input value={editData.name} onChange={(e) => patchRowEdit(key, { name: e.target.value })} placeholder={t("facilityDialog.namePlaceholder")} disabled={!editing} className="h-9 text-sm" />
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-muted-foreground">{t("common.description")}</Label>
+                              <Textarea value={editData.description} onChange={(e) => patchRowEdit(key, { description: e.target.value })} disabled={!editing} rows={2} className="text-sm resize-none" />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                )}
               </div>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                value={form.name}
-                onChange={(e) => set({ name: e.target.value })}
-                placeholder="Outdoor Pool"
-                maxLength={255}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={form.description}
-                onChange={(e) => set({ description: e.target.value })}
-                placeholder="Optional description..."
-                rows={3}
-              />
-            </div>
-
-            <EntityIconFields value={form} onChange={set} />
           </div>
 
-          <DialogFooter className="shrink-0 border-t border-border/50 bg-background/95 px-6 py-4 backdrop-blur-md">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? (editing ? "Saving..." : "Creating...") : (editing ? "Save changes" : "Create")}
-            </Button>
-          </DialogFooter>
+          {/* ── FOOTER (create mode only) ── */}
+          {mode === "create" && (
+            <DialogFooter className="shrink-0 px-6 py-4 border-t bg-muted/40">
+              <div className="flex items-center gap-2 w-full justify-end">
+                <Button type="button" variant="outline" size="sm" onClick={() => onOpenChange(false)} disabled={submitting} className="gap-1.5">
+                  <X className="h-3.5 w-3.5" /> {t("common.cancel")}
+                </Button>
+                <Button type="submit" size="sm" disabled={submitting} className="gap-1.5">
+                  <Check className="h-3.5 w-3.5" />
+                  {submitting ? t("common.saving") : t("common.create")}
+                </Button>
+              </div>
+            </DialogFooter>
+          )}
+
         </form>
       </DialogContent>
     </Dialog>
   )
 }
+
+export default FacilityDialog

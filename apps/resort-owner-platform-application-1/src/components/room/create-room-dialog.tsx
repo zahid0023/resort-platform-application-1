@@ -68,11 +68,11 @@ const CreateRoomDialog = ({
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); onOpenChange(v); }}>
       <DialogContent className="max-w-2xl p-0 overflow-hidden bg-card border-border">
-        <div className="relative bg-gradient-ocean text-primary-foreground p-8">
-          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-primary-foreground/70 mb-3">
+        <div className="relative p-8">
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.3em] mb-3">
             <Sparkles className="h-3 w-3" /> New room · {categoryName}
           </div>
-          <h2 className="font-display text-3xl">Compose a new stay</h2>
+          <h2 className="text-3xl">Compose a new stay</h2>
         </div>
 
         <form onSubmit={submit} className="p-8 space-y-6">
@@ -84,6 +84,7 @@ const CreateRoomDialog = ({
               <Input id="r-name" value={name} onChange={(e) => setName(e.target.value)}
                 placeholder="Lagoon Suite 04" className="bg-background" />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="roomNumber" className="text-xs uppercase tracking-[0.2em] text-muted-foreground inline-flex items-center gap-1.5">
                 <Hash className="h-3 w-3" /> Room number
@@ -146,7 +147,7 @@ const CreateRoomDialog = ({
               Cancel
             </Button>
             <Button type="submit" disabled={submitting}
-              className="bg-gradient-ocean text-primary-foreground hover:opacity-95">
+              className="hover:cursor-pointer">
               {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Add room
             </Button>

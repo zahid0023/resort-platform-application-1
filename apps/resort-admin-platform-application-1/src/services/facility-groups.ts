@@ -2,26 +2,32 @@ import { api } from "./api";
 
 export type IconType = "LUCIDE" | "IMAGE" | "SVG" | "EXTERNAL";
 
+export interface FacilityGroupLocale {
+  id: number;
+  locale_id: number;
+  name: string;
+  description?: string;
+  sort_order: number;
+}
+
 export interface FacilityGroupSummary {
   id: number;
   code: string;
-  name: string;
-  description?: string;
   sort_order: number;
   icon_type: IconType;
   icon_value: string;
   icon_meta?: Record<string, unknown>;
+  locales: FacilityGroupLocale[];
 }
 
 export interface FacilityGroup {
   id: number;
   code: string;
-  name: string;
-  description?: string;
   sort_order: number;
   icon_type: IconType;
   icon_value: string;
   icon_meta?: Record<string, unknown>;
+  locales: FacilityGroupLocale[];
 }
 
 export interface FacilityGroupListResponse {
@@ -34,24 +40,33 @@ export interface FacilityGroupListResponse {
   has_previous: boolean;
 }
 
-export interface CreateFacilityGroupRequest {
-  code: string;
+export interface CreateFacilityGroupLocaleRequest {
+  locale_id: number;
   name: string;
   description?: string;
+  sort_order: number;
+}
+
+export interface CreateFacilityGroupRequest {
+  code: string;
   sort_order?: number;
   icon_type: IconType;
-  icon_value: string;
+  icon_value?: string;
   icon_meta?: Record<string, unknown>;
+  locales?: CreateFacilityGroupLocaleRequest[];
 }
 
 export interface UpdateFacilityGroupRequest {
-  code?: string;
-  name?: string;
-  description?: string;
   sort_order?: number;
-  icon_type?: IconType;
+  icon_type: IconType;
   icon_value?: string;
   icon_meta?: Record<string, unknown>;
+}
+
+export interface UpdateFacilityGroupLocaleRequest {
+  name: string;
+  description?: string;
+  sort_order: number;
 }
 
 export interface MutationResponse {
@@ -62,7 +77,7 @@ export interface MutationResponse {
 export interface ListParams {
   page?: number;
   size?: number;
-  sort_by?: "id" | "code" | "name";
+  sort_by?: "id" | "code" | "sort_order" | "created_at";
   sort_dir?: "ASC" | "DESC";
 }
 
@@ -89,3 +104,12 @@ export const deleteFacilityGroup = (id: number): Promise<MutationResponse> =>
 
 export const getIconTypes = (): Promise<IconType[]> =>
   api.get<IconType[]>("/facility-groups/icon-types");
+
+export const addFacilityGroupLocale = (groupId: number, body: CreateFacilityGroupLocaleRequest): Promise<MutationResponse> =>
+  api.post<MutationResponse>(`/facility-groups/${groupId}/locales`, body);
+
+export const updateFacilityGroupLocale = (groupId: number, localeId: number, body: UpdateFacilityGroupLocaleRequest): Promise<MutationResponse> =>
+  api.put<MutationResponse>(`/facility-groups/${groupId}/locales/${localeId}`, body);
+
+export const removeFacilityGroupLocale = (groupId: number, localeId: number): Promise<MutationResponse> =>
+  api.delete<MutationResponse>(`/facility-groups/${groupId}/locales/${localeId}`);
