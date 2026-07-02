@@ -11,3 +11,7 @@ This is a **pnpm monorepo** containing three Next.js applications and a shared U
 - [Using Blocks in Apps](./using-blocks-in-apps.md)
 - [Dev Scripts](./dev-scripts.md)
 - [Vercel Deployment](./vercel-deployment.md)
+
+## Admin App
+
+- [Icon System](./icon-system.md) — Strategy-pattern icon picker & renderer (admin app)

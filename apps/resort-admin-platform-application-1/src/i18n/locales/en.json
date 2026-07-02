@@ -20,7 +20,10 @@
     "noDescription": "No description",
     "optional": "optional",
     "generalInfo": "General Information",
-    "saved": "Saved"
+    "icon": "Icon",
+    "saved": "Saved",
+    "hide": "Hide",
+    "loadMore": "Load more"
   },
   "auth": {
     "login": {
@@ -54,12 +57,14 @@
     "iso3": "ISO3 Code",
     "phone": "Phone Code",
     "sort": "Sort Order",
-    "language": "Language"
+    "language": "Language",
+    "facilityGroup": "Facility Group"
   },
   "toast": {
     "codeRequired": "Code is required.",
     "localeSelectLang": "Locale row {{n}}: please select a language.",
-    "localeNameRequired": "Locale row {{n}}: name is required."
+    "localeNameRequired": "Locale row {{n}}: name is required.",
+    "facilityGroupRequired": "Please select a facility group."
   },
   "locale": {
     "translations": "Translations",
@@ -88,6 +93,8 @@
   },
   "placeholder": {
     "selectLanguage": "Select language...",
+    "selectFacilityGroup": "Select facility group...",
+    "searchFacilityGroup": "Search by name or code…",
     "countryName": "Country name in this language",
     "countryDescription": "Optional description...",
     "cityName": "City name in this language",
@@ -156,12 +163,17 @@
     "country": {
       "title": "Delete Country",
       "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+    },
+    "locale": {
+      "title": "Delete Locale",
+      "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
     }
   },
   "locales": {
     "title": "Locales",
     "subtitle": "Manage language and regional locales used across the platform.",
     "new": "New Locale",
+    "loading": "Loading locales…",
     "empty": "No locales found.",
     "sure": "Sure?",
     "errLoad": "Failed to load locales.",
@@ -172,8 +184,10 @@
   "localeDialog": {
     "create": "Create Locale",
     "edit": "Edit Locale",
+    "view": "View Locale",
     "descCreate": "Add a new locale.",
     "descEdit": "Update locale details.",
+    "descView": "View locale details.",
     "codePlaceholder": "en",
     "namePlaceholder": "English",
     "descPlaceholder": "Optional description…",
@@ -185,6 +199,7 @@
     "title": "Facility Groups",
     "subtitle": "Organize facilities into logical groups.",
     "new": "New Facility Group",
+    "loading": "Loading facility groups…",
     "empty": "No facility groups found.",
     "errLoad": "Failed to load.",
     "errDelete": "Failed to delete.",
@@ -194,7 +209,10 @@
     "deleteTitle": "Delete this facility group?",
     "deleteDesc": "This action cannot be undone. The group will be permanently removed.",
     "noDescription": "No description",
-    "order": "Order: {{n}}"
+    "order": "Order: {{n}}",
+    "notFound": "Facility group not found.",
+    "back": "Back to Facility Groups",
+    "noFacilities": "No facilities in this group yet."
   },
   "facilityGroupDialog": {
     "create": "New Facility Group",
@@ -213,9 +231,11 @@
   },
   "facility": {
     "title": "Facilities",
-    "subtitle": "Facilities in this group.",
+    "subtitle": "Manage individual facilities across all groups.",
+    "showingFor": "Facilities in {{group}}",
     "new": "New Facility",
-    "empty": "No facilities yet.",
+    "loading": "Loading facilities…",
+    "empty": "No facilities found.",
     "errLoad": "Failed to load.",
     "errLoadGroup": "Failed to load group.",
     "errDelete": "Failed to delete.",
@@ -223,19 +243,23 @@
     "created": "Facility created successfully!",
     "updated": "Facility updated successfully!",
     "errSubmit": "Something went wrong.",
-    "backToGroups": "Back to Facilities",
+    "backToGroups": "Back to Facility Groups",
     "groupNotFound": "Facility group not found.",
     "countOne": "{{n}} facility",
     "countMany": "{{n}} facilities",
     "sortOrderLabel": "Sort order: {{n}}",
     "noDescription": "No description",
-    "order": "Order: {{n}}"
+    "order": "Order: {{n}}",
+    "deleteTitle": "Delete this facility?",
+    "deleteDesc": "This action cannot be undone. The facility will be permanently removed."
   },
   "facilityDialog": {
     "create": "New Facility",
     "edit": "Edit Facility",
-    "descCreate": "Create a new facility within this group.",
+    "view": "Facility Details",
+    "descCreate": "Create a new facility within a group.",
     "descEdit": "Update the details of this facility.",
+    "descView": "View the facility details.",
     "namePlaceholder": "Untitled facility",
     "errIconType": "Select an icon type",
     "errIconTypeDesc": "Please choose an icon type before saving.",
@@ -255,7 +279,10 @@
     "clearColor": "Clear color",
     "selectType": "Select icon type...",
     "none": "None",
-    "defaultSize": "Default"
+    "defaultSize": "Default",
+    "errNoType": "Select an icon type.",
+    "errNoValue": "Icon value is required.",
+    "preview": "Preview"
   },
   "roomCategory": {
     "title": "Room Categories",

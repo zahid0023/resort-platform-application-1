@@ -42,17 +42,21 @@ export interface ListLocalesParams {
   size?: number;
   sort_by?: "id" | "code" | "name" | "sortOrder" | "createdAt";
   sort_dir?: "ASC" | "DESC";
+  code?: string;
+  name?: string;
 }
 
 export const localesService = {
   async list(params: ListLocalesParams = {}): Promise<LocaleListResponse> {
-    const { page = 0, size = 10, sort_by = "id", sort_dir = "ASC" } = params;
+    const { page = 0, size = 10, sort_by = "id", sort_dir = "ASC", code, name } = params;
     const query = new URLSearchParams({
       page: String(page),
       size: String(size),
       sort_by,
       sort_dir,
     });
+    if (code) query.set("code", code);
+    if (name) query.set("name", name);
     return api.get<LocaleListResponse>(`/locales?${query}`);
   },
 

@@ -77,8 +77,9 @@ export interface MutationResponse {
 export interface ListParams {
   page?: number;
   size?: number;
-  sort_by?: "id" | "code" | "sort_order" | "created_at";
+  sort_by?: "id" | "code" | "sortOrder" | "createdAt";
   sort_dir?: "ASC" | "DESC";
+  code?: string;
 }
 
 export const listFacilityGroups = (params: ListParams = {}): Promise<FacilityGroupListResponse> => {
@@ -87,6 +88,7 @@ export const listFacilityGroups = (params: ListParams = {}): Promise<FacilityGro
   if (params.size !== undefined) query.set("size", String(params.size));
   if (params.sort_by) query.set("sort_by", params.sort_by);
   if (params.sort_dir) query.set("sort_dir", params.sort_dir);
+  if (params.code) query.set("code", params.code);
   return api.get<FacilityGroupListResponse>(`/facility-groups?${query.toString()}`);
 };
 
