@@ -7,9 +7,9 @@ import {
   ListOrdered, Loader2, Plus, Tag, Users,
 } from "lucide-react";
 
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Dialog, DialogContent } from "@resort/shadcn-ui";
+import { Button } from "@resort/shadcn-ui";
+import { cn } from "@resort/shadcn-ui";
 import { type RoomSummary } from "@/services/rooms";
 import {
   listRoomPricePeriods, type RoomPricePeriodSummary,

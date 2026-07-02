@@ -1,17 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useTranslation } from "react-i18next";
-import { Plus, Search, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,39 +13,100 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@resort/shadcn-ui";
+import { PageActions } from "@/components/shared/page-actions";
+import { PageHeader } from "@/components/shared/page-header";
+import { Pagination } from "@/components/shared/pagination";
 import { CountryCard } from "@/components/countries/country-card";
 import { CountryDialog, emptyCountryForm } from "@/components/countries/country-dialog";
 import type { CountryDialogMode, CountryFormState } from "@/components/countries/types";
-import { countriesService, type Country } from "@/services/countries";
+import { countriesService, type Country, type ListParams } from "@/services/countries";
 import { localesService, type Locale } from "@/services/locales";
-import { toast } from "sonner";
 
-type SearchField = "all" | "code" | "iso3" | "phone" | "name";
+const PAGE_SIZE = 20;
+
+// "all" is a frontend-only concept (client-side OR across all fields)
+const ALL_FIELD = "all";
+
+function buildApiFilters(field: string, q: string): Pick<ListParams, "code" | "iso3Code" | "phoneCode"> {
+  if (!q || field === ALL_FIELD) return {};
+  return { [field]: q } as Pick<ListParams, "code" | "iso3Code" | "phoneCode">;
+}
 
 export default function CountriesPage() {
   const { t } = useTranslation();
-  const [countries, setCountries] = useState<Country[]>([]);
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [searchField, setSearchField] = useState<SearchField>("all");
+  const router = useRouter();
 
+  // List data
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Pagination
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrevious, setHasPrevious] = useState(false);
+
+  // Search
+  const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState(ALL_FIELD);
+
+  // Sort
+  const [sortBy, setSortBy] = useState("sortOrder");
+  const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC");
+
+  // Dialog / locale
+  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<CountryDialogMode>("create");
   const [activeId, setActiveId] = useState<number | undefined>(undefined);
   const [form, setForm] = useState<CountryFormState>(emptyCountryForm);
-
   const [deleteTarget, setDeleteTarget] = useState<Country | null>(null);
 
-  async function refresh() {
+  // Refs to avoid stale closures in refresh
+  const dialogOpenRef = useRef(dialogOpen);
+  const activeIdRef = useRef(activeId);
+  useEffect(() => { dialogOpenRef.current = dialogOpen; }, [dialogOpen]);
+  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
+
+  const isFirstRender = useRef(true);
+
+  function toFieldOption(key: string) {
+    return { value: key, label: t(`apiFields.${key}`) };
+  }
+
+  const searchFields = useMemo(() => [
+    { value: ALL_FIELD, label: t("common.allFields") },
+    ...["code", "iso3Code", "phoneCode"].map(toFieldOption),
+  ], [t]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sortFields = useMemo(() => [
+    ...["sortOrder", "code", "name", "createdAt"].map(toFieldOption),
+  ], [t]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function refresh(overrides: Partial<ListParams> = {}) {
     setLoading(true);
     try {
-      const res = await countriesService.list({ size: 50, sort_by: "sortOrder" });
+      const res = await countriesService.list({
+        page,
+        size: PAGE_SIZE,
+        sort_by: sortBy,
+        sort_dir: sortDir,
+        ...buildApiFilters(searchField, search.trim()),
+        ...overrides,
+      });
+
       setCountries(res.data);
+      setTotalPages(res.total_pages);
+      setTotalElements(res.total_elements);
+      setHasNext(res.has_next);
+      setHasPrevious(res.has_previous);
+
+      // Sync open dialog form with refreshed data
       setForm((prev) => {
-        if (!dialogOpen || activeId == null) return prev;
-        const updated = res.data.find((c) => c.id === activeId);
+        if (!dialogOpenRef.current || activeIdRef.current == null) return prev;
+        const updated = res.data.find((c) => c.id === activeIdRef.current);
         if (!updated) return prev;
         return {
           ...prev,
@@ -66,46 +119,50 @@ export default function CountriesPage() {
           })),
         };
       });
-    } catch (e) {
-      toast.error((e as Error).message);
+    } catch (err) {
+      toast.error((err as Error).message);
     } finally {
       setLoading(false);
     }
   }
 
+  // Initial load
+  useEffect(() => { refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Locales for dialog
   useEffect(() => {
-    refresh();
     localesService
       .list({ size: 50, sort_by: "sortOrder" })
       .then((res) => setAvailableLocales(res.data))
-      .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      .catch(() => { });
   }, []);
 
-  const countryNames = useMemo(() => {
-    const out: Record<number, string> = {};
-    for (const c of countries) {
-      out[c.id] = c.locales[0]?.name ?? "";
-    }
-    return out;
-  }, [countries]);
+  // Debounced search — resets to page 0
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    setPage(0);
+    const timer = setTimeout(
+      () => refresh({ page: 0, ...buildApiFilters(searchField, search.trim()) }),
+      350,
+    );
+    return () => clearTimeout(timer);
+  }, [search, searchField]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const filtered = useMemo(() => {
+  const countryNames = useMemo(
+    () => Object.fromEntries(countries.map((c) => [c.id, c.locales[0]?.name ?? ""])),
+    [countries],
+  );
+
+  // Client-side OR filter only for "all" field (API has no OR-across-fields support)
+  const displayCountries = useMemo(() => {
+    if (searchField !== ALL_FIELD || !search.trim()) return countries;
     const q = search.trim().toLowerCase();
-    if (!q) return countries;
     return countries.filter((c) => {
       const code = c.code.toLowerCase();
       const iso3 = (c.iso3_code ?? "").toLowerCase();
       const phone = (c.phone_code ?? "").toLowerCase();
       const name = (countryNames[c.id] ?? "").toLowerCase();
-      switch (searchField) {
-        case "code": return code.includes(q);
-        case "iso3": return iso3.includes(q);
-        case "phone": return phone.includes(q);
-        case "name": return name.includes(q);
-        default:
-          return code.includes(q) || iso3.includes(q) || phone.includes(q) || name.includes(q);
-      }
+      return code.includes(q) || iso3.includes(q) || phone.includes(q) || name.includes(q);
     });
   }, [countries, countryNames, search, searchField]);
 
@@ -135,86 +192,96 @@ export default function CountriesPage() {
     setDialogOpen(true);
   }
 
+  function handleSortByChange(value: string) {
+    setSortBy(value);
+    setPage(0);
+    refresh({ sort_by: value, page: 0 });
+  }
+
+  function handleSortDirChange(dir: "ASC" | "DESC") {
+    setSortDir(dir);
+    setPage(0);
+    refresh({ sort_dir: dir, page: 0 });
+  }
+
+  function handlePageChange(p: number) {
+    setPage(p);
+    refresh({ page: p });
+  }
+
   async function confirmDelete() {
     if (!deleteTarget) return;
     try {
       await countriesService.remove(deleteTarget.id);
-      toast.success(t("delete.country.title") + ": " + deleteTarget.code);
+      toast.success(`${t("delete.country.title")}: ${deleteTarget.code}`);
       setDeleteTarget(null);
-      await refresh();
+      await refresh({ page: 0 });
+      setPage(0);
     } catch (err) {
       toast.error((err as Error).message);
     }
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("common.admin")}</p>
-          <h1 className="text-3xl font-semibold tracking-tight">{t("countries.title")}</h1>
-          <p className="text-muted-foreground text-sm mt-1">{t("countries.subtitle")}</p>
-        </div>
+    <div className="max-w-6xl mx-auto flex flex-col gap-6">
 
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-stretch">
-            <Select value={searchField} onValueChange={(v) => setSearchField(v as SearchField)}>
-              <SelectTrigger className="w-36 h-10 rounded-r-none border-r-0 bg-muted text-foreground focus:ring-0 focus:ring-offset-0">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t("common.allFields")}</SelectItem>
-                <SelectItem value="code">{t("common.code")}</SelectItem>
-                <SelectItem value="iso3">{t("field.iso3")}</SelectItem>
-                <SelectItem value="phone">{t("field.phone")}</SelectItem>
-                <SelectItem value="name">{t("common.localizedName")}</SelectItem>
-              </SelectContent>
-            </Select>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder={`${t("common.search")} ${searchField === "all" ? t("common.allFields") : searchField}…`}
-                className="pl-9 pr-9 w-64 h-10 rounded-l-none"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch("")}
-                  aria-label="Clear search"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+      {/* Header */}
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 w-full">
+        <PageHeader
+          eyebrow={t("common.admin")}
+          title={t("countries.title")}
+          subtitle={t("countries.subtitle")}
+        />
+        <PageActions
+          fields={searchFields}
+          searchField={searchField}
+          onSearchFieldChange={setSearchField}
+          search={search}
+          onSearchChange={setSearch}
+          sort={{
+            fields: sortFields,
+            sortBy,
+            onSortByChange: handleSortByChange,
+            sortDir,
+            onSortDirChange: handleSortDirChange,
+          }}
+          newLabel={t("countries.new")}
+          onNew={openCreate}
+        />
+      </header>
+
+      {/* Main content */}
+      <main className="flex flex-col gap-4">
+        {loading ? (
+          <div className="text-center py-16 text-muted-foreground">{t("countries.loading")}</div>
+        ) : displayCountries.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground border rounded-xl border-dashed">
+            {t("countries.empty")}
           </div>
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4 mr-1.5" /> {t("countries.new")}
-          </Button>
-        </div>
-      </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {displayCountries.map((c) => (
+              <CountryCard
+                key={c.id}
+                country={c}
+                defaultName={countryNames[c.id]}
+                onNavigate={(c) => router.push(`/countries/${c.id}`)}
+                onView={openDialog}
+                onDelete={setDeleteTarget}
+              />
+            ))}
+          </div>
+        )}
 
-      {loading ? (
-        <div className="text-center py-16 text-muted-foreground">{t("countries.loading")}</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground border rounded-xl border-dashed">
-          {t("countries.empty")}
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((c) => (
-            <CountryCard
-              key={c.id}
-              country={c}
-              defaultName={countryNames[c.id]}
-              onView={(country) => openDialog(country)}
-              onDelete={(country) => setDeleteTarget(country)}
-            />
-          ))}
-        </div>
-      )}
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalElements={totalElements}
+          hasNext={hasNext}
+          hasPrevious={hasPrevious}
+          onPageChange={handlePageChange}
+        />
+      </main>
 
       <CountryDialog
         open={dialogOpen}
@@ -224,7 +291,7 @@ export default function CountriesPage() {
         form={form}
         onFormChange={setForm}
         availableLocales={availableLocales}
-        onSaved={refresh}
+        onSaved={() => refresh()}
       />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>

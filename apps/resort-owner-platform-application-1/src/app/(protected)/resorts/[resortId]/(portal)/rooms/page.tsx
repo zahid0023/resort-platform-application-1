@@ -5,8 +5,8 @@ import { useParams } from "next/navigation"
 import { toast } from "sonner"
 import { Plus } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
+import { Button } from "@resort/shadcn-ui"
+import { Spinner } from "@resort/shadcn-ui"
 import { getResort } from "@/services/resorts"
 import {
   listResortRoomCategories,

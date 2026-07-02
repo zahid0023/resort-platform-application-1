@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { SidebarProvider } from "@/components/ui/sidebar"
+import { SidebarProvider } from "@resort/shadcn-ui"
 import { PortalHeader } from "@/layouts/portal/portal-header"
 import { PortalSidebar } from "@/layouts/portal/portal-sidebar"
 import { getToken } from "../../services/api"
@@ -27,12 +27,12 @@ export default function PortalLayout({
   if (!ready) return null
 
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen w-full">
+    <SidebarProvider defaultOpen={true}>
+      <div className="flex min-h-screen w-full overflow-x-hidden">
         <PortalSidebar />
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col min-w-0">
           <PortalHeader />
-          <main className="flex-1 overflow-auto bg-muted/30 p-6">
+          <main className="flex-1 overflow-auto bg-muted/30 p-4 lg:p-6">
             {children}
           </main>
         </div>

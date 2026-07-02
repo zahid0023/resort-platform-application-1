@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { SidebarMenuButton, useSidebar } from '@/components/ui/sidebar';
+import { SidebarMenuButton, useSidebar } from '@resort/shadcn-ui';
 
 interface SidebarMenuButtonActiveProps {
   title: string;

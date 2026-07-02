@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Button } from "@resort/shadcn-ui"
+import { Input } from "@resort/shadcn-ui"
+import { Field, FieldGroup, FieldLabel } from "@resort/shadcn-ui"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter, DialogClose,
-} from "@/components/ui/dialog"
+} from "@resort/shadcn-ui"
 import {
   createResortFacilityGroup,
   updateResortFacilityGroup,

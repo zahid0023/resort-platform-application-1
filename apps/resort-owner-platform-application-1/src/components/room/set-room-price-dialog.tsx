@@ -5,14 +5,14 @@ import { format } from "date-fns";
 import { DollarSign, ListOrdered, Loader2, Sparkles, Tag } from "lucide-react";
 import { toast } from "sonner";
 
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent } from "@resort/shadcn-ui";
+import { Button } from "@resort/shadcn-ui";
+import { Input } from "@resort/shadcn-ui";
+import { Label } from "@resort/shadcn-ui";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { DatePickerField } from "@/components/ui/date-picker-field";
+} from "@resort/shadcn-ui";
+import { DatePickerField } from "@resort/shadcn-ui";
 
 import { type RoomSummary } from "@/services/rooms";
 import {

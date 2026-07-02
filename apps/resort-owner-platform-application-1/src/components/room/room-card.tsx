@@ -2,8 +2,8 @@
 
 import { Baby, Building2, DollarSign, Hash, Tag, Users } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "@resort/shadcn-ui";
+import { cn } from "@resort/shadcn-ui";
 import { type RoomSummary } from "@/services/rooms";
 
 /* ------------------------------------------------------------------ */

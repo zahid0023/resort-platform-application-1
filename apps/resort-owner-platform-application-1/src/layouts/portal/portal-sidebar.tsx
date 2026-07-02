@@ -27,7 +27,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarTrigger,
-} from "@/components/ui/sidebar";
+} from "@resort/shadcn-ui";
 import { SidebarMenuButtonActive } from "@/layouts/portal/sidebar-menu-button-active";
 import { logout } from "@/services/auth";
 

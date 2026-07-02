@@ -4,8 +4,8 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { toast } from "sonner"
 import { PencilIcon, XIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
+import { Button } from "@resort/shadcn-ui"
+import { Spinner } from "@resort/shadcn-ui"
 import {
   ResortForm, loadDraft, clearDraft,
   type ResortFormState,

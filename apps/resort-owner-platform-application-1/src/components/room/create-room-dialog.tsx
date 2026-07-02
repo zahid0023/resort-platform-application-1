@@ -4,11 +4,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Baby, Building2, DollarSign, Hash, Loader2, Sparkles, Tag, Users } from "lucide-react";
 
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent } from "@resort/shadcn-ui";
+import { Button } from "@resort/shadcn-ui";
+import { Input } from "@resort/shadcn-ui";
+import { Label } from "@resort/shadcn-ui";
+import { Textarea } from "@resort/shadcn-ui";
 
 import { createRoom, type CreateRoomRequest } from "@/services/rooms";
 

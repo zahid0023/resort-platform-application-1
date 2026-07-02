@@ -3,11 +3,11 @@
 import { useMemo, useEffect, useRef, useState, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Dialog, DialogContent } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { cn } from "@/lib/utils"
+import { Dialog, DialogContent } from "@resort/shadcn-ui"
+import { Button } from "@resort/shadcn-ui"
+import { Input } from "@resort/shadcn-ui"
+import { Label } from "@resort/shadcn-ui"
+import { cn } from "@resort/shadcn-ui"
 import {
   Check, CheckCircle2, ChevronLeft, ChevronRight,
   CircleDashed, MapPin, Sparkles, Mail, Phone,

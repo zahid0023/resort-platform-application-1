@@ -1,6 +1,6 @@
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LocaleToggle } from "@/components/locale-toggle";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarTrigger } from "@resort/shadcn-ui";
 
 export function PortalHeader() {
   return (

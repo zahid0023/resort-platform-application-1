@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation"
 import { LogOutIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Button } from "@resort/shadcn-ui"
 import { logout } from "@/services/auth"
 
 interface LogoutButtonProps {

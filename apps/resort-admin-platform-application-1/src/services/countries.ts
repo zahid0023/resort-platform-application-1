@@ -25,6 +25,8 @@ export interface CountryListResponse {
   page_size: number;
   has_next: boolean;
   has_previous: boolean;
+  searchable_fields?: string[];
+  sortable_fields?: string[];
 }
 
 export interface CreateCountryLocaleRequest {
@@ -64,17 +66,23 @@ export interface ListParams {
   size?: number;
   sort_by?: string;
   sort_dir?: "ASC" | "DESC";
+  code?: string;
+  iso3Code?: string;
+  phoneCode?: string;
 }
 
 export const countriesService = {
   async list(params: ListParams = {}): Promise<CountryListResponse> {
-    const { page = 0, size = 10, sort_by = "id", sort_dir = "ASC" } = params;
+    const { page = 0, size = 10, sort_by = "id", sort_dir = "ASC", code, iso3Code, phoneCode } = params;
     const query = new URLSearchParams({
       page: String(page),
       size: String(size),
       sort_by,
       sort_dir,
     });
+    if (code)      query.set("code", code);
+    if (iso3Code)  query.set("iso3Code", iso3Code);
+    if (phoneCode) query.set("phoneCode", phoneCode);
     return api.get<CountryListResponse>(`/countries?${query}`);
   },
 

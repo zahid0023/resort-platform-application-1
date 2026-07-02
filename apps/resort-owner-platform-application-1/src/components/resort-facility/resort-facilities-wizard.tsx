@@ -3,14 +3,14 @@
 import { useEffect, useState } from "react"
 import { toast } from "sonner"
 import { CheckIcon, ChevronRightIcon, ChevronLeftIcon } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Field, FieldLabel } from "@/components/ui/field"
-import { Spinner } from "@/components/ui/spinner"
+import { Button } from "@resort/shadcn-ui"
+import { Input } from "@resort/shadcn-ui"
+import { Field, FieldLabel } from "@resort/shadcn-ui"
+import { Spinner } from "@resort/shadcn-ui"
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
   DialogDescription, DialogFooter,
-} from "@/components/ui/dialog"
+} from "@resort/shadcn-ui"
 import { bulkCreateResortFacilities, type CreateResortFacilityRequest } from "@/services/resort-facilities"
 import { listFacilitiesByGroup, type FacilitySummary } from "@/services/facilities"
 import type { ResortFacilityGroupSummary } from "@/services/resort-facility-groups"

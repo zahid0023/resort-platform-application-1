@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react"
 import { CheckCircle2Icon, CircleDashedIcon, MapPinIcon, PhoneIcon, SaveIcon, Trash2Icon } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Field, FieldLabel, FieldDescription } from "@/components/ui/field"
-import { Spinner } from "@/components/ui/spinner"
+import { Button } from "@resort/shadcn-ui"
+import { Input } from "@resort/shadcn-ui"
+import { Field, FieldLabel, FieldDescription } from "@resort/shadcn-ui"
+import { Spinner } from "@resort/shadcn-ui"
 import type { CountrySummary } from "@/services/countries"
 import type { CitySummary } from "@/services/cities"
 

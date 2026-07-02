@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { SidebarProvider } from "@/components/ui/sidebar"
-import { TooltipProvider } from "@/components/ui/tooltip"
+import { SidebarProvider } from "@resort/shadcn-ui"
+import { TooltipProvider } from "@resort/shadcn-ui"
 import { PortalHeader } from "@/layouts/portal/portal-header"
 import { ResortSidebar } from "@/layouts/portal/resort-sidebar"
 import { getToken } from "@/services/api"

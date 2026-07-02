@@ -1,6 +1,6 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@resort/shadcn-ui"
 import { LucideIconRenderer } from "ui-blocks"
 
 interface EntityCardPreviewProps {

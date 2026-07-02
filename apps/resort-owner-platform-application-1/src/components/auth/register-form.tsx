@@ -3,21 +3,21 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
+import { Button } from "@resort/shadcn-ui"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card"
+} from "@resort/shadcn-ui"
 import {
   Field,
   FieldDescription,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+} from "@resort/shadcn-ui"
+import { Input } from "@resort/shadcn-ui"
 import { register } from "@/services/auth"
 
 export function RegisterForm({ ...props }: React.ComponentProps<typeof Card>) {

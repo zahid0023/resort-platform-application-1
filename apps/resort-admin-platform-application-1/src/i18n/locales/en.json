@@ -18,7 +18,9 @@
     "search": "Search",
     "localizedName": "Localized Name",
     "noDescription": "No description",
-    "optional": "optional"
+    "optional": "optional",
+    "generalInfo": "General Information",
+    "saved": "Saved"
   },
   "auth": {
     "login": {
@@ -77,6 +79,11 @@
     "row": {
       "label": "Locale {{n}}",
       "new": "New"
+    },
+    "removedToast": "Translation removed.",
+    "delete": {
+      "title": "Delete Translation",
+      "desc": "Are you sure you want to remove this translation? This action cannot be undone."
     }
   },
   "placeholder": {
@@ -107,6 +114,11 @@
         "edit": "Update country details and locale translations.",
         "view": "Country details and locale translations."
       }
+    },
+    "discardChanges": {
+      "title": "Discard changes?",
+      "desc": "You have unsaved changes. Are you sure you want to discard them?",
+      "confirm": "Discard"
     }
   },
   "cities": {
@@ -125,7 +137,9 @@
     "subtitle": "Manage countries available in the resort application.",
     "new": "New Country",
     "loading": "Loading countries…",
-    "empty": "No countries found."
+    "empty": "No countries found.",
+    "createdToast": "Country created successfully!",
+    "updatedToast": "Country updated successfully."
   },
   "country": {
     "back": "Back to Countries",
@@ -268,5 +282,15 @@
   },
   "pagination": {
     "info": "Page {{current}} of {{total}} — {{elements}} total"
+  },
+  "apiFields": {
+    "id": "ID",
+    "code": "Code",
+    "iso3Code": "ISO3 Code",
+    "phoneCode": "Phone Code",
+    "name": "Localized Name",
+    "sortOrder": "Sort Order",
+    "createdAt": "Created At",
+    "updatedAt": "Updated At"
   }
 }

@@ -1,14 +1,14 @@
 "use client"
 
 import { useTranslation } from "react-i18next"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Button } from "@resort/shadcn-ui"
+import { Input } from "@resort/shadcn-ui"
+import { Label } from "@resort/shadcn-ui"
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { cn } from "@/lib/utils"
+} from "@resort/shadcn-ui"
+import { Popover, PopoverContent, PopoverTrigger } from "@resort/shadcn-ui"
+import { cn } from "@resort/shadcn-ui"
 import { LucideIconPicker } from "ui-blocks"
 
 export type IconType = "LUCIDE" | "IMAGE" | "SVG" | "EXTERNAL"

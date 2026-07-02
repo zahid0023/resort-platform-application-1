@@ -4,14 +4,14 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "@resort/shadcn-ui";
 import {
   Field,
   FieldGroup,
   FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
+} from "@resort/shadcn-ui";
+import { Input } from "@resort/shadcn-ui";
+import { Spinner } from "@resort/shadcn-ui";
 
 export function ForgotPasswordForm() {
   const { t } = useTranslation();

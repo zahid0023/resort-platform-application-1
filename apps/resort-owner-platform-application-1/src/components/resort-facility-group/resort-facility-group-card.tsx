@@ -2,8 +2,8 @@
 
 import { useState } from "react"
 import { SparklesIcon, PencilIcon, Trash2Icon } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
+import { Button } from "@resort/shadcn-ui"
+import { Spinner } from "@resort/shadcn-ui"
 import type { ResortFacilityGroupSummary } from "@/services/resort-facility-groups"
 
 export function ResortFacilityGroupCard({

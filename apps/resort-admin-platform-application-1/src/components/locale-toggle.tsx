@@ -8,7 +8,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "@resort/shadcn-ui";
 import { localesService, type Locale } from "@/services/locales";
 
 export function LocaleToggle() {

@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Hash, ListOrdered, Loader2, Sparkles, Tag } from "lucide-react";
 
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent } from "@resort/shadcn-ui";
+import { Button } from "@resort/shadcn-ui";
+import { Input } from "@resort/shadcn-ui";
+import { Label } from "@resort/shadcn-ui";
+import { Textarea } from "@resort/shadcn-ui";
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+} from "@resort/shadcn-ui";
 
 import { listRoomCategories, type RoomCategorySummary } from "@/services/room-categories";
 import { createResortRoomCategory, type CreateResortRoomCategoryRequest } from "@/services/resort-room-categories";

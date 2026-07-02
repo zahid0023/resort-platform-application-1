@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import { toast } from "sonner"
 import { BuildingIcon, MapPinIcon, MailIcon, PhoneIcon, GlobeIcon } from "lucide-react"
-import { Spinner } from "@/components/ui/spinner"
+import { Spinner } from "@resort/shadcn-ui"
 import { getResort, type Resort } from "@/services/resorts"
 
 function InfoRow({ icon, label, value }: {

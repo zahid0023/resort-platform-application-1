@@ -10,6 +10,7 @@ export interface CityLocaleRow {
 }
 
 export interface CityFormState {
+  country_id: number | "";
   code: string;
   sort_order: number;
   locales: CityLocaleRow[];

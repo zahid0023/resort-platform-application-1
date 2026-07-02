@@ -23,7 +23,7 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarTrigger,
-} from "@/components/ui/sidebar"
+} from "@resort/shadcn-ui"
 import { SidebarMenuButtonActive } from "@/layouts/portal/sidebar-menu-button-active"
 
 interface ResortSidebarProps {

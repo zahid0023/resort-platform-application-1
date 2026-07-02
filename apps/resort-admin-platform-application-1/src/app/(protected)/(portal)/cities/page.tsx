@@ -1,17 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { MapPin, Plus, Search, X } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { toast } from "sonner";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,51 +12,83 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from "@resort/shadcn-ui";
+import { PageActions } from "@/components/shared/page-actions";
+import { PageHeader } from "@/components/shared/page-header";
+import { Pagination } from "@/components/shared/pagination";
 import { CityCard } from "@/components/cities/city-card";
 import { CityDialog, emptyCityForm } from "@/components/cities/city-dialog";
 import type { CityDialogMode, CityFormState } from "@/components/cities/types";
-import { citiesService, type City } from "@/services/cities";
-import { countriesService, type Country } from "@/services/countries";
+import { citiesService, type City, type ListCitiesFlatParams } from "@/services/cities";
 import { localesService, type Locale } from "@/services/locales";
-import { toast } from "sonner";
+
+const PAGE_SIZE = 20;
 
 export default function CitiesPage() {
   const { t } = useTranslation();
 
-  const [countries, setCountries] = useState<Country[]>([]);
-  const [selectedCountryId, setSelectedCountryId] = useState<number | null>(null);
+  // List data
   const [cities, setCities] = useState<City[]>([]);
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
 
+  // Pagination
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [hasPrevious, setHasPrevious] = useState(false);
+
+  // Search / sort
+  const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("sortOrder");
+  const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC");
+
+  // Dialog
+  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<CityDialogMode>("create");
-  const [activeCityId, setActiveCityId] = useState<number | undefined>(undefined);
+  const [activeId, setActiveId] = useState<number | undefined>(undefined);
   const [form, setForm] = useState<CityFormState>(emptyCityForm);
-
   const [deleteTarget, setDeleteTarget] = useState<City | null>(null);
 
-  useEffect(() => {
-    countriesService
-      .list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setCountries(res.data))
-      .catch(() => {});
-    localesService
-      .list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableLocales(res.data))
-      .catch(() => {});
-  }, []);
+  const dialogOpenRef = useRef(dialogOpen);
+  const activeIdRef = useRef(activeId);
+  useEffect(() => { dialogOpenRef.current = dialogOpen; }, [dialogOpen]);
+  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
 
-  async function refresh(countryId: number) {
+  const isFirstRender = useRef(true);
+
+  const searchFields = useMemo(() => [
+    { value: "code", label: t("apiFields.code") },
+  ], [t]);
+
+  const sortFields = useMemo(() => [
+    { value: "sortOrder", label: t("apiFields.sortOrder") },
+    { value: "code", label: t("apiFields.code") },
+    { value: "createdAt", label: t("apiFields.createdAt") },
+  ], [t]);
+
+  async function refresh(overrides: Partial<ListCitiesFlatParams> = {}) {
     setLoading(true);
     try {
-      const res = await citiesService.list(countryId, { size: 50 });
+      const res = await citiesService.listFlat({
+        page,
+        size: PAGE_SIZE,
+        sort_by: sortBy,
+        sort_dir: sortDir,
+        code: search.trim() || undefined,
+        ...overrides,
+      });
       setCities(res.data);
+      setTotalPages(res.total_pages);
+      setTotalElements(res.total_elements);
+      setHasNext(res.has_next);
+      setHasPrevious(res.has_previous);
+
+      // Sync open dialog form with refreshed data
       setForm((prev) => {
-        if (!dialogOpen || activeCityId == null) return prev;
-        const updated = res.data.find((c) => c.id === activeCityId);
+        if (!dialogOpenRef.current || activeIdRef.current == null) return prev;
+        const updated = res.data.find((c) => c.id === activeIdRef.current);
         if (!updated) return prev;
         return {
           ...prev,
@@ -78,53 +101,54 @@ export default function CitiesPage() {
           })),
         };
       });
-    } catch (e) {
-      toast.error((e as Error).message);
+    } catch (err) {
+      toast.error((err as Error).message);
     } finally {
       setLoading(false);
     }
   }
 
-  function handleCountryChange(val: string) {
-    const id = Number(val);
-    setSelectedCountryId(id);
-    setCities([]);
-    setSearch("");
-    refresh(id);
-  }
+  // Initial load
+  useEffect(() => { refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const cityNames = useMemo(() => {
-    const out: Record<number, string> = {};
-    for (const c of cities) {
-      out[c.id] = c.locales[0]?.name ?? "";
-    }
-    return out;
-  }, [cities]);
+  // Locales for dialog
+  useEffect(() => {
+    localesService.list({ size: 50, sort_by: "sortOrder" })
+      .then((res) => setAvailableLocales(res.data))
+      .catch(() => {});
+  }, []);
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return cities;
-    return cities.filter((c) => {
-      const code = (c.code ?? "").toLowerCase();
-      const name = (cityNames[c.id] ?? "").toLowerCase();
-      return code.includes(q) || name.includes(q);
-    });
-  }, [cities, cityNames, search]);
+  // Debounced search
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    setPage(0);
+    const timer = setTimeout(
+      () => refresh({ page: 0, code: search.trim() || undefined }),
+      350,
+    );
+    return () => clearTimeout(timer);
+  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const cityNames = useMemo(
+    () => Object.fromEntries(cities.map((c) => [c.id, c.locales[0]?.name ?? ""])),
+    [cities],
+  );
 
   function openCreate() {
     setMode("create");
-    setActiveCityId(undefined);
+    setActiveId(undefined);
     setForm(emptyCityForm);
     setDialogOpen(true);
   }
 
-  function openDialog(c: City) {
+  function openDialog(city: City) {
     setMode("view");
-    setActiveCityId(c.id);
+    setActiveId(city.id);
     setForm({
-      code: c.code ?? "",
-      sort_order: c.sort_order,
-      locales: c.locales.map((l) => ({
+      country_id: "",
+      code: city.code ?? "",
+      sort_order: city.sort_order,
+      locales: city.locales.map((l) => ({
         id: l.id,
         locale_id: l.locale_id,
         name: l.name,
@@ -135,120 +159,104 @@ export default function CitiesPage() {
     setDialogOpen(true);
   }
 
+  function handleSortByChange(value: string) {
+    setSortBy(value);
+    setPage(0);
+    refresh({ sort_by: value, page: 0 });
+  }
+
+  function handleSortDirChange(dir: "ASC" | "DESC") {
+    setSortDir(dir);
+    setPage(0);
+    refresh({ sort_dir: dir, page: 0 });
+  }
+
+  function handlePageChange(p: number) {
+    setPage(p);
+    refresh({ page: p });
+  }
+
   async function confirmDelete() {
-    if (!deleteTarget || selectedCountryId == null) return;
+    if (!deleteTarget) return;
     try {
-      await citiesService.remove(selectedCountryId, deleteTarget.id);
+      await citiesService.remove(deleteTarget.id);
       toast.success(t("cities.deleted"));
       setDeleteTarget(null);
-      await refresh(selectedCountryId);
+      await refresh({ page: 0 });
+      setPage(0);
     } catch (err) {
       toast.error((err as Error).message);
     }
   }
 
-  const selectedCountry = countries.find((c) => c.id === selectedCountryId);
-  const selectedCountryName = selectedCountry
-    ? (selectedCountry.locales[0]?.name ?? selectedCountry.code)
-    : null;
-
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-wider text-muted-foreground">{t("common.admin")}</p>
-          <h1 className="text-3xl font-semibold tracking-tight">{t("cities.title")}</h1>
-          <p className="text-muted-foreground text-sm mt-1">{t("cities.subtitle")}</p>
-        </div>
+    <div className="max-w-6xl mx-auto flex flex-col gap-6">
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={selectedCountryId ? String(selectedCountryId) : ""} onValueChange={handleCountryChange}>
-            <SelectTrigger className="w-52 h-10">
-              <SelectValue placeholder={t("cities.selectCountry")} />
-            </SelectTrigger>
-            <SelectContent>
-              {countries.map((c) => (
-                <SelectItem key={c.id} value={String(c.id)}>
-                  {c.locales[0]?.name ?? c.code} ({c.code})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 w-full">
+        <PageHeader
+          eyebrow={t("common.admin")}
+          title={t("cities.title")}
+          subtitle={t("cities.subtitle")}
+        />
+        <PageActions
+          fields={searchFields}
+          searchField="code"
+          onSearchFieldChange={() => {}}
+          search={search}
+          onSearchChange={setSearch}
+          sort={{
+            fields: sortFields,
+            sortBy,
+            onSortByChange: handleSortByChange,
+            sortDir,
+            onSortDirChange: handleSortDirChange,
+          }}
+          newLabel={t("cities.new")}
+          onNew={openCreate}
+        />
+      </header>
 
-          {selectedCountryId != null && (
-            <>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={`${t("common.search")}…`}
-                  className="pl-9 pr-9 w-56 h-10"
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => setSearch("")}
-                    aria-label="Clear search"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-              <Button onClick={openCreate}>
-                <Plus className="h-4 w-4 mr-1.5" /> {t("cities.new")}
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {selectedCountryId == null ? (
-        <div className="flex flex-col items-center justify-center py-20 text-muted-foreground border rounded-xl border-dashed gap-3">
-          <MapPin className="h-8 w-8 opacity-30" />
-          <p className="text-sm">{t("cities.selectCountry")}</p>
-        </div>
-      ) : loading ? (
-        <div className="text-center py-16 text-muted-foreground">{t("cities.loading")}</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16 text-muted-foreground border rounded-xl border-dashed">
-          {t("cities.empty")}
-        </div>
-      ) : (
-        <>
-          {selectedCountryName && (
-            <p className="text-sm text-muted-foreground">
-              {t("cities.showingFor", { country: selectedCountryName })}
-            </p>
-          )}
+      <main className="flex flex-col gap-4">
+        {loading ? (
+          <div className="text-center py-16 text-muted-foreground">{t("cities.loading")}</div>
+        ) : cities.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground border rounded-xl border-dashed">
+            {t("cities.empty")}
+          </div>
+        ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filtered.map((c) => (
+            {cities.map((city) => (
               <CityCard
-                key={c.id}
-                city={c}
-                defaultName={cityNames[c.id]}
-                onView={(city) => openDialog(city)}
-                onDelete={(city) => setDeleteTarget(city)}
+                key={city.id}
+                city={city}
+                defaultName={cityNames[city.id]}
+                onView={openDialog}
+                onDelete={setDeleteTarget}
               />
             ))}
           </div>
-        </>
-      )}
+        )}
 
-      {selectedCountryId != null && (
-        <CityDialog
-          open={dialogOpen}
-          onOpenChange={setDialogOpen}
-          mode={mode}
-          countryId={selectedCountryId}
-          cityId={activeCityId}
-          form={form}
-          onFormChange={setForm}
-          availableLocales={availableLocales}
-          onSaved={() => refresh(selectedCountryId)}
+        <Pagination
+          currentPage={page}
+          totalPages={totalPages}
+          totalElements={totalElements}
+          hasNext={hasNext}
+          hasPrevious={hasPrevious}
+          onPageChange={handlePageChange}
         />
-      )}
+      </main>
+
+      <CityDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        mode={mode}
+        cityId={activeId}
+        form={form}
+        onFormChange={setForm}
+        availableLocales={availableLocales}
+        onSaved={() => refresh()}
+      />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>

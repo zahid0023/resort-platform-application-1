@@ -1,5 +1,5 @@
 import { ThemeToggle } from "@/components/theme-toggle";
-import { SidebarTrigger } from "@/components/ui/sidebar";
+import { SidebarTrigger } from "@resort/shadcn-ui";
 
 export function PortalHeader() {
   return (
