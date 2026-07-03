@@ -1,0 +1,175 @@
+import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { Tag } from "lucide-react";
+import { Dialog, DialogContent } from "@resort/shadcn-ui";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@resort/shadcn-ui";
+import { DialogEntityHeader } from "@/components/shared/dialog-entity-header";
+import { DialogCreateFooter } from "@/components/shared/dialog-create-footer";
+import { priceTypesService } from "@/services/price-types";
+import type { Locale } from "@/services/locales";
+import { toast } from "sonner";
+import type { PriceTypeDialogMode, PriceTypeFormState } from "./types";
+import { PriceTypeGeneralInfo } from "./price-type-general-info";
+import { PriceTypeLocaleTranslations } from "./price-type-locale-translations";
+
+export const emptyPriceTypeForm: PriceTypeFormState = {
+  code: "",
+  sort_order: 0,
+  locales: [{ locale_id: "", name: "", description: "", sort_order: 0, purpose: "", usage_example: "" }],
+};
+
+export interface PriceTypeDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  mode: PriceTypeDialogMode;
+  priceTypeId?: number;
+  form: PriceTypeFormState;
+  onFormChange: (form: PriceTypeFormState) => void;
+  availableLocales: Locale[];
+  onSaved?: () => void | Promise<void>;
+}
+
+export function PriceTypeDialog({
+  open,
+  onOpenChange,
+  mode,
+  priceTypeId,
+  form,
+  onFormChange,
+  availableLocales,
+  onSaved,
+}: PriceTypeDialogProps) {
+  const { t } = useTranslation();
+  const [submitting, setSubmitting] = useState(false);
+  const [generalEditing, setGeneralEditing] = useState(false);
+  const [translationsEditing, setTranslationsEditing] = useState(false);
+  const [confirmClose, setConfirmClose] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setGeneralEditing(false);
+      setTranslationsEditing(false);
+      setConfirmClose(false);
+    }
+  }, [open]);
+
+  const isDirty = mode === "create"
+    ? form.code.trim() !== ""
+      || form.locales.length > 1
+      || form.locales.some((l) => l.locale_id !== "" || l.name.trim() !== "")
+    : generalEditing || translationsEditing;
+
+  function requestClose() {
+    if (isDirty) setConfirmClose(true);
+    else onOpenChange(false);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (mode !== "create") return;
+    if (!form.code.trim()) { toast.error(t("toast.codeRequired")); return; }
+    for (const [i, row] of form.locales.entries()) {
+      if (!row.locale_id) { toast.error(t("toast.localeSelectLang", { n: i + 1 })); return; }
+      if (!row.name.trim()) { toast.error(t("toast.localeNameRequired", { n: i + 1 })); return; }
+    }
+    setSubmitting(true);
+    try {
+      const code = form.code.trim().toUpperCase();
+      await priceTypesService.create({
+        code,
+        sort_order: Number(form.sort_order) || 0,
+        locales: form.locales.map((row) => ({
+          locale_id: Number(row.locale_id),
+          name: row.name.trim(),
+          description: row.description.trim() || undefined,
+          sort_order: Number(row.sort_order) || 0,
+          purpose: row.purpose.trim() || undefined,
+          usage_example: row.usage_example.trim() || undefined,
+        })),
+      });
+      toast.success(t("priceType.created"));
+      onOpenChange(false);
+      await onSaved?.();
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const isEditing = generalEditing || translationsEditing;
+  const headerTitle = mode === "create"
+    ? t("priceTypeDialog.create")
+    : (isEditing ? t("priceTypeDialog.edit") : t("priceTypeDialog.view"));
+  const headerDesc = mode === "create"
+    ? t("priceTypeDialog.descCreate")
+    : (isEditing ? t("priceTypeDialog.descEdit") : t("priceTypeDialog.descView"));
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={(v) => { if (!v) requestClose(); }}>
+        <DialogContent
+          className="max-w-3xl p-0 gap-0 overflow-hidden flex flex-col max-h-[90vh]"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => { e.preventDefault(); requestClose(); }}
+        >
+          <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
+
+            <DialogEntityHeader icon={<Tag className="h-4 w-4" />} title={headerTitle} description={headerDesc} />
+
+            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+              <PriceTypeGeneralInfo
+                mode={mode}
+                form={form}
+                onFormChange={(patch) => onFormChange({ ...form, ...patch })}
+                priceTypeId={priceTypeId}
+                onSaved={onSaved}
+                editing={generalEditing}
+                onEditingChange={setGeneralEditing}
+                open={open}
+              />
+              <PriceTypeLocaleTranslations
+                mode={mode}
+                form={form}
+                onFormChange={onFormChange}
+                priceTypeId={priceTypeId}
+                availableLocales={availableLocales}
+                onSaved={onSaved}
+                editing={translationsEditing}
+                onEditingChange={setTranslationsEditing}
+                open={open}
+              />
+            </div>
+
+            {mode === "create" && (
+              <DialogCreateFooter submitting={submitting} onCancel={requestClose} />
+            )}
+
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("dialog.discardChanges.title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("dialog.discardChanges.desc")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => onOpenChange(false)}>{t("dialog.discardChanges.confirm")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}

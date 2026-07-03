@@ -58,7 +58,10 @@
     "phone": "Phone Code",
     "sort": "Sort Order",
     "language": "Language",
-    "facilityGroup": "Facility Group"
+    "facilityGroup": "Facility Group",
+    "purpose": "Purpose",
+    "usageExample": "Usage Example",
+    "calculationMethod": "Calculation Method"
   },
   "toast": {
     "codeRequired": "Code is required.",
@@ -79,7 +82,12 @@
     "empty": {
       "create": "No translations added yet.",
       "country": "No locale translations for this country.",
-      "city": "No locale translations for this city."
+      "city": "No locale translations for this city.",
+      "roomCategory": "No locale translations for this room category.",
+      "priceType": "No locale translations for this price type.",
+      "priceUnit": "No locale translations for this price unit.",
+      "pageType": "No locale translations for this page type.",
+      "uiBlockSection": "No locale translations for this UI block section."
     },
     "row": {
       "label": "Locale {{n}}",
@@ -306,6 +314,102 @@
     "descEdit": "Update room category details and locale translations.",
     "descView": "Room category details and locale translations.",
     "namePlaceholder": "Category name in this language"
+  },
+  "priceType": {
+    "title": "Price Types",
+    "subtitle": "Manage pricing categories for room rate periods.",
+    "new": "New Price Type",
+    "empty": "No price types found.",
+    "loading": "Loading price types…",
+    "errLoad": "Failed to load price types.",
+    "errDelete": "Failed to delete price type.",
+    "deleted": "Price type deleted.",
+    "created": "Price type created successfully!",
+    "updated": "Price type updated successfully!",
+    "deleteTitle": "Delete Price Type",
+    "deleteDesc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+  },
+  "priceTypeDialog": {
+    "create": "New Price Type",
+    "edit": "Edit Price Type",
+    "view": "Price Type Details",
+    "descCreate": "Add a new price type with locale translations.",
+    "descEdit": "Update price type details and locale translations.",
+    "descView": "Price type details and locale translations.",
+    "namePlaceholder": "Price type name in this language",
+    "purposePlaceholder": "Business purpose of this price type...",
+    "usageExamplePlaceholder": "Example scenario shown to administrators..."
+  },
+  "priceUnit": {
+    "title": "Price Units",
+    "subtitle": "Manage units of measurement applied to price periods.",
+    "new": "New Price Unit",
+    "empty": "No price units found.",
+    "loading": "Loading price units…",
+    "errLoad": "Failed to load price units.",
+    "errDelete": "Failed to delete price unit.",
+    "deleted": "Price unit deleted.",
+    "created": "Price unit created successfully!",
+    "updated": "Price unit updated successfully!",
+    "deleteTitle": "Delete Price Unit",
+    "deleteDesc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+  },
+  "priceUnitDialog": {
+    "create": "New Price Unit",
+    "edit": "Edit Price Unit",
+    "view": "Price Unit Details",
+    "descCreate": "Add a new price unit with locale translations.",
+    "descEdit": "Update price unit details and locale translations.",
+    "descView": "Price unit details and locale translations.",
+    "namePlaceholder": "Price unit name in this language",
+    "calculationMethodPlaceholder": "How the unit is applied when calculating a price...",
+    "usageExamplePlaceholder": "Example scenario shown to administrators..."
+  },
+  "uiBlockSection": {
+    "title": "UI Block Sections",
+    "subtitle": "Define layout areas within pages where UI blocks can be placed.",
+    "new": "New UI Block Section",
+    "empty": "No UI block sections found.",
+    "loading": "Loading UI block sections…",
+    "errLoad": "Failed to load UI block sections.",
+    "errDelete": "Failed to delete UI block section.",
+    "deleted": "UI block section deleted.",
+    "created": "UI block section created successfully!",
+    "updated": "UI block section updated successfully!",
+    "deleteTitle": "Delete UI Block Section",
+    "deleteDesc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+  },
+  "uiBlockSectionDialog": {
+    "create": "New UI Block Section",
+    "edit": "Edit UI Block Section",
+    "view": "UI Block Section Details",
+    "descCreate": "Add a new UI block section with locale translations.",
+    "descEdit": "Update UI block section details and locale translations.",
+    "descView": "UI block section details and locale translations.",
+    "namePlaceholder": "Section name in this language"
+  },
+  "pageType": {
+    "title": "Page Types",
+    "subtitle": "Define structural page classifications for resort website templates.",
+    "new": "New Page Type",
+    "empty": "No page types found.",
+    "loading": "Loading page types…",
+    "errLoad": "Failed to load page types.",
+    "errDelete": "Failed to delete page type.",
+    "deleted": "Page type deleted.",
+    "created": "Page type created successfully!",
+    "updated": "Page type updated successfully!",
+    "deleteTitle": "Delete Page Type",
+    "deleteDesc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+  },
+  "pageTypeDialog": {
+    "create": "New Page Type",
+    "edit": "Edit Page Type",
+    "view": "Page Type Details",
+    "descCreate": "Add a new page type with locale translations.",
+    "descEdit": "Update page type details and locale translations.",
+    "descView": "Page type details and locale translations.",
+    "namePlaceholder": "Page type name in this language"
   },
   "pagination": {
     "info": "Page {{current}} of {{total}} — {{elements}} total"

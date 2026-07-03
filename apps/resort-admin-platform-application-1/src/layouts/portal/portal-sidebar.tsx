@@ -39,16 +39,6 @@ const mainNavItems = [
     icon: LayoutDashboard,
   },
   {
-    title: "Page Types",
-    url: "/page-types",
-    icon: FileTextIcon,
-  },
-  {
-    title: "UI Block Categories",
-    url: "/ui-block-categories",
-    icon: LayersIcon,
-  },
-  {
     title: "UI Blocks",
     url: "/ui-blocks",
     icon: BlocksIcon,
@@ -60,10 +50,23 @@ const mainNavItems = [
   },
 ];
 
+const builderNavItems = [
+  {
+    title: "Page Types",
+    url: "/page-types",
+    icon: FileTextIcon,
+  },
+  {
+    title: "UI Block Sections",
+    url: "/ui-block-sections",
+    icon: LayersIcon,
+  },
+];
+
 const resortNavItems = [
-  { title: "Access Types", url: "/access-types", icon: CreditCardIcon },
   { title: "Room Categories", url: "/room-categories", icon: SettingsIcon },
   { title: "Price Types", url: "/price-types", icon: CreditCardIcon },
+  { title: "Price Units", url: "/price-units", icon: CreditCardIcon },
 ];
 
 const commonNavItems = [
@@ -99,6 +102,23 @@ export function PortalSidebar() {
             <SidebarGroupLabel>Main</SidebarGroupLabel>
             <SidebarMenu className="gap-2">
               {mainNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButtonActive
+                    icon={<item.icon />}
+                    title={item.title}
+                    url={item.url}
+                  />
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarGroupLabel>Layout</SidebarGroupLabel>
+            <SidebarMenu className="gap-2">
+              {builderNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButtonActive
                     icon={<item.icon />}

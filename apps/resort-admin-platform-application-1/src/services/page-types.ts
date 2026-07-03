@@ -1,21 +1,22 @@
 import { api } from "./api";
 
-export interface PageTypeSummary {
+export interface PageTypeLocale {
   id: number;
-  key: string;
+  locale_id: number;
   name: string;
-  description?: string | null;
+  description?: string;
+  sort_order: number;
 }
 
 export interface PageType {
   id: number;
-  key: string;
-  name: string;
-  description: string | null;
+  code: string;
+  sort_order: number;
+  locales: PageTypeLocale[];
 }
 
 export interface PageTypeListResponse {
-  data: PageTypeSummary[];
+  data: PageType[];
   current_page: number;
   total_pages: number;
   total_elements: number;
@@ -24,16 +25,27 @@ export interface PageTypeListResponse {
   has_previous: boolean;
 }
 
-export interface CreatePageTypeRequest {
-  key: string;
+export interface CreatePageTypeLocaleRequest {
+  locale_id: number;
   name: string;
   description?: string;
+  sort_order: number;
+}
+
+export interface CreatePageTypeRequest {
+  code: string;
+  sort_order: number;
+  locales?: CreatePageTypeLocaleRequest[];
 }
 
 export interface UpdatePageTypeRequest {
-  key?: string;
-  name?: string;
+  sort_order: number;
+}
+
+export interface UpdatePageTypeLocaleRequest {
+  name: string;
   description?: string;
+  sort_order: number;
 }
 
 export interface MutationResponse {
@@ -44,27 +56,49 @@ export interface MutationResponse {
 export interface ListParams {
   page?: number;
   size?: number;
-  sort_by?: "id" | "key" | "name";
+  sort_by?: string;
   sort_dir?: "ASC" | "DESC";
+  code?: string;
 }
 
-export const listPageTypes = (params: ListParams = {}): Promise<PageTypeListResponse> => {
-  const query = new URLSearchParams();
-  if (params.page !== undefined) query.set("page", String(params.page));
-  if (params.size !== undefined) query.set("size", String(params.size));
-  if (params.sort_by) query.set("sort_by", params.sort_by);
-  if (params.sort_dir) query.set("sort_dir", params.sort_dir);
-  return api.get<PageTypeListResponse>(`/page-types?${query.toString()}`);
+export const pageTypesService = {
+  async list(params: ListParams = {}): Promise<PageTypeListResponse> {
+    const { page = 0, size = 10, sort_by = "id", sort_dir = "ASC", code } = params;
+    const query = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+      sort_by,
+      sort_dir,
+    });
+    if (code) query.set("code", code);
+    return api.get<PageTypeListResponse>(`/page-types?${query}`);
+  },
+
+  async get(id: number): Promise<{ page_type: PageType }> {
+    return api.get<{ page_type: PageType }>(`/page-types/${id}`);
+  },
+
+  async create(body: CreatePageTypeRequest): Promise<MutationResponse> {
+    return api.post<MutationResponse>("/page-types", body);
+  },
+
+  async update(id: number, body: UpdatePageTypeRequest): Promise<MutationResponse> {
+    return api.put<MutationResponse>(`/page-types/${id}`, body);
+  },
+
+  async remove(id: number): Promise<MutationResponse> {
+    return api.delete<MutationResponse>(`/page-types/${id}`);
+  },
+
+  async addLocale(pageTypeId: number, body: CreatePageTypeLocaleRequest): Promise<MutationResponse> {
+    return api.post<MutationResponse>(`/page-types/${pageTypeId}/locales`, body);
+  },
+
+  async updateLocale(pageTypeId: number, localeId: number, body: UpdatePageTypeLocaleRequest): Promise<MutationResponse> {
+    return api.put<MutationResponse>(`/page-types/${pageTypeId}/locales/${localeId}`, body);
+  },
+
+  async removeLocale(pageTypeId: number, localeId: number): Promise<MutationResponse> {
+    return api.delete<MutationResponse>(`/page-types/${pageTypeId}/locales/${localeId}`);
+  },
 };
-
-export const getPageType = (id: number): Promise<{ data: PageType }> =>
-  api.get<{ data: PageType }>(`/page-types/${id}`);
-
-export const createPageType = (body: CreatePageTypeRequest): Promise<MutationResponse> =>
-  api.post<MutationResponse>("/page-types", body);
-
-export const updatePageType = (id: number, body: UpdatePageTypeRequest): Promise<{ data: PageType }> =>
-  api.put<{ data: PageType }>(`/page-types/${id}`, body);
-
-export const deletePageType = (id: number): Promise<MutationResponse> =>
-  api.delete<MutationResponse>(`/page-types/${id}`);
