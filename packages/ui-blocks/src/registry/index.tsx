@@ -11,6 +11,7 @@ import gallery1Defaults from "../gallery/gallery1/default.json";
 import Gallery4 from "../gallery/gallery4";
 import gallery4Schema from "../gallery/gallery4/schema.json";
 import gallery4Defaults from "../gallery/gallery4/default.json";
+import { UI_BLOCK_CATEGORY_KEYS } from "./enums";
 import type { UiBlockCategoryKey, PageTypeKey, AllowedPageKey } from "./enums";
 
 export type { UiBlockCategoryKey, PageTypeKey, AllowedPageKey } from "./enums";
@@ -82,6 +83,6 @@ export const UI_BLOCKS_INDEX: UiBlockMeta[] = [
   },
 ];
 
-export const UI_BLOCK_CATEGORIES = [
-  ...new Set(UI_BLOCKS_INDEX.map((uiBlock) => uiBlock.category)),
-];
+export const UI_BLOCK_CATEGORIES = UI_BLOCK_CATEGORY_KEYS.filter((key) =>
+  UI_BLOCKS_INDEX.some((b) => b.category === key),
+);

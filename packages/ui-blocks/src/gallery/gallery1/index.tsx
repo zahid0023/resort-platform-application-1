@@ -1,4 +1,4 @@
-import { cn } from "../../lib/utils";
+import { cn } from "@resort/shadcn-ui";
 import defaults from "./default.json";
 
 export interface Gallery1Props {
@@ -32,12 +32,12 @@ const Gallery1 = ({
   image6 = defaults.image6,
   backgroundColor = defaults.backgroundColor,
 }: Gallery1Props) => {
-  const images = [image1, image2, image3, image4, image5, image6].filter(Boolean);
+  const images = [image1, image2, image3, image4, image5, image6].filter((s): s is string => !!s);
   const gridClass = columnsClass[columns] ?? columnsClass["3"];
 
   return (
     <div
-      className="w-full py-12 px-6"
+      className="w-full min-h-screen py-12 px-6"
       style={{ backgroundColor }}
     >
       {(title || subtitle) && (
@@ -59,6 +59,7 @@ const Gallery1 = ({
             <img
               src={src}
               alt={`Gallery image ${i + 1}`}
+              loading="lazy"
               className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
             />
           </div>

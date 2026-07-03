@@ -1,5 +1,4 @@
-import { Button } from "../../components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
+import { Button } from "@resort/shadcn-ui";
 import defaults from "./default.json";
 
 export interface Hero1Props {
@@ -16,15 +15,13 @@ const Hero1 = ({
   buttonVariant = defaults.buttonVariant as Hero1Props["buttonVariant"],
 }: Hero1Props) => {
   return (
-    <Card className="bg-transparent flex justify-center items-center flex-col w-full h-full text-center shadow-none border-0">
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{subtitle}</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <section className="flex flex-col justify-center items-center w-full min-h-screen text-center px-6">
+      <div className="flex flex-col items-center gap-4 max-w-2xl">
+        <h1 className="text-4xl font-bold tracking-tight">{title}</h1>
+        <p className="text-muted-foreground text-lg">{subtitle}</p>
         <Button variant={buttonVariant}>{buttonText}</Button>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 };
 

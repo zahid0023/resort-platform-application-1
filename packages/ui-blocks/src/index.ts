@@ -19,3 +19,7 @@ export {
   type PageTypeKey,
   type AllowedPageKey,
 } from "./registry";
+
+// Shared UI components — reusable across admin and owner apps
+export { BlocksNav } from "./components/blocks-nav";
+export { BlockItem } from "./components/block-item";

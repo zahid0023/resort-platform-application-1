@@ -1,6 +1,4 @@
-import { cn } from "../../lib/utils";
-import { Badge } from "../../components/ui/badge";
-import { Button } from "../../components/ui/button";
+import { Badge, Button } from "@resort/shadcn-ui";
 import defaults from "./default.json";
 
 export interface Hero4Props {
@@ -22,7 +20,7 @@ const Hero4 = ({
 }: Hero4Props) => {
   return (
     <div
-      className={cn("flex flex-col w-full h-full justify-center items-center gap-6 py-12 text-center")}
+      className="flex flex-col w-full min-h-screen justify-center items-center gap-6 py-12 text-center"
       style={{ backgroundColor }}
     >
       {badge && <Badge variant="secondary">{badge}</Badge>}
