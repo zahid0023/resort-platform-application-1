@@ -1,0 +1,58 @@
+{
+  "auth": {
+    "login": {
+      "title": "Login to your account",
+      "desc": "Enter your email below to login to your account",
+      "email": "Email",
+      "password": "Password",
+      "forgotPassword": "Forgot your password?",
+      "submit": "Login",
+      "submitting": "Logging in...",
+      "successToast": "Logged in successfully!",
+      "failToast": "Login failed. Please try again."
+    },
+    "register": {
+      "title": "Create an account",
+      "desc": "Enter your information below to create your account",
+      "emailDesc": "We'll use this to contact you. We will not share your email with anyone else.",
+      "passwordDesc": "Must be at least 8 characters long.",
+      "confirmPassword": "Confirm Password",
+      "confirmPasswordDesc": "Please confirm your password.",
+      "submit": "Create Account",
+      "submitting": "Creating Account...",
+      "successToast": "User registered successfully!",
+      "failToast": "Registration failed. Please try again."
+    },
+    "forgotPassword": {
+      "submit": "Send reset link"
+    }
+  },
+  "resorts": {
+    "portfolio": "My portfolio",
+    "headline1": "Your collection of",
+    "headline2": "extraordinary",
+    "headline3": "places.",
+    "destinations_one": "{{count}} destination in your portfolio.",
+    "destinations_other": "{{count}} destinations in your portfolio.",
+    "addNew": "Add a new resort",
+    "addNewDesc": "Begin a new chapter in your portfolio.",
+    "loading": "Loading resorts…",
+    "errLoad": "Failed to load resorts."
+  },
+  "resort": {
+    "new": "New resort",
+    "newTitle": "Name your sanctuary",
+    "code": "Resort code",
+    "codePlaceholder": "e.g. SUNSET-RESORT",
+    "codeHint": "A short, unique identifier for this resort. Cannot be changed after creation.",
+    "submit": "Add resort",
+    "submitting": "Creating…",
+    "successToast": "Resort created!",
+    "cancel": "Cancel"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete"
+  }
+}

@@ -1,19 +1,23 @@
 import { api } from "./api";
 
-export interface CitySummary {
+interface CityLocale {
   id: number;
+  locale_id: number;
   name: string;
-  country_id: number;
+  description?: string;
+  sort_order: number;
 }
 
-export interface City {
+interface City {
   id: number;
-  name: string;
   country_id: number;
+  code?: string;
+  sort_order: number;
+  locales: CityLocale[];
 }
 
-export interface CityListResponse {
-  data: CitySummary[];
+interface CityListResponse {
+  data: City[];
   current_page: number;
   total_pages: number;
   total_elements: number;
@@ -22,45 +26,46 @@ export interface CityListResponse {
   has_previous: boolean;
 }
 
-export interface CreateCityRequest {
+export interface CitySummary {
+  id: number;
   name: string;
   country_id: number;
 }
 
-export interface UpdateCityRequest {
-  name?: string;
-  country_id?: number;
-}
-
-export interface MutationResponse {
-  success: boolean;
-  id: number;
-}
-
-export interface ListParams {
+interface ListParams {
   page?: number;
   size?: number;
-  sort_by?: "id" | "name";
+  sort_by?: string;
   sort_dir?: "ASC" | "DESC";
+  code?: string;
+  countryId?: number;
 }
 
-export const listCities = (params: ListParams = {}): Promise<CityListResponse> => {
-  const query = new URLSearchParams();
-  if (params.page !== undefined) query.set("page", String(params.page));
-  if (params.size !== undefined) query.set("size", String(params.size));
-  if (params.sort_by) query.set("sort_by", params.sort_by);
-  if (params.sort_dir) query.set("sort_dir", params.sort_dir);
-  return api.get<CityListResponse>(`/cities?${query.toString()}`);
-};
-
-export const getCity = (id: number): Promise<{ data: City }> =>
-  api.get<{ data: City }>(`/cities/${id}`);
-
-export const createCity = (body: CreateCityRequest): Promise<MutationResponse> =>
-  api.post<MutationResponse>("/cities", body);
-
-export const updateCity = (id: number, body: UpdateCityRequest): Promise<MutationResponse> =>
-  api.put<MutationResponse>(`/cities/${id}`, body);
-
-export const deleteCity = (id: number): Promise<MutationResponse> =>
-  api.delete<MutationResponse>(`/cities/${id}`);
+export async function listCities(
+  params: ListParams = {},
+): Promise<{ data: CitySummary[] }> {
+  const {
+    page = 0,
+    size = 50,
+    sort_by = "sortOrder",
+    sort_dir = "ASC",
+    code,
+    countryId,
+  } = params;
+  const query = new URLSearchParams({
+    page: String(page),
+    size: String(size),
+    sort_by,
+    sort_dir,
+  });
+  if (code) query.set("code", code);
+  if (countryId) query.set("countryId", String(countryId));
+  const res = await api.get<CityListResponse>(`/cities?${query}`);
+  return {
+    data: res.data.map((c) => ({
+      id: c.id,
+      name: c.locales[0]?.name ?? c.code ?? String(c.id),
+      country_id: c.country_id,
+    })),
+  };
+}

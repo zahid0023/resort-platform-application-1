@@ -1,36 +1,89 @@
-import { api } from "./api"
+import { api } from "./api";
 
-export type ImageHostingProvider = "S3" | "CLOUDINARY"
+export type ImageHostingProvider = "S3" | "CLOUDINARY";
 
-export const PROVIDER_FIELDS: Record<ImageHostingProvider, { key: string; label: string; secret?: boolean }[]> = {
+export interface ProviderField {
+  key: string;
+  label: string;
+  secret?: boolean;
+}
+
+export const PROVIDER_FIELDS: Record<ImageHostingProvider, ProviderField[]> = {
   S3: [
-    { key: "bucket",     label: "Bucket name" },
-    { key: "region",     label: "Region (e.g. ap-southeast-1)" },
-    { key: "access_key", label: "Access Key ID",     secret: false },
-    { key: "secret_key", label: "Secret Access Key", secret: true  },
+    { key: "bucket", label: "Bucket Name" },
+    { key: "region", label: "AWS Region" },
+    { key: "access_key", label: "Access Key ID" },
+    { key: "secret_key", label: "Secret Access Key", secret: true },
   ],
   CLOUDINARY: [
-    { key: "cloud_name", label: "Cloud name" },
-    { key: "api_key",    label: "API Key" },
+    { key: "cloud_name", label: "Cloud Name" },
+    { key: "api_key", label: "API Key" },
     { key: "api_secret", label: "API Secret", secret: true },
   ],
+};
+
+export interface ResortImageHostingConfig {
+  id: number;
+  name: string;
+  provider: ImageHostingProvider;
+  config: Record<string, string>;
 }
 
-export interface CreateImageStorageConfigRequest {
-  provider: ImageHostingProvider
-  config: Record<string, string>
+export interface ResortImageHostingConfigListResponse {
+  data: ResortImageHostingConfig[];
+  current_page: number;
+  total_pages: number;
+  total_elements: number;
+  page_size: number;
+  has_next: boolean;
+  has_previous: boolean;
 }
 
-export interface CreateImageStorageConfigResponse {
-  success: boolean
-  id: number
+export interface MutationResponse {
+  success: boolean;
+  id: number;
 }
 
-export const createImageStorageConfig = (
-  resortId: number,
-  body: CreateImageStorageConfigRequest,
-): Promise<CreateImageStorageConfigResponse> =>
-  api.post<CreateImageStorageConfigResponse>(
-    `/resorts/${resortId}/resort-image-storage-configs`,
-    body,
-  )
+export interface CreateResortImageHostingConfigRequest {
+  name: string;
+  provider: ImageHostingProvider;
+  config: Record<string, string>;
+}
+
+export interface ListParams {
+  page?: number;
+  size?: number;
+  sort_by?: string;
+  sort_dir?: "ASC" | "DESC";
+}
+
+export const resortImageHostingConfigsService = {
+  async list(params: ListParams = {}): Promise<ResortImageHostingConfigListResponse> {
+    const { page = 0, size = 50, sort_by = "id", sort_dir = "ASC" } = params;
+    const query = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+      sort_by,
+      sort_dir,
+    });
+    return api.get<ResortImageHostingConfigListResponse>(
+      `/resort-image-hosting-configs?${query}`,
+    );
+  },
+
+  async get(id: number): Promise<{ resort_image_hosting_config: ResortImageHostingConfig }> {
+    return api.get(`/resort-image-hosting-configs/${id}`);
+  },
+
+  async create(body: CreateResortImageHostingConfigRequest): Promise<MutationResponse> {
+    return api.post<MutationResponse>("/resort-image-hosting-configs", body);
+  },
+
+  async update(id: number, name: string): Promise<MutationResponse> {
+    return api.put<MutationResponse>(`/resort-image-hosting-configs/${id}`, { name });
+  },
+
+  async remove(id: number): Promise<MutationResponse> {
+    return api.delete<MutationResponse>(`/resort-image-hosting-configs/${id}`);
+  },
+};

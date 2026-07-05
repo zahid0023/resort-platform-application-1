@@ -87,7 +87,9 @@
       "priceType": "No locale translations for this price type.",
       "priceUnit": "No locale translations for this price unit.",
       "pageType": "No locale translations for this page type.",
-      "uiBlockSection": "No locale translations for this UI block section."
+      "uiBlockSection": "No locale translations for this UI block section.",
+      "resortAccessType": "No locale translations for this resort access type.",
+      "resortPermissionType": "No locale translations for this resort permission type."
     },
     "row": {
       "label": "Locale {{n}}",
@@ -107,7 +109,11 @@
     "countryDescription": "Optional description...",
     "cityName": "City name in this language",
     "cityDescription": "Optional description...",
-    "cityCode": "DHAKA"
+    "cityCode": "DHAKA",
+    "resortAccessTypeName": "Access type name in this language",
+    "resortAccessTypeDescription": "Optional description...",
+    "resortPermissionTypeName": "Permission type name in this language",
+    "resortPermissionTypeDescription": "Optional description..."
   },
   "dialog": {
     "city": {
@@ -410,6 +416,48 @@
     "descEdit": "Update page type details and locale translations.",
     "descView": "Page type details and locale translations.",
     "namePlaceholder": "Page type name in this language"
+  },
+  "resortAccessType": {
+    "title": "Resort Access Types",
+    "subtitle": "Define roles users can hold in relation to a specific resort.",
+    "new": "New Access Type",
+    "loading": "Loading resort access types…",
+    "empty": "No resort access types found.",
+    "createdToast": "Resort access type created successfully!",
+    "updatedToast": "Resort access type updated successfully.",
+    "deleteTitle": "Delete Resort Access Type",
+    "deleteDesc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+  },
+  "resortPermissionType": {
+    "title": "Resort Permission Types",
+    "subtitle": "Define granular actions users can perform within a specific resort.",
+    "new": "New Permission Type",
+    "loading": "Loading resort permission types…",
+    "empty": "No resort permission types found.",
+    "createdToast": "Resort permission type created successfully!",
+    "updatedToast": "Resort permission type updated successfully.",
+    "deleteTitle": "Delete Resort Permission Type",
+    "deleteDesc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+  },
+  "resortPermissionTypeDialog": {
+    "new": "New Resort Permission Type",
+    "edit": "Edit Resort Permission Type",
+    "view": "Resort Permission Type Details",
+    "desc": {
+      "create": "Add a new resort permission type with locale translations.",
+      "edit": "Update resort permission type details and locale translations.",
+      "view": "Resort permission type details and locale translations."
+    }
+  },
+  "resortAccessTypeDialog": {
+    "new": "New Resort Access Type",
+    "edit": "Edit Resort Access Type",
+    "view": "Resort Access Type Details",
+    "desc": {
+      "create": "Add a new resort access type with locale translations.",
+      "edit": "Update resort access type details and locale translations.",
+      "view": "Resort access type details and locale translations."
+    }
   },
   "pagination": {
     "info": "Page {{current}} of {{total}} — {{elements}} total"

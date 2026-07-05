@@ -67,6 +67,8 @@ const resortNavItems = [
   { title: "Room Categories", url: "/room-categories", icon: SettingsIcon },
   { title: "Price Types", url: "/price-types", icon: CreditCardIcon },
   { title: "Price Units", url: "/price-units", icon: CreditCardIcon },
+  { title: "Resort Access Types", url: "/resort-access-types", icon: SettingsIcon },
+  { title: "Resort Permission Types", url: "/resort-permission-types", icon: SettingsIcon },
 ];
 
 const commonNavItems = [

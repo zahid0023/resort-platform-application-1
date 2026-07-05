@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { Button } from "@resort/shadcn-ui"
 import {
@@ -21,6 +22,7 @@ import { Input } from "@resort/shadcn-ui"
 import { register } from "@/services/auth"
 
 export function RegisterForm({ ...props }: React.ComponentProps<typeof Card>) {
+  const { t } = useTranslation()
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [form, setForm] = useState({
@@ -38,21 +40,21 @@ export function RegisterForm({ ...props }: React.ComponentProps<typeof Card>) {
     setLoading(true)
     try {
       await register(form)
-      toast.success("User registered successfully!")
+      toast.success(t("auth.register.successToast"))
       router.push("/login")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Registration failed. Please try again.")
+      toast.error(err instanceof Error ? err.message : t("auth.register.failToast"))
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <Card {...props}>
+    <Card className="border-0 shadow-none" {...props}>
       <CardHeader>
-        <CardTitle>Create an account</CardTitle>
+        <CardTitle>{t("auth.register.title")}</CardTitle>
         <CardDescription>
-          Enter your information below to create your account
+          {t("auth.register.desc")}
         </CardDescription>
       </CardHeader>
 
@@ -60,7 +62,7 @@ export function RegisterForm({ ...props }: React.ComponentProps<typeof Card>) {
         <form onSubmit={handleSubmit}>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="user_name">Email</FieldLabel>
+              <FieldLabel htmlFor="user_name">{t("auth.login.email")}</FieldLabel>
               <Input
                 id="user_name"
                 name="user_name"
@@ -71,12 +73,11 @@ export function RegisterForm({ ...props }: React.ComponentProps<typeof Card>) {
                 required
               />
               <FieldDescription>
-                We&apos;ll use this to contact you. We will not share your email
-                with anyone else.
+                {t("auth.register.emailDesc")}
               </FieldDescription>
             </Field>
             <Field>
-              <FieldLabel htmlFor="password">Password</FieldLabel>
+              <FieldLabel htmlFor="password">{t("auth.login.password")}</FieldLabel>
               <Input
                 id="password"
                 name="password"
@@ -86,12 +87,12 @@ export function RegisterForm({ ...props }: React.ComponentProps<typeof Card>) {
                 required
               />
               <FieldDescription>
-                Must be at least 8 characters long.
+                {t("auth.register.passwordDesc")}
               </FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor="confirm_password">
-                Confirm Password
+                {t("auth.register.confirmPassword")}
               </FieldLabel>
               <Input
                 id="confirm_password"
@@ -101,12 +102,12 @@ export function RegisterForm({ ...props }: React.ComponentProps<typeof Card>) {
                 onChange={handleChange}
                 required
               />
-              <FieldDescription>Please confirm your password.</FieldDescription>
+              <FieldDescription>{t("auth.register.confirmPasswordDesc")}</FieldDescription>
             </Field>
             <FieldGroup>
               <Field>
                 <Button type="submit" disabled={loading}>
-                  {loading ? "Creating Account..." : "Create Account"}
+                  {loading ? t("auth.register.submitting") : t("auth.register.submit")}
                 </Button>
               </Field>
             </FieldGroup>
