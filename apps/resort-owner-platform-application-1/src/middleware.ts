@@ -23,7 +23,7 @@ export function middleware(request: NextRequest) {
 
   if (token && isAuthRoute) {
     const dashboardUrl = request.nextUrl.clone();
-    dashboardUrl.pathname = "/dashboard";
+    dashboardUrl.pathname = "/resorts";
     return NextResponse.redirect(dashboardUrl);
   }
 
