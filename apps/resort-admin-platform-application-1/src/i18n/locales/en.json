@@ -67,7 +67,8 @@
     "codeRequired": "Code is required.",
     "localeSelectLang": "Locale row {{n}}: please select a language.",
     "localeNameRequired": "Locale row {{n}}: name is required.",
-    "facilityGroupRequired": "Please select a facility group."
+    "facilityGroupRequired": "Please select a facility group.",
+    "commChannelTypeRequired": "Please select a value type (Phone, Email, or URL)."
   },
   "locale": {
     "translations": "Translations",
@@ -89,7 +90,9 @@
       "pageType": "No locale translations for this page type.",
       "uiBlockSection": "No locale translations for this UI block section.",
       "resortAccessType": "No locale translations for this resort access type.",
-      "resortPermissionType": "No locale translations for this resort permission type."
+      "resortPermissionType": "No locale translations for this resort permission type.",
+      "contactType": "No locale translations for this contact type.",
+      "commChannel": "No locale translations for this communication channel."
     },
     "row": {
       "label": "Locale {{n}}",
@@ -458,6 +461,61 @@
       "edit": "Update resort access type details and locale translations.",
       "view": "Resort access type details and locale translations."
     }
+  },
+  "commChannel": {
+    "title": "Communication Channels",
+    "subtitle": "Manage the mediums through which resorts can be contacted.",
+    "new": "New Channel",
+    "empty": "No communication channels found.",
+    "loading": "Loading communication channels…",
+    "errLoad": "Failed to load communication channels.",
+    "errDelete": "Failed to delete communication channel.",
+    "deleted": "Communication channel deleted.",
+    "created": "Communication channel created successfully!",
+    "updated": "Communication channel updated successfully!",
+    "deleteTitle": "Delete Communication Channel",
+    "deleteDesc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+  },
+  "commChannelDialog": {
+    "create": "New Communication Channel",
+    "edit": "Edit Communication Channel",
+    "view": "Communication Channel Details",
+    "descCreate": "Add a new communication channel with locale translations.",
+    "descEdit": "Update channel details and locale translations.",
+    "descView": "Channel details and locale translations.",
+    "namePlaceholder": "Channel name in this language",
+    "descriptionPlaceholder": "Optional description..."
+  },
+  "commChannelField": {
+    "valueType": "Value type",
+    "is_phone": "Phone",
+    "is_email": "Email",
+    "is_url": "URL / Link",
+    "is_clickable": "Clickable"
+  },
+  "contactType": {
+    "title": "Contact Types",
+    "subtitle": "Manage contact categories used across resorts in the platform.",
+    "new": "New Contact Type",
+    "empty": "No contact types found.",
+    "loading": "Loading contact types…",
+    "errLoad": "Failed to load contact types.",
+    "errDelete": "Failed to delete contact type.",
+    "deleted": "Contact type deleted.",
+    "created": "Contact type created successfully!",
+    "updated": "Contact type updated successfully!",
+    "deleteTitle": "Delete Contact Type",
+    "deleteDesc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+  },
+  "contactTypeDialog": {
+    "create": "New Contact Type",
+    "edit": "Edit Contact Type",
+    "view": "Contact Type Details",
+    "descCreate": "Add a new contact type with locale translations.",
+    "descEdit": "Update contact type details and locale translations.",
+    "descView": "Contact type details and locale translations.",
+    "namePlaceholder": "Contact type name in this language",
+    "descriptionPlaceholder": "Optional description..."
   },
   "pagination": {
     "info": "Page {{current}} of {{total}} — {{elements}} total"

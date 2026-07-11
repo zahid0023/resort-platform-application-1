@@ -11,9 +11,11 @@ import { ResortDialog } from "@/components/resorts/resort-dialog"
 import { LogoutButton } from "@/components/auth/logout-button"
 import { LocaleToggle } from "@/components/locale-toggle"
 import { listResorts, type ResortSummary, type ResortListResponse } from "@/services/resorts"
+import { useTranslation } from "react-i18next"
 
 export default function ResortsPage() {
   const router = useRouter()
+  const { t } = useTranslation()
   const [data, setData] = useState<ResortListResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(0)
@@ -24,7 +26,7 @@ export default function ResortsPage() {
     try {
       setData(await listResorts({ page, size: 12, sort_by: "id", sort_dir: "ASC" }))
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to load resorts.")
+      toast.error(err instanceof Error ? err.message : t("resorts.errLoad"))
     } finally {
       setLoading(false)
     }
@@ -66,25 +68,26 @@ export default function ResortsPage() {
         {/* Header section */}
         <section className="mb-12">
           <p className="mb-4 text-xs uppercase tracking-[0.3em] text-muted-foreground">
-            My portfolio
+            {t("resorts.portfolio")}
           </p>
           <h1 className="max-w-2xl text-4xl font-semibold leading-[1.1] tracking-tight text-foreground md:text-5xl">
-            Your collection of{" "}
-            <em className="font-normal italic text-muted-foreground">extraordinary</em>{" "}
-            places.
+            {t("resorts.headline1")}{" "}
+            <em className="font-normal italic text-muted-foreground">{t("resorts.headline2")}</em>{" "}
+            {t("resorts.headline3")}
           </h1>
           {!loading && (
             <p className="mt-5 text-sm text-muted-foreground">
-              {total} {total === 1 ? "destination" : "destinations"} in your portfolio.
+              {t("resorts.destinations", { count: total })}
             </p>
           )}
         </section>
 
-        {/* Content section */}
+        {/* Content section */}\
         <section>
           {loading ? (
             <div className="flex justify-center py-32">
               <Spinner className="size-6" />
+              <span className="sr-only">{t("resorts.loading")}</span>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -103,9 +106,9 @@ export default function ResortsPage() {
                     <PlusIcon className="size-6" strokeWidth={1.5} />
                   </div>
                   <div>
-                    <h3 className="text-base font-medium text-foreground">Add a new resort</h3>
+                    <h3 className="text-base font-medium text-foreground">{t("resorts.addNew")}</h3>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Begin a new chapter in your portfolio.
+                      {t("resorts.addNewDesc")}
                     </p>
                   </div>
                 </div>

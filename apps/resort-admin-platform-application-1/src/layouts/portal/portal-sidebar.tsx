@@ -11,6 +11,8 @@ import {
   LayoutDashboard,
   LayoutTemplateIcon,
   LogOut,
+  PhoneCallIcon,
+  RadioIcon,
   SettingsIcon,
   ZapIcon,
 } from "lucide-react";
@@ -69,6 +71,11 @@ const resortNavItems = [
   { title: "Price Units", url: "/price-units", icon: CreditCardIcon },
   { title: "Resort Access Types", url: "/resort-access-types", icon: SettingsIcon },
   { title: "Resort Permission Types", url: "/resort-permission-types", icon: SettingsIcon },
+];
+
+const contactNavItems = [
+  { title: "Contact Types", url: "/contact-types", icon: PhoneCallIcon },
+  { title: "Communication Channels", url: "/communication-channels", icon: RadioIcon },
 ];
 
 const commonNavItems = [
@@ -138,6 +145,23 @@ export function PortalSidebar() {
             <SidebarGroupLabel>Resort</SidebarGroupLabel>
             <SidebarMenu className="gap-2">
               {resortNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButtonActive
+                    icon={<item.icon />}
+                    title={item.title}
+                    url={item.url}
+                  />
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarGroupLabel>Contact</SidebarGroupLabel>
+            <SidebarMenu className="gap-2">
+              {contactNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButtonActive
                     icon={<item.icon />}
