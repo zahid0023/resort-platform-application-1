@@ -22,7 +22,7 @@ import { listCountries, type CountrySummary } from "@/services/countries"
 import { listCities, type CitySummary } from "@/services/cities"
 import { listContactTypes, type ContactType } from "@/services/contact-types"
 import { listCommunicationChannels, type CommunicationChannel } from "@/services/communication-channels"
-import { createResortContact } from "@/services/resort-contacts"
+import { localesService } from "@/services/locales"
 import { useTranslation } from "react-i18next"
 import hero from "@/assets/hero-resort.jpg"
 
@@ -34,7 +34,8 @@ interface ResortDialogProps {
 
 interface StepOneForm {
   name: string
-  description: string
+  tagline: string
+  short_description: string
   code: string
   estd: string
 }
@@ -69,7 +70,7 @@ function newContactRow(): ContactRow {
 
 const TOTAL_STEPS = 3
 
-const EMPTY_STEP1: StepOneForm = { name: "", description: "", code: "", estd: "" }
+const EMPTY_STEP1: StepOneForm = { name: "", tagline: "", short_description: "", code: "", estd: "" }
 const EMPTY_STEP2: StepTwoForm = {
   country_id: null,
   country_name: "",
@@ -112,6 +113,8 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
   const [loadingContactTypes, setLoadingContactTypes] = useState(false)
   const [loadingChannels, setLoadingChannels] = useState(false)
 
+  const [enLocaleId, setEnLocaleId] = useState<number | null>(null)
+
   useEffect(() => {
     if (open) {
       setIntro(true)
@@ -125,6 +128,11 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
       setCities([])
       setContactTypes([])
       setChannels([])
+      localesService.list({ code: "en", size: 1 }).then((res) => {
+        setEnLocaleId(res.data[0]?.id ?? null)
+      }).catch(() => {
+        // locale fetch failure is non-blocking; basic_info will be created without locale rows
+      })
     }
   }, [open])
 
@@ -223,7 +231,7 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
   const updateContact = (uid: string, field: keyof Omit<ContactRow, "uid">, value: unknown) =>
     setContacts((prev) => prev.map((r) => (r.uid === uid ? { ...r, [field]: value } : r)))
 
-  const step1Valid = !!step1.name.trim() && !!step1.code.trim() && !!step1.estd.trim()
+  const step1Valid = !!step1.name.trim() && !!step1.tagline.trim() && !!step1.code.trim() && !!step1.estd.trim()
   const step2Valid = !!step2.country_id && !!step2.city_id
   const step3Valid = contacts.every(
     (c) => !!c.contact_type_id && !!c.communication_channel_id && !!c.contact_value.trim()
@@ -244,29 +252,44 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
     if (!step3Valid || submitting) return
     setSubmitting(true)
     try {
-      const result = await createResort(step1.code.trim())
-      const resortId = result.id
+      const localeRows = enLocaleId
+        ? [{
+            locale_id: enLocaleId,
+            sort_order: 1,
+            name: step1.name.trim(),
+            tagline: step1.tagline.trim(),
+            short_description: step1.short_description.trim() || undefined,
+            address: step2.address.trim() || undefined,
+          }]
+        : undefined
 
-      for (let i = 0; i < contacts.length; i++) {
-        const c = contacts[i]
-        if (!c.contact_type_id || !c.communication_channel_id || !c.contact_value.trim()) continue
-        try {
-          await createResortContact(resortId, {
-            contact_type_id: c.contact_type_id,
-            communication_channel_id: c.communication_channel_id,
+      const result = await createResort({
+        code: step1.code.trim(),
+        basic_info: {
+          code: step1.code.trim().slice(0, 50),
+          sort_order: 1,
+          estd: Number(step1.estd),
+          country_id: step2.country_id!,
+          city_id: step2.city_id!,
+          lat: step2.latitude ? Number(step2.latitude) : undefined,
+          lon: step2.longitude ? Number(step2.longitude) : undefined,
+          locales: localeRows,
+        },
+        contacts: contacts
+          .filter((c) => c.contact_type_id && c.communication_channel_id && c.contact_value.trim())
+          .map((c, i) => ({
+            contact_type_id: c.contact_type_id!,
+            communication_channel_id: c.communication_channel_id!,
             contact_value: c.contact_value.trim(),
             is_primary: c.is_primary,
             sort_order: i,
-          })
-        } catch {
-          // contact failures are non-blocking after the resort is created
-        }
-      }
+          })),
+      })
 
       toast.success(t("resort.successToast"))
       onSuccess()
       onOpenChange(false)
-      router.push(`/resorts/${resortId}/dashboard`)
+      router.push(`/resorts/${result.id}/dashboard`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong.")
     } finally {
@@ -402,17 +425,30 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                   </div>
 
                   <div className="space-y-1.5">
+                    <Label htmlFor="tagline">{t("resort.taglineLabel")}</Label>
+                    <Input
+                      id="tagline"
+                      name="tagline"
+                      value={step1.tagline}
+                      onChange={handleStep1Change}
+                      placeholder={t("resort.taglinePlaceholder")}
+                      maxLength={255}
+                      disabled={submitting}
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
                     <div className="flex items-center gap-2">
-                      <Label htmlFor="description">{t("resort.descriptionLabel")}</Label>
+                      <Label htmlFor="short_description">{t("resort.shortDescLabel")}</Label>
                       <span className="text-xs text-muted-foreground">{t("resort.optional")}</span>
                     </div>
                     <Textarea
-                      id="description"
-                      name="description"
-                      value={step1.description}
+                      id="short_description"
+                      name="short_description"
+                      value={step1.short_description}
                       onChange={handleStep1Change}
-                      placeholder={t("resort.descriptionPlaceholder")}
-                      maxLength={400}
+                      placeholder={t("resort.shortDescPlaceholder")}
+                      maxLength={1024}
                       rows={2}
                       disabled={submitting}
                     />

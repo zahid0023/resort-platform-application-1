@@ -58,7 +58,7 @@ export interface ListParams {
 }
 
 export const resortImageHostingConfigsService = {
-  async list(params: ListParams = {}): Promise<ResortImageHostingConfigListResponse> {
+  async list(resortId: number, params: ListParams = {}): Promise<ResortImageHostingConfigListResponse> {
     const { page = 0, size = 50, sort_by = "id", sort_dir = "ASC" } = params;
     const query = new URLSearchParams({
       page: String(page),
@@ -67,23 +67,23 @@ export const resortImageHostingConfigsService = {
       sort_dir,
     });
     return api.get<ResortImageHostingConfigListResponse>(
-      `/resort-image-hosting-configs?${query}`,
+      `/resorts/${resortId}/resort-image-hosting-configs?${query}`,
     );
   },
 
-  async get(id: number): Promise<{ resort_image_hosting_config: ResortImageHostingConfig }> {
-    return api.get(`/resort-image-hosting-configs/${id}`);
+  async get(resortId: number, id: number): Promise<{ resort_image_hosting_config: ResortImageHostingConfig }> {
+    return api.get(`/resorts/${resortId}/resort-image-hosting-configs/${id}`);
   },
 
-  async create(body: CreateResortImageHostingConfigRequest): Promise<MutationResponse> {
-    return api.post<MutationResponse>("/resort-image-hosting-configs", body);
+  async create(resortId: number, body: CreateResortImageHostingConfigRequest): Promise<MutationResponse> {
+    return api.post<MutationResponse>(`/resorts/${resortId}/resort-image-hosting-configs`, body);
   },
 
-  async update(id: number, name: string): Promise<MutationResponse> {
-    return api.put<MutationResponse>(`/resort-image-hosting-configs/${id}`, { name });
+  async update(resortId: number, id: number, name: string): Promise<MutationResponse> {
+    return api.put<MutationResponse>(`/resorts/${resortId}/resort-image-hosting-configs/${id}`, { name });
   },
 
-  async remove(id: number): Promise<MutationResponse> {
-    return api.delete<MutationResponse>(`/resort-image-hosting-configs/${id}`);
+  async remove(resortId: number, id: number): Promise<MutationResponse> {
+    return api.delete<MutationResponse>(`/resorts/${resortId}/resort-image-hosting-configs/${id}`);
   },
 };

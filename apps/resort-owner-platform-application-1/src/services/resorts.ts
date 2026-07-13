@@ -1,8 +1,29 @@
 import { api } from "./api";
 
+export interface ResortBasicInfoSummary {
+  id: number;
+  resort_id: number;
+  code: string;
+  sort_order: number;
+  estd: number;
+  country_id: number;
+  city_id: number;
+  logo_url?: string;
+  lat?: number;
+  lon?: number;
+  locales?: {
+    locale_id: number;
+    name: string;
+    tagline: string;
+    short_description?: string;
+    address?: string;
+  }[];
+}
+
 export interface ResortSummary {
   id: number;
   code: string;
+  resort_basic_info?: ResortBasicInfoSummary;
 }
 
 export interface ResortListResponse {
@@ -28,6 +49,41 @@ export interface ListParams {
   code?: string;
 }
 
+export interface CreateResortBasicInfoLocale {
+  locale_id: number;
+  sort_order: number;
+  name: string;
+  tagline: string;
+  short_description?: string;
+  address?: string;
+}
+
+export interface CreateResortBasicInfo {
+  code: string;
+  sort_order: number;
+  estd: number;
+  country_id: number;
+  city_id: number;
+  logo_url?: string;
+  lat?: number;
+  lon?: number;
+  locales?: CreateResortBasicInfoLocale[];
+}
+
+export interface CreateResortContact {
+  contact_type_id: number;
+  communication_channel_id: number;
+  contact_value: string;
+  is_primary: boolean;
+  sort_order: number;
+}
+
+export interface CreateResortRequest {
+  code: string;
+  basic_info?: CreateResortBasicInfo;
+  contacts?: CreateResortContact[];
+}
+
 function buildQuery(params: ListParams): URLSearchParams {
   const { page = 0, size = 10, sort_by = "id", sort_dir = "ASC", code } = params;
   const q = new URLSearchParams({ page: String(page), size: String(size), sort_by, sort_dir });
@@ -49,8 +105,8 @@ export function getResort(id: number): Promise<{ data: ResortSummary }> {
   return api.get<{ data: ResortSummary }>(`/resorts/${id}`);
 }
 
-export function createResort(code: string): Promise<MutationResponse> {
-  return api.post<MutationResponse>("/resorts", { code });
+export function createResort(body: CreateResortRequest): Promise<MutationResponse> {
+  return api.post<MutationResponse>("/resorts", body);
 }
 
 export function deleteResort(id: number): Promise<MutationResponse> {

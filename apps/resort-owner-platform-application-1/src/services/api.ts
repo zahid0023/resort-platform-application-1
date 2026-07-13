@@ -72,4 +72,29 @@ export const api = {
 
     delete: <T>(path: string, options?: RequestInit) =>
         apiFetch<T>(path, { ...options, method: "DELETE" }),
+
+    postForm: <T>(path: string, body: FormData): Promise<T> => {
+        const token = getToken();
+        return fetch(`${BASE_URL}${path}`, {
+            method: "POST",
+            body,
+            headers: {
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        }).then(async (res) => {
+            if (!res.ok) {
+                const text = await res.text().catch(() => "");
+                let message = res.statusText;
+                try {
+                    const json = JSON.parse(text);
+                    message = json.message || json.error || text || res.statusText;
+                } catch {
+                    message = text || res.statusText;
+                }
+                throw new Error(message || `Request failed: ${res.status}`);
+            }
+            if (res.status === 204) return undefined as T;
+            return res.json();
+        });
+    },
 };
