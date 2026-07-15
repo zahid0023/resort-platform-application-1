@@ -23,3 +23,5 @@ export {
 // Shared UI components — reusable across admin and owner apps
 export { BlocksNav } from "./components/blocks-nav";
 export { BlockItem } from "./components/block-item";
+export { LucideIconRenderer } from "./components/lucide-icon-renderer";
+export { LucideIconPicker } from "./components/lucide-icon-picker";

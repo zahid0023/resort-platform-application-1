@@ -17,7 +17,7 @@ export function SidebarMenuButtonActive({ title, url, icon }: SidebarMenuButtonA
   return (
     <SidebarMenuButton
       asChild
-      isActive={pathname === url}
+      isActive={pathname === url || pathname.startsWith(url + "/")}
       onClick={() => isMobile && setOpenMobile(false)}
       tooltip={title}
     >

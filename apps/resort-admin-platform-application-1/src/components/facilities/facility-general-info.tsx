@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
 import { Check, ChevronDown, Loader2, Pencil, X } from "lucide-react"
 import { Button } from "@resort/shadcn-ui"
@@ -49,6 +49,7 @@ export function FacilityGeneralInfo({
   const [loadingGroups, setLoadingGroups] = useState(false)
   const [groupSearch, setGroupSearch] = useState("")
   const [groupPopoverOpen, setGroupPopoverOpen] = useState(false)
+  const groupsLoadedRef = useRef(false)
 
   const showGroupSelector = mode === "create" && fixedFacilityGroupId == null
 
@@ -64,15 +65,9 @@ export function FacilityGeneralInfo({
       setGroupSearch("")
       setGroupPopoverOpen(false)
       setViewGroupName("")
+      groupsLoadedRef.current = false
     }
   }, [open])
-
-  // Load first page when dialog opens in create mode without fixed group
-  useEffect(() => {
-    if (open && showGroupSelector) {
-      loadGroupPage(0, true)
-    }
-  }, [open, showGroupSelector]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load group name for view mode
   useEffect(() => {
@@ -183,7 +178,16 @@ export function FacilityGeneralInfo({
           {showGroupSelector && (
             <div className="space-y-2">
               <Label className="text-xs font-medium">{t("field.facilityGroup")} *</Label>
-              <Popover open={groupPopoverOpen} onOpenChange={setGroupPopoverOpen}>
+              <Popover
+                open={groupPopoverOpen}
+                onOpenChange={(v) => {
+                  setGroupPopoverOpen(v)
+                  if (v && !groupsLoadedRef.current) {
+                    groupsLoadedRef.current = true
+                    loadGroupPage(0, true)
+                  }
+                }}
+              >
                 <PopoverTrigger asChild>
                   <Button
                     type="button"

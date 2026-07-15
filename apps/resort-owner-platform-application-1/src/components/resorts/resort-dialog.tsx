@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Dialog, DialogContent } from "@resort/shadcn-ui"
+import { Dialog, DialogContent, DialogTitle } from "@resort/shadcn-ui"
 import { Button } from "@resort/shadcn-ui"
 import { Input } from "@resort/shadcn-ui"
 import { Label } from "@resort/shadcn-ui"
@@ -300,6 +300,7 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden flex flex-col max-h-[90vh] bg-card border-border/60">
+        <DialogTitle className="sr-only">Create Resort</DialogTitle>
         <div className="grid md:grid-cols-[260px_1fr] flex-1 min-h-0">
 
           {/* Left rail */}

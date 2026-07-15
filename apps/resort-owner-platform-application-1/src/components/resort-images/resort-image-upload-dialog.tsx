@@ -8,6 +8,7 @@ import {
   Button,
   Dialog,
   DialogContent,
+  DialogTitle,
   Label,
   Select,
   SelectContent,
@@ -258,6 +259,7 @@ export function ResortImageUploadDialog({ open, onOpenChange, resortId, onUpload
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden flex flex-col max-h-[90vh]">
+        <DialogTitle className="sr-only">Upload Images</DialogTitle>
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b shrink-0">
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
