@@ -25,6 +25,8 @@ export interface ResortFacilityGeneralInfoProps {
   open: boolean
   facilityMode: FacilityMode
   onFacilityModeChange: (m: FacilityMode) => void
+  lockedGroupName?: string
+  platformFacilityGroupId?: number
 }
 
 export function ResortFacilityGeneralInfo({
@@ -39,6 +41,8 @@ export function ResortFacilityGeneralInfo({
   open,
   facilityMode,
   onFacilityModeChange,
+  lockedGroupName,
+  platformFacilityGroupId,
 }: ResortFacilityGeneralInfoProps) {
   const { t } = useTranslation()
   const [local, setLocal] = useState<{ sort_order: number; facility_id: number | "" }>({
@@ -85,7 +89,12 @@ export function ResortFacilityGeneralInfo({
   async function loadPlatFacilities(page: number, reset = false) {
     setPlatLoading(true)
     try {
-      const res = await platformFacilitiesService.list({ page, size: PLAT_PAGE_SIZE, sort_by: "sortOrder" })
+      const res = await platformFacilitiesService.list({
+        page,
+        size: PLAT_PAGE_SIZE,
+        sort_by: "sortOrder",
+        ...(platformFacilityGroupId !== undefined ? { facilityGroupId: platformFacilityGroupId } : {}),
+      })
       setPlatFacilities((prev) => (reset ? res.data : [...prev, ...res.data]))
       setPlatPage(page)
       setPlatHasNext(res.has_next)
@@ -222,110 +231,20 @@ export function ResortFacilityGeneralInfo({
   const showChooser = mode === "create" || editing
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <>
+      {/* ── Section 1: Facility Type ──────────────────────────────────────── */}
+      <div className="space-y-4">
         <div className="flex items-center gap-2">
           <div className="h-1 w-1 rounded-full bg-primary" />
           <h3 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
-            {t("common.generalInfo")}
+            {t("resortFacility.facilityType")}
           </h3>
         </div>
-        {mode !== "create" && !editing && (
-          <Button type="button" size="sm" variant="outline" onClick={startEdit} className="h-7 text-xs px-2.5 gap-1.5">
-            <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-          </Button>
-        )}
-        {editing && (
-          <div className="flex items-center gap-1.5">
-            <Button type="button" size="sm" variant="outline" onClick={() => onEditingChange(false)} disabled={submitting} className="h-7 text-xs px-2.5 gap-1.5">
-              <X className="h-3.5 w-3.5" /> {t("common.cancel")}
-            </Button>
-            <Button type="button" size="sm" onClick={save} disabled={submitting} className="h-7 text-xs px-2.5 gap-1.5">
-              <Check className="h-3.5 w-3.5" />
-              {submitting ? t("common.saving") : t("common.save")}
-            </Button>
-          </div>
-        )}
-      </div>
 
-      <Card>
-        <CardContent className="space-y-4">
-
-          {/* Group picker — create mode only */}
-          {mode === "create" && (
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">{t("resortFacility.group")} *</Label>
-              <Popover open={groupPopoverOpen} onOpenChange={handleGroupPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button type="button" variant="outline" className="w-full justify-between font-normal">
-                    <span className={form.resort_facility_group_id ? "" : "text-muted-foreground"}>
-                      {selectedGroupLabel}
-                    </span>
-                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <div className="p-2 border-b">
-                    <Input
-                      placeholder={t("resortFacility.searchGroup")}
-                      value={groupSearch}
-                      onChange={(e) => setGroupSearch(e.target.value)}
-                      className="h-8 text-sm"
-                      autoFocus
-                    />
-                  </div>
-                  <div className="max-h-52 overflow-y-auto">
-                    {groupLoading && groups.length === 0 ? (
-                      <div className="flex items-center justify-center py-6">
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : filteredGroups.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">{t("resortFacility.noGroups")}</p>
-                    ) : (
-                      filteredGroups.map((g) => {
-                        const label = g.locales[0]?.name ?? `Group #${g.id}`
-                        const isSelected = form.resort_facility_group_id === g.id
-                        return (
-                          <button
-                            key={g.id}
-                            type="button"
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 ${isSelected ? "bg-accent" : ""}`}
-                            onClick={() => {
-                              onFormChange({ resort_facility_group_id: g.id })
-                              setGroupPopoverOpen(false)
-                              setGroupSearch("")
-                            }}
-                          >
-                            {isSelected
-                              ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-                              : <span className="w-3.5 shrink-0" />
-                            }
-                            <span>{label}</span>
-                            <span className="ml-auto text-xs text-muted-foreground">#{g.id}</span>
-                          </button>
-                        )
-                      })
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          )}
-
-          {/* View mode: show group info */}
-          {isReadOnly && (
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">{t("resortFacility.group")}</Label>
-              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
-                <span className="text-sm font-mono">Group #{form.resort_facility_group_id}</span>
-              </div>
-            </div>
-          )}
-
-          {/* From Platform / Custom choice */}
-          {showChooser && (
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">{t("resortFacility.facilityType")}</Label>
+        <Card>
+          <CardContent className="space-y-4">
+            {/* Toggle — shown in create and edit modes */}
+            {showChooser && (
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -352,80 +271,11 @@ export function ResortFacilityGeneralInfo({
                   <span className="text-xs text-muted-foreground">{t("resortFacility.customDesc")}</span>
                 </button>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Platform facility picker */}
-          {showChooser && activeMode === "platform" && (
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">{t("resortFacility.platformFacility")} *</Label>
-              <Popover open={platPopoverOpen} onOpenChange={handlePlatPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button type="button" variant="outline" className="w-full justify-between font-normal">
-                    <span className={activeFacilityId ? "" : "text-muted-foreground"}>{selectedPlatLabel}</span>
-                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  <div className="p-2 border-b">
-                    <Input
-                      placeholder={t("resortFacility.searchPlatformFacility")}
-                      value={platSearch}
-                      onChange={(e) => setPlatSearch(e.target.value)}
-                      className="h-8 text-sm"
-                      autoFocus
-                    />
-                  </div>
-                  <div className="max-h-52 overflow-y-auto">
-                    {platLoading && platFacilities.length === 0 ? (
-                      <div className="flex items-center justify-center py-6">
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : filteredPlatFacilities.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">{t("resortFacility.noPlatformFacilities")}</p>
-                    ) : (
-                      filteredPlatFacilities.map((f) => {
-                        const label = f.locales[0]?.name ?? f.code
-                        const isSelected = activeFacilityId === f.id
-                        return (
-                          <button
-                            key={f.id}
-                            type="button"
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 ${isSelected ? "bg-accent" : ""}`}
-                            onClick={() => selectPlatFacility(f)}
-                          >
-                            {isSelected
-                              ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-                              : <span className="w-3.5 shrink-0" />
-                            }
-                            <span>{label}</span>
-                            <span className="ml-auto text-xs text-muted-foreground font-mono">{f.code}</span>
-                          </button>
-                        )
-                      })
-                    )}
-                    {platHasNext && !platSearch.trim() && (
-                      <button
-                        type="button"
-                        className="w-full px-3 py-2 text-sm text-muted-foreground hover:bg-accent flex items-center justify-center gap-1.5 border-t"
-                        onClick={() => loadPlatFacilities(platPage + 1)}
-                        disabled={platLoading}
-                      >
-                        {platLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                        {t("common.loadMore")}
-                      </button>
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          )}
-
-          {/* View mode: show platform link or custom badge */}
-          {isReadOnly && (
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">{t("resortFacility.facilityType")}</Label>
-              {form.facility_id ? (
+            {/* View mode badge */}
+            {isReadOnly && (
+              form.facility_id ? (
                 <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
                   <Link2 className="h-3.5 w-3.5 text-primary shrink-0" />
                   <span className="text-sm font-medium">{t("resortFacility.fromPlatform")}</span>
@@ -436,27 +286,204 @@ export function ResortFacilityGeneralInfo({
                   <Star className="h-3.5 w-3.5 text-primary shrink-0" />
                   <span className="text-sm font-medium">{t("resortFacility.custom")}</span>
                 </div>
-              )}
+              )
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Section 2: General Info ───────────────────────────────────────── */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-1 w-1 rounded-full bg-primary" />
+            <h3 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+              {t("common.generalInfo")}
+            </h3>
+          </div>
+          {mode !== "create" && !editing && (
+            <Button type="button" size="sm" variant="outline" onClick={startEdit} className="h-7 text-xs px-2.5 gap-1.5">
+              <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+            </Button>
+          )}
+          {editing && (
+            <div className="flex items-center gap-1.5">
+              <Button type="button" size="sm" variant="outline" onClick={() => onEditingChange(false)} disabled={submitting} className="h-7 text-xs px-2.5 gap-1.5">
+                <X className="h-3.5 w-3.5" /> {t("common.cancel")}
+              </Button>
+              <Button type="button" size="sm" onClick={save} disabled={submitting} className="h-7 text-xs px-2.5 gap-1.5">
+                <Check className="h-3.5 w-3.5" />
+                {submitting ? t("common.saving") : t("common.save")}
+              </Button>
             </div>
           )}
+        </div>
 
-          {/* Sort order */}
-          <div className="space-y-2">
-            <Label htmlFor="rf-sort" className="text-xs font-medium">{t("field.sort")} *</Label>
-            <Input
-              id="rf-sort"
-              type="number"
-              value={sortValue}
-              onChange={(e) => {
-                if (mode === "create") onFormChange({ sort_order: Number(e.target.value) })
-                else setLocal((p) => ({ ...p, sort_order: Number(e.target.value) }))
-              }}
-              required={mode === "create"}
-              disabled={isReadOnly}
-            />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        <Card>
+          <CardContent className="space-y-4">
+
+            {/* Group — create mode only */}
+            {mode === "create" && (
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">{t("resortFacility.group")} *</Label>
+                {lockedGroupName ? (
+                  <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
+                    <span className="text-sm">{lockedGroupName}</span>
+                    <span className="ml-auto text-xs text-muted-foreground font-mono">#{form.resort_facility_group_id}</span>
+                  </div>
+                ) : (
+                  <Popover open={groupPopoverOpen} onOpenChange={handleGroupPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                        <span className={form.resort_facility_group_id ? "" : "text-muted-foreground"}>
+                          {selectedGroupLabel}
+                        </span>
+                        <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                      <div className="p-2 border-b">
+                        <Input
+                          placeholder={t("resortFacility.searchGroup")}
+                          value={groupSearch}
+                          onChange={(e) => setGroupSearch(e.target.value)}
+                          className="h-8 text-sm"
+                          autoFocus
+                        />
+                      </div>
+                      <div className="max-h-52 overflow-y-auto">
+                        {groupLoading && groups.length === 0 ? (
+                          <div className="flex items-center justify-center py-6">
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          </div>
+                        ) : filteredGroups.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">{t("resortFacility.noGroups")}</p>
+                        ) : (
+                          filteredGroups.map((g) => {
+                            const label = g.locales[0]?.name ?? `Group #${g.id}`
+                            const isSelected = form.resort_facility_group_id === g.id
+                            return (
+                              <button
+                                key={g.id}
+                                type="button"
+                                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 ${isSelected ? "bg-accent" : ""}`}
+                                onClick={() => {
+                                  onFormChange({ resort_facility_group_id: g.id })
+                                  setGroupPopoverOpen(false)
+                                  setGroupSearch("")
+                                }}
+                              >
+                                {isSelected
+                                  ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                                  : <span className="w-3.5 shrink-0" />
+                                }
+                                <span>{label}</span>
+                                <span className="ml-auto text-xs text-muted-foreground">#{g.id}</span>
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                )}
+              </div>
+            )}
+
+            {/* View mode: group */}
+            {isReadOnly && (
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">{t("resortFacility.group")}</Label>
+                <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
+                  <span className="text-sm font-mono">Group #{form.resort_facility_group_id}</span>
+                </div>
+              </div>
+            )}
+
+            {/* Platform facility picker */}
+            {showChooser && activeMode === "platform" && !!form.resort_facility_group_id && (
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">{t("resortFacility.platformFacility")} *</Label>
+                <Popover open={platPopoverOpen} onOpenChange={handlePlatPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button type="button" variant="outline" className="w-full justify-between font-normal">
+                      <span className={activeFacilityId ? "" : "text-muted-foreground"}>{selectedPlatLabel}</span>
+                      <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                    <div className="p-2 border-b">
+                      <Input
+                        placeholder={t("resortFacility.searchPlatformFacility")}
+                        value={platSearch}
+                        onChange={(e) => setPlatSearch(e.target.value)}
+                        className="h-8 text-sm"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="max-h-52 overflow-y-auto">
+                      {platLoading && platFacilities.length === 0 ? (
+                        <div className="flex items-center justify-center py-6">
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : filteredPlatFacilities.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">{t("resortFacility.noPlatformFacilities")}</p>
+                      ) : (
+                        filteredPlatFacilities.map((f) => {
+                          const label = f.locales[0]?.name ?? f.code
+                          const isSelected = activeFacilityId === f.id
+                          return (
+                            <button
+                              key={f.id}
+                              type="button"
+                              className={`w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 ${isSelected ? "bg-accent" : ""}`}
+                              onClick={() => selectPlatFacility(f)}
+                            >
+                              {isSelected
+                                ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                                : <span className="w-3.5 shrink-0" />
+                              }
+                              <span>{label}</span>
+                              <span className="ml-auto text-xs text-muted-foreground font-mono">{f.code}</span>
+                            </button>
+                          )
+                        })
+                      )}
+                      {platHasNext && !platSearch.trim() && (
+                        <button
+                          type="button"
+                          className="w-full px-3 py-2 text-sm text-muted-foreground hover:bg-accent flex items-center justify-center gap-1.5 border-t"
+                          onClick={() => loadPlatFacilities(platPage + 1)}
+                          disabled={platLoading}
+                        >
+                          {platLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                          {t("common.loadMore")}
+                        </button>
+                      )}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
+
+            {/* Sort order */}
+            <div className="space-y-2">
+              <Label htmlFor="rf-sort" className="text-xs font-medium">{t("field.sort")} *</Label>
+              <Input
+                id="rf-sort"
+                type="number"
+                value={sortValue}
+                onChange={(e) => {
+                  if (mode === "create") onFormChange({ sort_order: Number(e.target.value) })
+                  else setLocal((p) => ({ ...p, sort_order: Number(e.target.value) }))
+                }}
+                required={mode === "create"}
+                disabled={isReadOnly || (mode === "create" && !form.resort_facility_group_id)}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </>
   )
 }

@@ -145,9 +145,7 @@ export function ResortFacilityGroupLocaleTranslations({
     )
     const nextLocale = availableLocales.find((l) => !usedIds.has(l.id))
     const newRow = { locale_id: nextLocale ? nextLocale.id : "", name: "", description: "", sort_order: form.locales.length + 1, _new: true }
-    const key = `c_${form.locales.length}`
     onFormChange({ ...form, locales: [...form.locales, newRow] })
-    setRowEditData((prev) => ({ ...prev, [key]: { ...newRow } }))
   }
 
   function updateLocaleRow(idx: number, patch: Partial<LocaleRow>) {
@@ -158,15 +156,6 @@ export function ResortFacilityGroupLocaleTranslations({
     const key = `c_${idx}`
     setRowEditData((prev) => { const n = { ...prev }; delete n[key]; return n })
     onFormChange({ ...form, locales: form.locales.filter((_, i) => i !== idx) })
-  }
-
-  function saveCreateRow(key: string, idx: number) {
-    const data = rowEditData[key]
-    if (!data) return
-    if (!data.locale_id) { toast.error(t("locale.errLang", { n: idx + 1 })); return }
-    if (!data.name.trim()) { toast.error(t("locale.errName", { n: idx + 1 })); return }
-    updateLocaleRow(idx, data)
-    setRowEditData((prev) => { const n = { ...prev }; delete n[key]; return n })
   }
 
   const allLocaleRows: Array<LocaleRow & { _rkey: string }> = [
@@ -271,7 +260,7 @@ export function ResortFacilityGroupLocaleTranslations({
           )
         )}
 
-        {/* CREATE mode */}
+        {/* CREATE mode — direct binding, no per-row save/cancel */}
         {mode === "create" && !disabled && (
           form.locales.length === 0 ? (
             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
@@ -281,62 +270,28 @@ export function ResortFacilityGroupLocaleTranslations({
           ) : (
             <div className="divide-y">
               {form.locales.map((row, idx) => {
-                const key = `c_${idx}`
-                const isEditing = key in rowEditData
-                const editData = rowEditData[key] ?? row
-                const localeMeta = availableLocales.find((l) => l.id === row.locale_id)
                 const usedIds = form.locales
                   .map((r, i) => i !== idx ? r.locale_id : null)
                   .filter((v): v is number => typeof v === "number")
-                const saved = !isEditing && !!row.name.trim()
 
                 return (
                   <div key={idx} className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-sm font-medium">
                         <Languages className="h-3.5 w-3.5 text-muted-foreground" />
-                        {localeMeta ? `${localeMeta.name} (${localeMeta.code})` : t("locale.row.label", { n: idx + 1 })}
-                        {saved
-                          ? <span className="text-xs px-1.5 py-0.5 rounded-md bg-green-500/10 text-green-600 font-medium"><Check className="h-3 w-3 inline mr-0.5" />{t("common.saved")}</span>
-                          : <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-medium">{t("locale.row.new")}</span>
-                        }
+                        {t("locale.row.label", { n: idx + 1 })}
                       </div>
-                      <div className="flex items-center gap-1">
-                        {!isEditing && (
-                          <>
-                            <Button type="button" size="icon" variant="ghost" className="h-7 w-7"
-                              onClick={() => startEditRow(key, row)}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button type="button" size="icon" variant="ghost"
-                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                              onClick={() => removeLocaleRow(idx)}>
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                          </>
-                        )}
-                        {isEditing && (
-                          <>
-                            <Button type="button" size="icon" variant="ghost"
-                              className="h-7 w-7 text-muted-foreground"
-                              onClick={() => cancelEditRow(key, false)}>
-                              <X className="h-3.5 w-3.5" />
-                            </Button>
-                            <Button type="button" size="icon" variant="ghost"
-                              className="h-7 w-7 text-primary"
-                              onClick={() => saveCreateRow(key, idx)}>
-                              <Check className="h-3.5 w-3.5" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                      <Button type="button" size="icon" variant="ghost"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        onClick={() => removeLocaleRow(idx)}>
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                     <div className="flex flex-col gap-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground">{t("field.language")} *</Label>
-                        <Select value={editData.locale_id ? String(editData.locale_id) : ""}
-                          onValueChange={(v) => patchRowEdit(key, { locale_id: Number(v) })}
-                          disabled={!isEditing}>
+                        <Select value={row.locale_id ? String(row.locale_id) : ""}
+                          onValueChange={(v) => updateLocaleRow(idx, { locale_id: Number(v) })}>
                           <SelectTrigger className="h-9 text-sm w-full">
                             <SelectValue placeholder={t("field.language")} />
                           </SelectTrigger>
@@ -351,23 +306,23 @@ export function ResortFacilityGroupLocaleTranslations({
                       </div>
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground">{t("field.sort")} *</Label>
-                        <Input type="number" value={editData.sort_order}
-                          onChange={(e) => patchRowEdit(key, { sort_order: Number(e.target.value) })}
-                          disabled={!isEditing} className="h-9 text-sm" />
+                        <Input type="number" value={row.sort_order}
+                          onChange={(e) => updateLocaleRow(idx, { sort_order: Number(e.target.value) })}
+                          className="h-9 text-sm" />
                       </div>
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">{t("common.name")} *</Label>
-                      <Input value={editData.name}
-                        onChange={(e) => patchRowEdit(key, { name: e.target.value })}
+                      <Input value={row.name}
+                        onChange={(e) => updateLocaleRow(idx, { name: e.target.value })}
                         placeholder={t("resortFacilityGroup.namePlaceholder")}
-                        disabled={!isEditing} className="h-9 text-sm" />
+                        className="h-9 text-sm" />
                     </div>
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">{t("resortFacilityGroup.description")}</Label>
-                      <Textarea value={editData.description}
-                        onChange={(e) => patchRowEdit(key, { description: e.target.value })}
-                        disabled={!isEditing} rows={2} className="text-sm resize-none" />
+                      <Textarea value={row.description}
+                        onChange={(e) => updateLocaleRow(idx, { description: e.target.value })}
+                        rows={2} className="text-sm resize-none" />
                     </div>
                   </div>
                 )

@@ -151,7 +151,7 @@ export default function ResortFacilitiesPage() {
     localesService
       .list({ size: 50, sort_by: "sortOrder" })
       .then((res) => setAvailableLocales(res.data))
-      .catch(() => {})
+      .catch((err) => toast.error((err as Error).message))
   }
 
   const defaultNames = useMemo(
@@ -307,6 +307,9 @@ export default function ResortFacilitiesPage() {
         onFormChange={setForm}
         availableLocales={availableLocales}
         onSaved={() => refreshFacilities()}
+        lockedGroupName={groupName}
+        defaultFacilityMode={group?.facility_group_id ? "platform" : "custom"}
+        platformFacilityGroupId={group?.facility_group_id}
       />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>

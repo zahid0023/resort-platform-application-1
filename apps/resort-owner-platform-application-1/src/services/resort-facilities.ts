@@ -87,7 +87,7 @@ export const resortFacilitiesService = {
     if (params.size !== undefined) q.set("size", String(params.size))
     if (params.sort_by) q.set("sort_by", params.sort_by)
     if (params.sort_dir) q.set("sort_dir", params.sort_dir)
-    if (params.resort_facility_group_id !== undefined) q.set("resort_facility_group_id", String(params.resort_facility_group_id))
+    if (params.resort_facility_group_id !== undefined) q.set("resortFacilityGroupId", String(params.resort_facility_group_id))
     return api.get<ResortFacilityListResponse>(`${base(resortId)}?${q}`)
   },
 

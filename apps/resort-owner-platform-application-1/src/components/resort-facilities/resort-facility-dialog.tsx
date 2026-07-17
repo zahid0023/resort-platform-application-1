@@ -265,6 +265,9 @@ export interface ResortFacilityDialogProps {
   onFormChange: (form: ResortFacilityFormState) => void
   availableLocales: Locale[]
   onSaved?: () => void | Promise<void>
+  lockedGroupName?: string
+  defaultFacilityMode?: FacilityMode
+  platformFacilityGroupId?: number
 }
 
 export function ResortFacilityDialog({
@@ -277,6 +280,9 @@ export function ResortFacilityDialog({
   onFormChange,
   availableLocales,
   onSaved,
+  lockedGroupName,
+  defaultFacilityMode = "custom",
+  platformFacilityGroupId,
 }: ResortFacilityDialogProps) {
   const { t } = useTranslation()
   const [submitting, setSubmitting] = useState(false)
@@ -288,11 +294,11 @@ export function ResortFacilityDialog({
   })
   const [translationsEditing, setTranslationsEditing] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
-  const [facilityMode, setFacilityMode] = useState<FacilityMode>("custom")
+  const [facilityMode, setFacilityMode] = useState<FacilityMode>(defaultFacilityMode)
   const [createIconEditing, setCreateIconEditing] = useState(false)
 
-  // inputsDisabled: in create mode, From Platform chosen but no facility picked yet
-  const inputsDisabled = mode === "create" && facilityMode === "platform" && !form.facility_id
+  // inputsDisabled: in create mode, no facility group selected yet
+  const inputsDisabled = mode === "create" && !form.resort_facility_group_id
 
   useEffect(() => {
     if (!open) {
@@ -301,10 +307,10 @@ export function ResortFacilityDialog({
       setIconSubmitting(false)
       setTranslationsEditing(false)
       setConfirmClose(false)
-      setFacilityMode("custom")
+      setFacilityMode(defaultFacilityMode)
       setCreateIconEditing(false)
     }
-  }, [open])
+  }, [open, defaultFacilityMode])
 
   const isDirty = mode === "create"
     ? form.resort_facility_group_id !== "" || form.icon_type !== "" || form.icon_value !== "" || form.sort_order !== 0
@@ -427,6 +433,8 @@ export function ResortFacilityDialog({
                 open={open}
                 facilityMode={facilityMode}
                 onFacilityModeChange={setFacilityMode}
+                lockedGroupName={lockedGroupName}
+                platformFacilityGroupId={platformFacilityGroupId}
               />
 
               {/* Icon section */}
@@ -462,7 +470,7 @@ export function ResortFacilityDialog({
                     else setLocalIcon((prev) => ({ ...prev, ...patch }))
                   }}
                   readOnly={!iconEditing && mode !== "create"}
-                  showAutoFillHint={mode === "create" && !!form.facility_id}
+                  showAutoFillHint={mode === "create" && !!form.resort_facility_group_id && !!form.facility_id}
                   disabled={inputsDisabled}
                   editingHint={createIconEditing}
                   onEditingHintChange={setCreateIconEditing}

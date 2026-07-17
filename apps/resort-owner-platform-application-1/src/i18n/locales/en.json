@@ -108,10 +108,22 @@
     "headline1": "Managing",
     "errLoad": "Failed to load resort.",
     "nav": {
-      "basicInfo":    { "title": "Basic Info",      "desc": "Name, location, and locale content" },
-      "contacts":     { "title": "Contacts",         "desc": "Phone, email, and other contact details" },
-      "imageStorage": { "title": "Image Storage",    "desc": "Configure your image hosting provider" },
-      "settings":     { "title": "Settings",         "desc": "Access control and advanced options" }
+      "basicInfo": {
+        "title": "Basic Info",
+        "desc": "Name, location, and locale content"
+      },
+      "contacts": {
+        "title": "Contacts",
+        "desc": "Phone, email, and other contact details"
+      },
+      "imageStorage": {
+        "title": "Image Storage",
+        "desc": "Configure your image hosting provider"
+      },
+      "settings": {
+        "title": "Settings",
+        "desc": "Access control and advanced options"
+      }
     }
   },
   "resortPortal": {
@@ -188,7 +200,10 @@
     "deselectAll": "Deselect all",
     "creatingFacilities": "Creating…",
     "stepGroup": "Create Group",
-    "stepFacilities": "Add Facilities"
+    "stepFacilities": "Add Facilities",
+    "createdTitle": "Facility Group Created!",
+    "createdAsk": "Would you like to add facilities to this group now?",
+    "addFacilitiesYes": "Yes, add facilities"
   },
   "resortFacility": {
     "title": "Facilities",
@@ -212,6 +227,8 @@
     "dialogDescEdit": "Update this facility's details.",
     "dialogDescView": "View facility details.",
     "facilityType": "Facility type",
+    "facilityGroupSelect": "Facility Group Select",
+    "facilityGroupType": "Facility Group Type",
     "fromPlatform": "From Platform",
     "fromPlatformDesc": "Link to a platform-defined facility.",
     "custom": "Custom",
@@ -401,7 +418,8 @@
     "back": "Back",
     "loadMore": "Load more",
     "allFields": "All Fields",
-    "search": "Search"
+    "search": "Search",
+    "change": "Change"
   },
   "apiFields": {
     "id": "ID",

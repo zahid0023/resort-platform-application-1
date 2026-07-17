@@ -123,7 +123,7 @@ export default function ResortFacilityGroupsPage() {
     localesService
       .list({ size: 50, sort_by: "sortOrder" })
       .then((res) => setAvailableLocales(res.data))
-      .catch(() => {})
+      .catch((err) => toast.error((err as Error).message))
   }
 
   const defaultNames = useMemo(

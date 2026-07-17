@@ -26,7 +26,7 @@ export const emptyForm: ResortFacilityGroupFormState = {
   icon_type: "",
   icon_value: "",
   icon_color: "",
-  locales: [{ locale_id: "", name: "", description: "", sort_order: 0 }],
+  locales: [],
 }
 
 export function toFormState(group: ResortFacilityGroupSummary): ResortFacilityGroupFormState {

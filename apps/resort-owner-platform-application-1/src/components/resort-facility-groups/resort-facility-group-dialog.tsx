@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
-import { Check, Layers, ListChecks, Loader2, Pencil, X, Ban } from "lucide-react"
+import { Check, ChevronDown, CircleCheck, Layers, ListChecks, Loader2, Pencil, X, Ban } from "lucide-react"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -10,6 +10,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea,
 } from "@resort/shadcn-ui"
 import { LucideIconPicker, LucideIconRenderer } from "ui-blocks"
+import { useRouter } from "next/navigation"
 import { resortFacilityGroupsService } from "@/services/resort-facility-groups"
 import type { IconType } from "@/services/resort-facility-groups"
 import { resortFacilitiesService } from "@/services/resort-facilities"
@@ -264,7 +265,30 @@ function IconSection({ form, onFormChange, readOnly, showAutoFillHint, disabled,
   )
 }
 
-// ── Step 2: Platform facility selector ───────────────────────────────────────
+// ── Step 3: Platform facility selector with customization ────────────────────
+
+export interface FacilityCustomization {
+  sort_order: number
+  icon_type: IconType | ""
+  icon_value: string
+  icon_color: string
+  locales: Array<{ locale_id: number; name: string; description: string; sort_order: number }>
+}
+
+function initCustomization(f: PlatformFacilitySummary): FacilityCustomization {
+  return {
+    sort_order: f.sort_order ?? 0,
+    icon_type: (f.icon_type ?? "") as IconType | "",
+    icon_value: f.icon_value ?? "",
+    icon_color: String(f.icon_meta?.color ?? ""),
+    locales: f.locales.map((l) => ({
+      locale_id: l.locale_id,
+      name: l.name,
+      description: "",
+      sort_order: l.sort_order,
+    })),
+  }
+}
 
 interface FacilityPickerProps {
   facilities: PlatformFacilitySummary[]
@@ -273,10 +297,25 @@ interface FacilityPickerProps {
   onToggle: (id: number) => void
   onSelectAll: () => void
   onDeselectAll: () => void
+  customizations: Record<number, FacilityCustomization>
+  onCustomizationChange: (id: number, patch: Partial<FacilityCustomization>) => void
+  onLocaleChange: (id: number, idx: number, patch: Partial<FacilityCustomization["locales"][number]>) => void
+  availableLocales: Locale[]
 }
 
-function FacilityPicker({ facilities, loading, selectedIds, onToggle, onSelectAll, onDeselectAll }: FacilityPickerProps) {
+function FacilityPicker({
+  facilities, loading, selectedIds, onToggle, onSelectAll, onDeselectAll,
+  customizations, onCustomizationChange, onLocaleChange, availableLocales,
+}: FacilityPickerProps) {
   const { t } = useTranslation()
+  const [expandedId, setExpandedId] = useState<number | null>(null)
+
+  function handleToggle(id: number) {
+    const willSelect = !selectedIds.has(id)
+    onToggle(id)
+    if (willSelect) setExpandedId(id)
+    else if (expandedId === id) setExpandedId(null)
+  }
 
   if (loading) {
     return (
@@ -314,55 +353,214 @@ function FacilityPicker({ facilities, loading, selectedIds, onToggle, onSelectAl
         </Button>
       </div>
 
-      {/* Facility cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+      {/* Facility list */}
+      <div className="space-y-2">
         {facilities.map((f) => {
           const selected = selectedIds.has(f.id)
+          const expanded = selected && expandedId === f.id
           const name = f.locales[0]?.name ?? f.code
           const accentColor = String(f.icon_meta?.color ?? "") || undefined
+          const custom = customizations[f.id]
 
           return (
-            <button
+            <div
               key={f.id}
-              type="button"
-              onClick={() => onToggle(f.id)}
-              className={`flex items-center gap-3 p-3 rounded-lg border text-left transition-all
-                ${selected
-                  ? "border-primary bg-primary/5 ring-1 ring-primary"
-                  : "border-border hover:bg-accent/40 hover:border-border"
-                }`}
+              className={`rounded-lg border overflow-hidden transition-colors ${selected ? "border-primary" : "border-border"}`}
             >
-              {/* Checkbox */}
-              <div className={`flex size-4 shrink-0 items-center justify-center rounded border transition-colors
-                ${selected ? "border-primary bg-primary" : "border-muted-foreground/40 bg-background"}`}
-              >
-                {selected && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
-              </div>
-
-              {/* Icon */}
+              {/* Row header */}
               <div
-                className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0"
-                style={{
-                  background: accentColor ? `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)` : undefined,
-                }}
+                className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${selected ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-accent/40"}`}
+                onClick={() => selected ? setExpandedId(expanded ? null : f.id) : handleToggle(f.id)}
               >
-                {f.icon_type === "LUCIDE" && f.icon_value ? (
-                  <LucideIconRenderer name={f.icon_value} size={14} style={{ color: accentColor ? "white" : undefined }} />
-                ) : (f.icon_type === "IMAGE" || f.icon_type === "EXTERNAL") && f.icon_value ? (
-                  <img src={f.icon_value} alt={name} className="h-4 w-4 object-contain" />
-                ) : (
-                  <span className="text-xs font-mono font-semibold text-muted-foreground">
-                    {name[0]?.toUpperCase() ?? "?"}
-                  </span>
+                {/* Checkbox */}
+                <div
+                  className={`flex size-4 shrink-0 items-center justify-center rounded border transition-colors ${selected ? "border-primary bg-primary" : "border-muted-foreground/40 bg-background"}`}
+                  onClick={(e) => { e.stopPropagation(); handleToggle(f.id) }}
+                >
+                  {selected && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
+                </div>
+
+                {/* Platform icon */}
+                <div
+                  className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0"
+                  style={{ background: accentColor ? `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)` : undefined }}
+                >
+                  {f.icon_type === "LUCIDE" && f.icon_value ? (
+                    <LucideIconRenderer name={f.icon_value} size={14} style={{ color: accentColor ? "white" : undefined }} />
+                  ) : (f.icon_type === "IMAGE" || f.icon_type === "EXTERNAL") && f.icon_value ? (
+                    <img src={f.icon_value} alt={name} className="h-4 w-4 object-contain" />
+                  ) : (
+                    <span className="text-xs font-mono font-semibold text-muted-foreground">{name[0]?.toUpperCase() ?? "?"}</span>
+                  )}
+                </div>
+
+                {/* Info */}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium leading-tight truncate">{name}</p>
+                  <p className="text-xs text-muted-foreground font-mono">{f.code}</p>
+                </div>
+
+                {/* Expand chevron (only when selected) */}
+                {selected && (
+                  <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
                 )}
               </div>
 
-              {/* Info */}
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium leading-tight truncate">{name}</p>
-                <p className="text-xs text-muted-foreground font-mono">{f.code}</p>
-              </div>
-            </button>
+              {/* ── Customization panel ──────────────────────────────────── */}
+              {expanded && custom && (
+                <div className="border-t bg-muted/20 p-4 space-y-5">
+
+                  {/* Sort order */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-medium">{t("field.sort")} *</Label>
+                    <Input
+                      type="number"
+                      value={custom.sort_order}
+                      onChange={(e) => onCustomizationChange(f.id, { sort_order: Number(e.target.value) })}
+                      className="h-9"
+                    />
+                  </div>
+
+                  {/* Icon override */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="h-1 w-1 rounded-full bg-primary" />
+                      <span className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+                        {t("resortFacilityGroup.iconSection")}
+                      </span>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-medium">{t("resortFacility.iconType")}</Label>
+                      <Select
+                        value={custom.icon_type || "__none"}
+                        onValueChange={(v) => onCustomizationChange(f.id, {
+                          icon_type: v === "__none" ? "" : v as IconType,
+                          icon_value: "",
+                          icon_color: "",
+                        })}
+                      >
+                        <SelectTrigger className="h-9 w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none">{t("resortFacility.iconNone")}</SelectItem>
+                          {ICON_TYPES.map((opt) => (
+                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {custom.icon_type === "LUCIDE" && (
+                      <>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-medium">{t("resortFacility.iconValue")} *</Label>
+                          <LucideIconPicker
+                            value={custom.icon_value}
+                            color={custom.icon_color || undefined}
+                            onChange={(n) => onCustomizationChange(f.id, { icon_value: n })}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-medium">{t("resortFacility.iconColor")}</Label>
+                          <div className="flex items-center gap-2">
+                            <input type="color" value={custom.icon_color || "#6366f1"}
+                              onChange={(e) => onCustomizationChange(f.id, { icon_color: e.target.value })}
+                              className="h-9 w-12 rounded border cursor-pointer" />
+                            <Input value={custom.icon_color}
+                              onChange={(e) => onCustomizationChange(f.id, { icon_color: e.target.value })}
+                              placeholder="#6366f1" className="font-mono h-9" />
+                            {custom.icon_color && (
+                              <Button type="button" size="sm" variant="ghost" className="h-9 px-2 text-xs"
+                                onClick={() => onCustomizationChange(f.id, { icon_color: "" })}>
+                                {t("resortFacility.clearColor")}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    {(custom.icon_type === "IMAGE" || custom.icon_type === "EXTERNAL") && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs font-medium">{t("resortFacility.iconUrl")} *</Label>
+                        <Input value={custom.icon_value}
+                          onChange={(e) => onCustomizationChange(f.id, { icon_value: e.target.value })}
+                          placeholder="https://…" className="h-9" />
+                        {custom.icon_value && (
+                          <img src={custom.icon_value} alt="preview" className="h-12 w-12 object-contain rounded border" />
+                        )}
+                      </div>
+                    )}
+                    {custom.icon_type === "SVG" && (
+                      <>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-medium">{t("resortFacility.iconSvg")} *</Label>
+                          <Textarea value={custom.icon_value}
+                            onChange={(e) => onCustomizationChange(f.id, { icon_value: e.target.value })}
+                            placeholder="<svg …>…</svg>" rows={3} className="font-mono text-xs resize-none" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs font-medium">{t("resortFacility.iconColor")}</Label>
+                          <div className="flex items-center gap-2">
+                            <input type="color" value={custom.icon_color || "#6366f1"}
+                              onChange={(e) => onCustomizationChange(f.id, { icon_color: e.target.value })}
+                              className="h-9 w-12 rounded border cursor-pointer" />
+                            <Input value={custom.icon_color}
+                              onChange={(e) => onCustomizationChange(f.id, { icon_color: e.target.value })}
+                              placeholder="#6366f1" className="font-mono h-9" />
+                            {custom.icon_color && (
+                              <Button type="button" size="sm" variant="ghost" className="h-9 px-2 text-xs"
+                                onClick={() => onCustomizationChange(f.id, { icon_color: "" })}>
+                                {t("resortFacility.clearColor")}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Locale translations */}
+                  {custom.locales.length > 0 && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1 w-1 rounded-full bg-primary" />
+                        <span className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
+                          {t("locale.translations")}
+                        </span>
+                      </div>
+                      <div className="divide-y border rounded-lg overflow-hidden">
+                        {custom.locales.map((row, idx) => {
+                          const localeMeta = availableLocales.find((l) => l.id === row.locale_id)
+                          return (
+                            <div key={row.locale_id} className="p-3 space-y-2.5">
+                              <p className="text-xs font-medium text-muted-foreground">
+                                {localeMeta ? `${localeMeta.name} (${localeMeta.code})` : `Locale #${row.locale_id}`}
+                              </p>
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">{t("common.name")} *</Label>
+                                <Input value={row.name}
+                                  onChange={(e) => onLocaleChange(f.id, idx, { name: e.target.value })}
+                                  className="h-8 text-xs" />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">{t("field.sort")}</Label>
+                                <Input type="number" value={row.sort_order}
+                                  onChange={(e) => onLocaleChange(f.id, idx, { sort_order: Number(e.target.value) })}
+                                  className="h-8 text-xs" />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs text-muted-foreground">{t("resortFacilityGroup.description")}</Label>
+                                <Textarea value={row.description}
+                                  onChange={(e) => onLocaleChange(f.id, idx, { description: e.target.value })}
+                                  rows={2} className="text-xs resize-none" />
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           )
         })}
       </div>
@@ -396,6 +594,7 @@ export function ResortFacilityGroupDialog({
   onSaved,
 }: ResortFacilityGroupDialogProps) {
   const { t } = useTranslation()
+  const router = useRouter()
 
   // Step 1 state
   const [submitting, setSubmitting] = useState(false)
@@ -410,12 +609,13 @@ export function ResortFacilityGroupDialog({
   const [confirmClose, setConfirmClose] = useState(false)
   const [createGroupMode, setCreateGroupMode] = useState<GroupMode>("platform")
 
-  // Step 2 state
-  const [step, setStep] = useState<1 | 2>(1)
+  // Step 2/3 state
+  const [step, setStep] = useState<1 | 2 | 3>(1)
   const [newGroupId, setNewGroupId] = useState(0)
   const [platformFacilities, setPlatformFacilities] = useState<PlatformFacilitySummary[]>([])
   const [platformFacilitiesLoading, setPlatformFacilitiesLoading] = useState(false)
   const [selectedFacilityIds, setSelectedFacilityIds] = useState<Set<number>>(new Set())
+  const [facilityCustomizations, setFacilityCustomizations] = useState<Record<number, FacilityCustomization>>({})
   const [creatingFacilities, setCreatingFacilities] = useState(false)
 
   const inputsDisabled = mode === "create" && createGroupMode === "platform" && !form.facility_group_id
@@ -433,17 +633,18 @@ export function ResortFacilityGroupDialog({
       setNewGroupId(0)
       setPlatformFacilities([])
       setSelectedFacilityIds(new Set())
+      setFacilityCustomizations({})
       setCreatingFacilities(false)
     }
   }, [open])
 
   const isDirty = mode === "create"
     ? form.icon_type !== "" || form.icon_value !== "" || form.sort_order !== 0
-      || form.locales.length > 1 || form.locales.some((l) => l.locale_id !== "" || l.name.trim() !== "")
+      || form.locales.length > 0
     : generalEditing || iconEditing || translationsEditing
 
   function requestClose() {
-    if (step === 2) {
+    if (step === 2 || step === 3) {
       // Group already saved — safe to close, just trigger refresh
       finishAndClose()
       return
@@ -495,7 +696,7 @@ export function ResortFacilityGroupDialog({
         sort_by: "sortOrder",
       })
       setPlatformFacilities(res.data)
-      setSelectedFacilityIds(new Set(res.data.map((f) => f.id)))
+      setSelectedFacilityIds(new Set())
     } catch (err) {
       toast.error((err as Error).message)
     } finally {
@@ -528,17 +729,9 @@ export function ResortFacilityGroupDialog({
         })),
       })
       toast.success(t("resortFacilityGroup.created"))
-
-      // Platform group → proceed to step 2 (facility selection)
-      if (form.facility_group_id) {
-        setNewGroupId(result.id)
-        setStep(2)
-        loadPlatformFacilities(Number(form.facility_group_id))
-      } else {
-        // Custom group → done
-        onOpenChange(false)
-        await onSaved?.()
-      }
+      setNewGroupId(result.id)
+      setStep(2)
+      await onSaved?.()
     } catch (err) {
       toast.error((err as Error).message)
     } finally {
@@ -555,22 +748,24 @@ export function ResortFacilityGroupDialog({
     try {
       const toCreate = platformFacilities.filter((f) => selectedFacilityIds.has(f.id))
       await Promise.all(
-        toCreate.map((f) =>
-          resortFacilitiesService.create(resortId, {
+        toCreate.map((f) => {
+          const custom = facilityCustomizations[f.id] ?? initCustomization(f)
+          const hasIcon = !!custom.icon_type && !!custom.icon_value
+          return resortFacilitiesService.create(resortId, {
             resort_facility_group_id: newGroupId,
             facility_id: f.id,
-            sort_order: f.sort_order ?? 0,
-            icon_type: f.icon_type ? (f.icon_type as "LUCIDE" | "IMAGE" | "SVG" | "EXTERNAL") : null,
-            icon_value: f.icon_value ?? null,
-            icon_meta: f.icon_meta ?? null,
-            locales: f.locales.map((l) => ({
+            sort_order: custom.sort_order,
+            icon_type: hasIcon ? (custom.icon_type as IconType) : null,
+            icon_value: hasIcon ? custom.icon_value : null,
+            icon_meta: hasIcon && custom.icon_color ? { color: custom.icon_color } : null,
+            locales: custom.locales.map((l) => ({
               locale_id: l.locale_id,
               name: l.name,
-              description: "",
+              description: l.description,
               sort_order: l.sort_order,
             })),
-          }),
-        ),
+          })
+        }),
       )
       toast.success(t("resortFacilityGroup.facilitiesAdded", { count: toCreate.length }))
       finishAndClose()
@@ -582,27 +777,52 @@ export function ResortFacilityGroupDialog({
   }
 
   function toggleFacility(id: number) {
+    const isSelected = selectedFacilityIds.has(id)
     setSelectedFacilityIds((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      isSelected ? next.delete(id) : next.add(id)
       return next
+    })
+    if (!isSelected && !facilityCustomizations[id]) {
+      const f = platformFacilities.find((f) => f.id === id)
+      if (f) setFacilityCustomizations((prev) => ({ ...prev, [id]: initCustomization(f) }))
+    }
+  }
+
+  function handleCustomizationChange(id: number, patch: Partial<FacilityCustomization>) {
+    setFacilityCustomizations((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }))
+  }
+
+  function handleLocaleChange(id: number, idx: number, patch: Partial<FacilityCustomization["locales"][number]>) {
+    setFacilityCustomizations((prev) => {
+      const custom = prev[id]
+      if (!custom) return prev
+      return { ...prev, [id]: { ...custom, locales: custom.locales.map((l, i) => i === idx ? { ...l, ...patch } : l) } }
     })
   }
 
   const isEditing = generalEditing || iconEditing || translationsEditing
 
   // ── Header content switches on step ──────────────────────────────────────
-  const headerIcon = step === 2 ? <ListChecks className="h-4 w-4" /> : <Layers className="h-4 w-4" />
-  const headerTitle = step === 2
+  const headerIcon = step === 3
+    ? <ListChecks className="h-4 w-4" />
+    : step === 2
+      ? <CircleCheck className="h-4 w-4 text-green-500" />
+      : <Layers className="h-4 w-4" />
+  const headerTitle = step === 3
     ? t("resortFacilityGroup.addFacilitiesStep")
-    : mode === "create"
-      ? t("resortFacilityGroup.dialogCreate")
-      : isEditing ? t("resortFacilityGroup.dialogEdit") : t("resortFacilityGroup.dialogView")
-  const headerDesc = step === 2
+    : step === 2
+      ? t("resortFacilityGroup.createdTitle")
+      : mode === "create"
+        ? t("resortFacilityGroup.dialogCreate")
+        : isEditing ? t("resortFacilityGroup.dialogEdit") : t("resortFacilityGroup.dialogView")
+  const headerDesc = step === 3
     ? t("resortFacilityGroup.addFacilitiesDesc")
-    : mode === "create"
-      ? t("resortFacilityGroup.dialogDescCreate")
-      : isEditing ? t("resortFacilityGroup.dialogDescEdit") : t("resortFacilityGroup.dialogDescView")
+    : step === 2
+      ? t("resortFacilityGroup.createdAsk")
+      : mode === "create"
+        ? t("resortFacilityGroup.dialogDescCreate")
+        : isEditing ? t("resortFacilityGroup.dialogDescEdit") : t("resortFacilityGroup.dialogDescView")
 
   return (
     <>
@@ -613,8 +833,8 @@ export function ResortFacilityGroupDialog({
           onEscapeKeyDown={(e) => { e.preventDefault(); requestClose() }}
         >
           <DialogTitle className="sr-only">{mode === "create" ? t("resortFacilityGroup.dialogCreate") : t("resortFacilityGroup.dialogView")}</DialogTitle>
-          {/* ── Step indicator (only in create mode, step 2) ─────────────────── */}
-          {step === 2 && (
+          {/* ── Step indicator (only in create mode, step 3) ─────────────────── */}
+          {step === 3 && (
             <div className="flex items-center gap-2 px-6 pt-4 shrink-0">
               <div className="flex items-center gap-1.5">
                 <div className="flex size-5 items-center justify-center rounded-full bg-primary/20 text-primary">
@@ -729,8 +949,42 @@ export function ResortFacilityGroupDialog({
             </form>
           )}
 
-          {/* ── Step 2: Platform facility selection ───────────────────────────── */}
+          {/* ── Step 2: Success + confirm ─────────────────────────────────────── */}
           {step === 2 && (
+            <div className="flex flex-col min-h-0 flex-1">
+              <div className="flex-1 overflow-y-auto px-6 py-10 flex flex-col items-center justify-center text-center gap-5">
+                <div className="flex size-20 items-center justify-center rounded-full bg-green-500/10">
+                  <CircleCheck className="h-10 w-10 text-green-500" />
+                </div>
+                <div className="space-y-1.5 max-w-xs">
+                  <h3 className="text-base font-semibold">{t("resortFacilityGroup.createdTitle")}</h3>
+                  <p className="text-sm text-muted-foreground">{t("resortFacilityGroup.createdAsk")}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-end gap-2 px-6 py-4 border-t shrink-0">
+                <Button type="button" variant="outline" onClick={finishAndClose}>
+                  {t("resortFacilityGroup.addFacilitiesSkip")}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    if (form.facility_group_id) {
+                      setStep(3)
+                      loadPlatformFacilities(Number(form.facility_group_id))
+                    } else {
+                      onOpenChange(false)
+                      router.push(`/resorts/${resortId}/facility-groups/${newGroupId}/facilities`)
+                    }
+                  }}
+                >
+                  {t("resortFacilityGroup.addFacilitiesYes")}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 3: Platform facility selection ───────────────────────────── */}
+          {step === 3 && (
             <div className="flex flex-col min-h-0 flex-1">
               <div className="flex-1 overflow-y-auto px-6 py-5">
                 <FacilityPicker
@@ -738,8 +992,21 @@ export function ResortFacilityGroupDialog({
                   loading={platformFacilitiesLoading}
                   selectedIds={selectedFacilityIds}
                   onToggle={toggleFacility}
-                  onSelectAll={() => setSelectedFacilityIds(new Set(platformFacilities.map((f) => f.id)))}
+                  onSelectAll={() => {
+                    setSelectedFacilityIds(new Set(platformFacilities.map((f) => f.id)))
+                    setFacilityCustomizations((prev) => {
+                      const next = { ...prev }
+                      for (const f of platformFacilities) {
+                        if (!next[f.id]) next[f.id] = initCustomization(f)
+                      }
+                      return next
+                    })
+                  }}
                   onDeselectAll={() => setSelectedFacilityIds(new Set())}
+                  customizations={facilityCustomizations}
+                  onCustomizationChange={handleCustomizationChange}
+                  onLocaleChange={handleLocaleChange}
+                  availableLocales={availableLocales}
                 />
               </div>
 
