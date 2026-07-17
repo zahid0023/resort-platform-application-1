@@ -1,4 +1,4 @@
-import { Eye, Trash2 } from "lucide-react"
+import { Eye, Star, Trash2 } from "lucide-react"
 import { Badge, Button, Card } from "@resort/shadcn-ui"
 import { LucideIconRenderer } from "ui-blocks"
 import type { ResortFacilitySummary } from "@/services/resort-facilities"
@@ -77,7 +77,15 @@ export function ResortFacilityCard({ facility, defaultName, onView, onDelete }: 
       </div>
 
       <div className="mt-4 pt-3 border-t flex items-center justify-between">
-        <Badge variant="secondary">#{facility.sort_order}</Badge>
+        <div className="flex items-center gap-1.5">
+          <Badge variant="secondary">#{facility.sort_order}</Badge>
+          {facility.is_highlighted && (
+            <Badge variant="outline" className="gap-1 text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-400">
+              <Star className="h-3 w-3 fill-current" />
+              Highlighted
+            </Badge>
+          )}
+        </div>
         <span className="text-xs text-muted-foreground">
           {facility.locales.length} locale{facility.locales.length !== 1 ? "s" : ""}
         </span>

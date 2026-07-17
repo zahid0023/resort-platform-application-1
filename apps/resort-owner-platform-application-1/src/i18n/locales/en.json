@@ -259,7 +259,19 @@
     "noGroups": "No groups found.",
     "errGroupRequired": "Please select a facility group.",
     "allFacilities": "All Facilities",
-    "byGroup": "By Group"
+    "byGroup": "By Group",
+    "highlighted": "Highlight status",
+    "isHighlighted": "Featured highlight",
+    "notHighlighted": "Not highlighted",
+    "highlightedHint": "Manage via Highlights",
+    "manageHighlights": "Manage Highlights",
+    "highlights": "Highlights",
+    "highlightsSubtitle": "Select {{min}}–{{max}} facilities to feature as resort highlights.",
+    "highlightsSaved": "Highlights updated.",
+    "highlightMin": "Select at least {{min}} facilities.",
+    "highlightMax": "Select at most {{max}} facilities.",
+    "highlightCount": "{{count}} / {{max}} selected",
+    "saveHighlights": "Save Highlights"
   },
   "basicInfo": {
     "pageTitle": "Basic Information",

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useTranslation } from "react-i18next"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Star } from "lucide-react"
 import { toast } from "sonner"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -18,6 +18,7 @@ import {
   ResortFacilityDialog,
   emptyResortFacilityForm,
 } from "@/components/resort-facilities/resort-facility-dialog"
+import { ResortFacilityHighlightsDialog } from "@/components/resort-facilities/resort-facility-highlights-dialog"
 import type { ResortFacilityDialogMode, ResortFacilityFormState } from "@/components/resort-facilities/types"
 import { toFormState } from "@/components/resort-facilities/types"
 import {
@@ -67,6 +68,7 @@ export default function ResortFacilitiesPage() {
   const [activeId, setActiveId] = useState<number | undefined>(undefined)
   const [form, setForm] = useState<ResortFacilityFormState>(emptyResortFacilityForm)
   const [deleteTarget, setDeleteTarget] = useState<ResortFacilitySummary | null>(null)
+  const [highlightsOpen, setHighlightsOpen] = useState(false)
 
   const dialogOpenRef = useRef(dialogOpen)
   const activeIdRef = useRef(activeId)
@@ -248,7 +250,18 @@ export default function ResortFacilitiesPage() {
           title={groupName}
           subtitle={t("resortFacility.subtitle")}
         />
-        <PageActions
+        <div className="flex flex-col sm:items-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 text-xs self-start sm:self-auto text-amber-600 border-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/30"
+            onClick={() => setHighlightsOpen(true)}
+          >
+            <Star className="h-3.5 w-3.5 fill-current" />
+            {t("resortFacility.manageHighlights")}
+          </Button>
+          <PageActions
           fields={searchFields}
           searchField={searchField}
           onSearchFieldChange={setSearchField}
@@ -264,6 +277,7 @@ export default function ResortFacilitiesPage() {
           newLabel={t("resortFacility.new")}
           onNew={openCreate}
         />
+        </div>
       </header>
 
       <main className="flex flex-col gap-4">
@@ -310,6 +324,13 @@ export default function ResortFacilitiesPage() {
         lockedGroupName={groupName}
         defaultFacilityMode={group?.facility_group_id ? "platform" : "custom"}
         platformFacilityGroupId={group?.facility_group_id}
+      />
+
+      <ResortFacilityHighlightsDialog
+        resortId={resortId}
+        open={highlightsOpen}
+        onOpenChange={setHighlightsOpen}
+        onSaved={() => refreshFacilities()}
       />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>

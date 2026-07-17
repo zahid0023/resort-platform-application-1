@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
-import { Check, ChevronDown, Link2, Loader2, Pencil, Star, X } from "lucide-react"
+import { Check, ChevronDown, Link2, Loader2, Pencil, Star, StarOff, X } from "lucide-react"
 import { Button, Card, CardContent, Input, Label, Popover, PopoverContent, PopoverTrigger } from "@resort/shadcn-ui"
 import { resortFacilitiesService } from "@/services/resort-facilities"
 import { platformFacilitiesService, type PlatformFacilitySummary } from "@/services/platform-facilities"
@@ -481,6 +481,28 @@ export function ResortFacilityGeneralInfo({
                 disabled={isReadOnly || (mode === "create" && !form.resort_facility_group_id)}
               />
             </div>
+
+            {/* Highlight status — read-only, managed via highlights endpoint */}
+            {mode !== "create" && (
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">{t("resortFacility.highlighted")}</Label>
+                <div className={[
+                  "flex items-center gap-2 rounded-md border px-3 py-2",
+                  form.is_highlighted
+                    ? "border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800"
+                    : "border-border bg-muted/30",
+                ].join(" ")}>
+                  {form.is_highlighted
+                    ? <Star className="h-3.5 w-3.5 text-amber-500 fill-current shrink-0" />
+                    : <StarOff className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  }
+                  <span className={["text-sm", form.is_highlighted ? "text-amber-700 dark:text-amber-400 font-medium" : "text-muted-foreground"].join(" ")}>
+                    {form.is_highlighted ? t("resortFacility.isHighlighted") : t("resortFacility.notHighlighted")}
+                  </span>
+                  <span className="ml-auto text-xs text-muted-foreground">{t("resortFacility.highlightedHint")}</span>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

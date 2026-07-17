@@ -259,7 +259,19 @@
     "noGroups": "কোনো গ্রুপ পাওয়া যায়নি।",
     "errGroupRequired": "অনুগ্রহ করে একটি ফ্যাসিলিটি গ্রুপ নির্বাচন করুন।",
     "allFacilities": "সকল ফ্যাসিলিটি",
-    "byGroup": "গ্রুপ অনুযায়ী"
+    "byGroup": "গ্রুপ অনুযায়ী",
+    "highlighted": "হাইলাইট অবস্থা",
+    "isHighlighted": "ফিচার্ড হাইলাইট",
+    "notHighlighted": "হাইলাইট করা হয়নি",
+    "highlightedHint": "হাইলাইটস থেকে পরিচালনা করুন",
+    "manageHighlights": "হাইলাইটস পরিচালনা",
+    "highlights": "হাইলাইটস",
+    "highlightsSubtitle": "রিসোর্ট হাইলাইট হিসেবে {{min}}–{{max}}টি ফ্যাসিলিটি নির্বাচন করুন।",
+    "highlightsSaved": "হাইলাইটস আপডেট হয়েছে।",
+    "highlightMin": "কমপক্ষে {{min}}টি ফ্যাসিলিটি নির্বাচন করুন।",
+    "highlightMax": "সর্বোচ্চ {{max}}টি ফ্যাসিলিটি নির্বাচন করুন।",
+    "highlightCount": "{{count}} / {{max}} নির্বাচিত",
+    "saveHighlights": "হাইলাইটস সংরক্ষণ করুন"
   },
   "basicInfo": {
     "pageTitle": "মৌলিক তথ্য",

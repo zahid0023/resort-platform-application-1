@@ -16,6 +16,7 @@ export interface ResortFacilitySummary {
   resort_facility_group_id: number
   facility_id?: number
   sort_order: number
+  is_highlighted: boolean
   icon_type?: IconType
   icon_value?: string
   icon_meta?: Record<string, unknown>
@@ -68,6 +69,10 @@ export interface MutationResponse {
   id: number
 }
 
+export interface SetHighlightsRequest {
+  facility_ids: number[]
+}
+
 export interface ListParams {
   page?: number
   size?: number
@@ -117,5 +122,9 @@ export const resortFacilitiesService = {
 
   removeLocale(resortId: number, facilityId: number, localeId: number): Promise<MutationResponse> {
     return api.delete<MutationResponse>(`${base(resortId)}/${facilityId}/locales/${localeId}`)
+  },
+
+  setHighlights(resortId: number, body: SetHighlightsRequest): Promise<MutationResponse> {
+    return api.put<MutationResponse>(`${base(resortId)}/highlights`, body)
   },
 }

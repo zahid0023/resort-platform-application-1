@@ -16,6 +16,7 @@ export interface ResortFacilityFormState {
   resort_facility_group_id: number | ""
   facility_id: number | ""
   sort_order: number
+  is_highlighted: boolean
   icon_type: IconType | ""
   icon_value: string
   icon_color: string
@@ -26,6 +27,7 @@ export const emptyForm: ResortFacilityFormState = {
   resort_facility_group_id: "",
   facility_id: "",
   sort_order: 0,
+  is_highlighted: false,
   icon_type: "",
   icon_value: "",
   icon_color: "",
@@ -37,6 +39,7 @@ export function toFormState(facility: ResortFacilitySummary): ResortFacilityForm
     resort_facility_group_id: facility.resort_facility_group_id,
     facility_id: facility.facility_id ?? "",
     sort_order: facility.sort_order,
+    is_highlighted: facility.is_highlighted ?? false,
     icon_type: (facility.icon_type ?? "") as IconType | "",
     icon_value: facility.icon_value ?? "",
     icon_color: String(facility.icon_meta?.color ?? ""),
