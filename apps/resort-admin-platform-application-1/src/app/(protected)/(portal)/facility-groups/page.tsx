@@ -23,10 +23,13 @@ import type { FacilityGroupDialogMode, FacilityGroupFormState } from "@/componen
 import { toIconValue } from "@/components/facility-groups/types";
 import {
   listFacilityGroups,
+  getFacilityGroup,
   deleteFacilityGroup,
   type FacilityGroupSummary,
   type ListParams,
+  type ScopeAssignment,
 } from "@/services/facility-groups";
+import { facilityScopesService, type FacilityScope } from "@/services/facility-scopes";
 import { localesService, type Locale } from "@/services/locales";
 
 const PAGE_SIZE = 20;
@@ -60,8 +63,12 @@ export default function FacilityGroupsPage() {
   const [sortBy, setSortBy] = useState("sortOrder");
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC");
 
-  // Dialog / locale
+  // Scope assignments cache (populated as dialogs are opened)
+  const [scopeMap, setScopeMap] = useState<Record<number, ScopeAssignment[]>>({});
+
+  // Dialog
   const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
+  const [availableScopes, setAvailableScopes] = useState<FacilityScope[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<FacilityGroupDialogMode>("create");
   const [activeId, setActiveId] = useState<number | undefined>(undefined);
@@ -107,7 +114,7 @@ export default function FacilityGroupsPage() {
       setHasNext(res.has_next);
       setHasPrevious(res.has_previous);
 
-      // Sync open dialog form with refreshed data
+      // Sync open dialog locales with refreshed data
       setForm((prev) => {
         if (!dialogOpenRef.current || activeIdRef.current == null) return prev;
         const updated = res.data.find((g) => g.id === activeIdRef.current);
@@ -141,6 +148,14 @@ export default function FacilityGroupsPage() {
       .catch(() => {});
   }, []);
 
+  // Scopes for dialog
+  useEffect(() => {
+    facilityScopesService
+      .list({ size: 50, sort_by: "sortOrder" })
+      .then((res) => setAvailableScopes(res.data))
+      .catch(() => {});
+  }, []);
+
   // Debounced search — resets to page 0
   useEffect(() => {
     if (isFirstRender.current) { isFirstRender.current = false; return; }
@@ -171,26 +186,40 @@ export default function FacilityGroupsPage() {
   function openCreate() {
     setMode("create");
     setActiveId(undefined);
-    setForm(emptyFacilityGroupForm);
+    const resortScope = availableScopes.find((s) => s.code === "RESORT");
+    setForm({
+      ...emptyFacilityGroupForm,
+      scope_ids: resortScope ? [resortScope.id] : [],
+    });
     setDialogOpen(true);
   }
 
-  function openDialog(g: FacilityGroupSummary) {
-    setMode("view");
-    setActiveId(g.id);
-    setForm({
-      code: g.code,
-      sort_order: g.sort_order,
-      icon: toIconValue(g),
-      locales: g.locales.map((l) => ({
-        id: l.id,
-        locale_id: l.locale_id,
-        name: l.name,
-        description: l.description ?? "",
-        sort_order: l.sort_order,
-      })),
-    });
-    setDialogOpen(true);
+  async function openDialog(g: FacilityGroupSummary) {
+    try {
+      const res = await getFacilityGroup(g.id);
+      const full = res.data;
+      setMode("view");
+      setActiveId(full.id);
+      const assignments = full.scope_assignments ?? [];
+      setScopeMap((prev) => ({ ...prev, [full.id]: assignments }));
+      setForm({
+        code: full.code,
+        sort_order: full.sort_order,
+        icon: toIconValue(full),
+        locales: full.locales.map((l) => ({
+          id: l.id,
+          locale_id: l.locale_id,
+          name: l.name,
+          description: l.description ?? "",
+          sort_order: l.sort_order,
+        })),
+        scope_ids: [],
+        scope_assignments: assignments,
+      });
+      setDialogOpen(true);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
   }
 
   function handleSortByChange(value: string) {
@@ -266,6 +295,7 @@ export default function FacilityGroupsPage() {
                 key={g.id}
                 group={g}
                 defaultName={groupNames[g.id]}
+                scopeAssignments={scopeMap[g.id]}
                 onNavigate={(g) => router.push(`/facility-groups/${g.id}`)}
                 onView={openDialog}
                 onDelete={setDeleteTarget}
@@ -292,6 +322,7 @@ export default function FacilityGroupsPage() {
         form={form}
         onFormChange={setForm}
         availableLocales={availableLocales}
+        availableScopes={availableScopes}
         onSaved={() => refresh()}
       />
 

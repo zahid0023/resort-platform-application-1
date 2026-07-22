@@ -9,19 +9,16 @@ import { Input } from "@resort/shadcn-ui"
 import { Label } from "@resort/shadcn-ui"
 import { Textarea } from "@resort/shadcn-ui"
 import { Switch } from "@resort/shadcn-ui"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@resort/shadcn-ui"
-import { Loader2, Sparkles, ChevronLeft, ChevronRight, Globe2, MapPin, Languages, Lock, ArrowRight, Plus, X, Phone } from "lucide-react"
+import { Loader2, Sparkles, ChevronLeft, ChevronRight, ChevronDown, Globe2, MapPin, Languages, Lock, ArrowRight, Plus, X, Phone } from "lucide-react"
 import { createResort } from "@/services/resorts"
-import { listCountries, type CountrySummary } from "@/services/countries"
-import { listCities, type CitySummary } from "@/services/cities"
-import { listContactTypes, type ContactType } from "@/services/contact-types"
-import { listCommunicationChannels, type CommunicationChannel } from "@/services/communication-channels"
+import type { Country } from "@/services/countries"
+import type { City } from "@/services/cities"
+import { CountryPickerDialog } from "@/components/countries/country-picker-dialog"
+import { CityPickerDialog } from "@/components/cities/city-picker-dialog"
+import { ContactTypePickerDialog } from "@/components/contact-types/contact-type-picker-dialog"
+import type { ContactType } from "@/services/contact-types"
+import { CommunicationChannelPickerDialog } from "@/components/communication-channels/communication-channel-picker-dialog"
+import type { CommunicationChannel } from "@/services/communication-channels"
 import { localesService } from "@/services/locales"
 import { useTranslation } from "react-i18next"
 import hero from "@/assets/hero-resort.jpg"
@@ -53,7 +50,9 @@ interface StepTwoForm {
 interface ContactRow {
   uid: string
   contact_type_id: number | null
+  contact_type_name: string
   communication_channel_id: number | null
+  communication_channel_name: string
   contact_value: string
   is_primary: boolean
 }
@@ -62,7 +61,9 @@ function newContactRow(): ContactRow {
   return {
     uid: Math.random().toString(36).slice(2),
     contact_type_id: null,
+    contact_type_name: "",
     communication_channel_id: null,
+    communication_channel_name: "",
     contact_value: "",
     is_primary: false,
   }
@@ -102,16 +103,12 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
   const [step1, setStep1] = useState<StepOneForm>(EMPTY_STEP1)
   const [step2, setStep2] = useState<StepTwoForm>(EMPTY_STEP2)
 
-  const [countries, setCountries] = useState<CountrySummary[]>([])
-  const [loadingCountries, setLoadingCountries] = useState(false)
-  const [cities, setCities] = useState<CitySummary[]>([])
-  const [loadingCities, setLoadingCities] = useState(false)
+  const [countryPickerOpen, setCountryPickerOpen] = useState(false)
+  const [cityPickerOpen, setCityPickerOpen] = useState(false)
+  const [contactTypePickerForUid, setContactTypePickerForUid] = useState<string | null>(null)
+  const [channelPickerForUid, setChannelPickerForUid] = useState<string | null>(null)
 
   const [contacts, setContacts] = useState<ContactRow[]>([])
-  const [contactTypes, setContactTypes] = useState<ContactType[]>([])
-  const [channels, setChannels] = useState<CommunicationChannel[]>([])
-  const [loadingContactTypes, setLoadingContactTypes] = useState(false)
-  const [loadingChannels, setLoadingChannels] = useState(false)
 
   const [enLocaleId, setEnLocaleId] = useState<number | null>(null)
 
@@ -124,10 +121,10 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
       setStep1(EMPTY_STEP1)
       setStep2(EMPTY_STEP2)
       setContacts([])
-      setCountries([])
-      setCities([])
-      setContactTypes([])
-      setChannels([])
+      setCountryPickerOpen(false)
+      setCityPickerOpen(false)
+      setContactTypePickerForUid(null)
+      setChannelPickerForUid(null)
       localesService.list({ code: "en", size: 1 }).then((res) => {
         setEnLocaleId(res.data[0]?.id ?? null)
       }).catch(() => {
@@ -135,32 +132,6 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
       })
     }
   }, [open])
-
-  const handleContactTypeSelectOpen = async (isOpen: boolean) => {
-    if (!isOpen || contactTypes.length > 0) return
-    setLoadingContactTypes(true)
-    try {
-      const res = await listContactTypes()
-      setContactTypes(res.data)
-    } catch {
-      toast.error(t("resort.contactDataError"))
-    } finally {
-      setLoadingContactTypes(false)
-    }
-  }
-
-  const handleChannelSelectOpen = async (isOpen: boolean) => {
-    if (!isOpen || channels.length > 0) return
-    setLoadingChannels(true)
-    try {
-      const res = await listCommunicationChannels()
-      setChannels(res.data)
-    } catch {
-      toast.error(t("resort.contactDataError"))
-    } finally {
-      setLoadingChannels(false)
-    }
-  }
 
   const handleStep1Change = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -181,49 +152,23 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
   const handleStep2Change = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setStep2((prev) => ({ ...prev, [e.target.name]: e.target.value }))
 
-  const handleCountryOpenChange = async (isOpen: boolean) => {
-    if (!isOpen || countries.length > 0) return
-    setLoadingCountries(true)
-    try {
-      const res = await listCountries({ size: 20 })
-      setCountries(res.data)
-    } catch {
-      toast.error("Failed to load countries.")
-    } finally {
-      setLoadingCountries(false)
-    }
-  }
-
-  const handleCountrySelect = (value: string) => {
-    const country = countries.find((c) => String(c.id) === value)
-    if (!country) return
+  const handleCountrySelect = (country: Country) => {
     setStep2((prev) => ({
       ...prev,
       country_id: country.id,
-      country_name: country.name,
+      country_name: country.locales[0]?.name ?? country.code,
       city_id: null,
       city_name: "",
     }))
-    setCities([])
+    setCityPickerOpen(true)
   }
 
-  const handleCityOpenChange = async (isOpen: boolean) => {
-    if (!isOpen || !step2.country_id || cities.length > 0) return
-    setLoadingCities(true)
-    try {
-      const res = await listCities({ countryId: step2.country_id, size: 20 })
-      setCities(res.data)
-    } catch {
-      toast.error("Failed to load cities.")
-    } finally {
-      setLoadingCities(false)
-    }
-  }
-
-  const handleCitySelect = (value: string) => {
-    const city = cities.find((c) => String(c.id) === value)
-    if (!city) return
-    setStep2((prev) => ({ ...prev, city_id: city.id, city_name: city.name }))
+  const handleCitySelect = (city: City) => {
+    setStep2((prev) => ({
+      ...prev,
+      city_id: city.id,
+      city_name: city.locales[0]?.name ?? city.code ?? String(city.id),
+    }))
   }
 
   const addContact = () => setContacts((prev) => [...prev, newContactRow()])
@@ -507,53 +452,35 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                   {/* Country — required, global */}
                   <div className="space-y-1.5">
                     <Label>{t("resort.country")}</Label>
-                    <Select
-                      value={step2.country_id ? String(step2.country_id) : ""}
-                      onValueChange={handleCountrySelect}
-                      onOpenChange={handleCountryOpenChange}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-between font-normal"
+                      onClick={() => setCountryPickerOpen(true)}
                       disabled={submitting}
                     >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder={t("resort.countryPlaceholder")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {loadingCountries ? (
-                          <div className="flex items-center justify-center py-4">
-                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                          </div>
-                        ) : (
-                          countries.map((c) => (
-                            <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                      <span className={step2.country_name ? "" : "text-muted-foreground"}>
+                        {step2.country_name || t("resort.countryPlaceholder")}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                    </Button>
                   </div>
 
-                  {/* City — required, global */}
+                  {/* City — required, filtered by selected country */}
                   <div className="space-y-1.5">
                     <Label>{t("resort.city")}</Label>
-                    <Select
-                      value={step2.city_id ? String(step2.city_id) : ""}
-                      onValueChange={handleCitySelect}
-                      onOpenChange={handleCityOpenChange}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-between font-normal"
+                      onClick={() => setCityPickerOpen(true)}
                       disabled={!step2.country_id || submitting}
                     >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder={step2.country_id ? t("resort.cityPlaceholder") : t("resort.cityAfterCountry")} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {loadingCities ? (
-                          <div className="flex items-center justify-center py-4">
-                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                          </div>
-                        ) : (
-                          cities.map((c) => (
-                            <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
+                      <span className={step2.city_name ? "" : "text-muted-foreground"}>
+                        {step2.city_name || (step2.country_id ? t("resort.cityPlaceholder") : t("resort.cityAfterCountry"))}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                    </Button>
                   </div>
 
                   {/* Address — EN badge, locale-specific text */}
@@ -647,58 +574,36 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
                                 <Label className="text-xs text-muted-foreground">
                                   {t("resort.contactType")}
                                 </Label>
-                                <Select
-                                    value={row.contact_type_id ? String(row.contact_type_id) : ""}
-                                    onValueChange={(v) => updateContact(row.uid, "contact_type_id", Number(v))}
-                                    onOpenChange={handleContactTypeSelectOpen}
-                                    disabled={submitting}
-                                  >
-                                    <SelectTrigger className="h-8 text-xs w-full">
-                                      <SelectValue placeholder={t("resort.contactTypePlaceholder")} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {loadingContactTypes ? (
-                                        <div className="flex items-center justify-center py-4">
-                                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                        </div>
-                                      ) : (
-                                        contactTypes.map((ct) => (
-                                          <SelectItem key={ct.id} value={String(ct.id)}>
-                                            {ct.locales[0]?.name ?? ct.code}
-                                          </SelectItem>
-                                        ))
-                                      )}
-                                    </SelectContent>
-                                  </Select>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full h-8 justify-between font-normal text-xs"
+                                  onClick={() => setContactTypePickerForUid(row.uid)}
+                                  disabled={submitting}
+                                >
+                                  <span className={row.contact_type_name ? "" : "text-muted-foreground"}>
+                                    {row.contact_type_name || t("resort.contactTypePlaceholder")}
+                                  </span>
+                                  <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
+                                </Button>
                               </div>
 
                               <div className="space-y-1">
                                 <Label className="text-xs text-muted-foreground">
                                   {t("resort.channel")}
                                 </Label>
-                                <Select
-                                  value={row.communication_channel_id ? String(row.communication_channel_id) : ""}
-                                  onValueChange={(v) => updateContact(row.uid, "communication_channel_id", Number(v))}
-                                  onOpenChange={handleChannelSelectOpen}
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full h-8 justify-between font-normal text-xs"
+                                  onClick={() => setChannelPickerForUid(row.uid)}
                                   disabled={submitting}
                                 >
-                                  <SelectTrigger className="h-8 text-xs w-full">
-                                    <SelectValue placeholder={t("resort.channelPlaceholder")} />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {loadingChannels ? (
-                                      <div className="flex items-center justify-center py-4">
-                                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                      </div>
-                                    ) : (
-                                      channels.map((ch) => (
-                                        <SelectItem key={ch.id} value={String(ch.id)}>
-                                          {ch.locales[0]?.name ?? ch.code}
-                                        </SelectItem>
-                                      ))
-                                    )}
-                                  </SelectContent>
-                                </Select>
+                                  <span className={row.communication_channel_name ? "" : "text-muted-foreground"}>
+                                    {row.communication_channel_name || t("resort.channelPlaceholder")}
+                                  </span>
+                                  <ChevronDown className="h-3.5 w-3.5 opacity-50 shrink-0" />
+                                </Button>
                               </div>
 
                               <div className="space-y-1">
@@ -749,6 +654,47 @@ export function ResortDialog({ open, onOpenChange, onSuccess }: ResortDialogProp
               )}
 
             </div>
+
+            <CountryPickerDialog
+              open={countryPickerOpen}
+              onOpenChange={setCountryPickerOpen}
+              selectedId={step2.country_id ?? undefined}
+              onSelect={handleCountrySelect}
+            />
+
+            <CityPickerDialog
+              open={cityPickerOpen}
+              onOpenChange={setCityPickerOpen}
+              selectedId={step2.city_id ?? undefined}
+              countryId={step2.country_id ?? undefined}
+              onSelect={handleCitySelect}
+            />
+
+            <ContactTypePickerDialog
+              open={contactTypePickerForUid !== null}
+              onOpenChange={(o) => { if (!o) setContactTypePickerForUid(null) }}
+              selectedId={contacts.find((r) => r.uid === contactTypePickerForUid)?.contact_type_id ?? undefined}
+              onSelect={(ct: ContactType) => {
+                if (contactTypePickerForUid) {
+                  updateContact(contactTypePickerForUid, "contact_type_id", ct.id)
+                  updateContact(contactTypePickerForUid, "contact_type_name", ct.locales[0]?.name ?? ct.code)
+                }
+                setContactTypePickerForUid(null)
+              }}
+            />
+
+            <CommunicationChannelPickerDialog
+              open={channelPickerForUid !== null}
+              onOpenChange={(o) => { if (!o) setChannelPickerForUid(null) }}
+              selectedId={contacts.find((r) => r.uid === channelPickerForUid)?.communication_channel_id ?? undefined}
+              onSelect={(ch: CommunicationChannel) => {
+                if (channelPickerForUid) {
+                  updateContact(channelPickerForUid, "communication_channel_id", ch.id)
+                  updateContact(channelPickerForUid, "communication_channel_name", ch.locales[0]?.name ?? ch.code)
+                }
+                setChannelPickerForUid(null)
+              }}
+            />
 
             {/* Footer */}
             <div className="px-8 py-5 border-t border-border/60 flex items-center justify-between gap-4 bg-background/50">

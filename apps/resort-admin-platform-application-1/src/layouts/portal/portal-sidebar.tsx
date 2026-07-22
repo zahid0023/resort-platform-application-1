@@ -83,6 +83,7 @@ const commonNavItems = [
   { title: "Cities", url: "/cities", icon: GlobeIcon },
   { title: "Facility Groups", url: "/facility-groups", icon: FolderIcon },
   { title: "Facilities", url: "/facilities", icon: BlocksIcon },
+  { title: "Facility Scopes", url: "/facility-scopes", icon: SettingsIcon },
   { title: "Locales", url: "/locales", icon: LanguagesIcon },
 ];
 

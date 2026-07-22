@@ -16,6 +16,7 @@ import { Button } from "@resort/shadcn-ui"
 import { DialogEntityHeader } from "@/components/shared/dialog-entity-header"
 import { DialogCreateFooter } from "@/components/shared/dialog-create-footer"
 import { createFacilityGroup, updateFacilityGroup } from "@/services/facility-groups"
+import type { FacilityScope } from "@/services/facility-scopes"
 import type { Locale } from "@/services/locales"
 import { toast } from "sonner"
 import type { FacilityGroupDialogMode, FacilityGroupFormState } from "./types"
@@ -24,12 +25,15 @@ import { IconPicker, EMPTY_ICON_VALUE } from "@/components/shared/icon-picker"
 import type { IconValue } from "@/components/shared/icon-picker"
 import { FacilityGroupGeneralInfo } from "./facility-group-general-info"
 import { FacilityGroupLocaleTranslations } from "./facility-group-locale-translations"
+import { FacilityGroupScopeAssignments } from "./facility-group-scope-assignments"
 
 export const emptyFacilityGroupForm: FacilityGroupFormState = {
   code: "",
   sort_order: 0,
   icon: EMPTY_ICON_VALUE,
   locales: [{ locale_id: "", name: "", description: "", sort_order: 0 }],
+  scope_ids: [],
+  scope_assignments: [],
 }
 
 export interface FacilityGroupDialogProps {
@@ -40,6 +44,7 @@ export interface FacilityGroupDialogProps {
   form: FacilityGroupFormState
   onFormChange: (form: FacilityGroupFormState) => void
   availableLocales: Locale[]
+  availableScopes: FacilityScope[]
   onSaved?: () => void | Promise<void>
 }
 
@@ -51,6 +56,7 @@ export function FacilityGroupDialog({
   form,
   onFormChange,
   availableLocales,
+  availableScopes,
   onSaved,
 }: FacilityGroupDialogProps) {
   const { t } = useTranslation()
@@ -60,6 +66,7 @@ export function FacilityGroupDialog({
   const [iconSubmitting, setIconSubmitting] = useState(false)
   const [localIcon, setLocalIcon] = useState<IconValue>(EMPTY_ICON_VALUE)
   const [translationsEditing, setTranslationsEditing] = useState(false)
+  const [scopesEditing, setScopesEditing] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
 
   useEffect(() => {
@@ -68,6 +75,7 @@ export function FacilityGroupDialog({
       setIconEditing(false)
       setIconSubmitting(false)
       setTranslationsEditing(false)
+      setScopesEditing(false)
       setConfirmClose(false)
     }
   }, [open])
@@ -116,6 +124,7 @@ export function FacilityGroupDialog({
     if (!form.code.trim()) { toast.error(t("toast.codeRequired")); return }
     if (!form.icon.type) { toast.error(t("facilityGroupDialog.errIconType")); return }
     if (!form.icon.value) { toast.error(t("facilityGroupDialog.errIconValue")); return }
+    if (form.scope_ids.length === 0) { toast.error(t("facilityGroup.scopeRequired")); return }
     for (const [i, row] of form.locales.entries()) {
       if (!row.locale_id) { toast.error(t("toast.localeSelectLang", { n: i + 1 })); return }
       if (!row.name.trim()) { toast.error(t("toast.localeNameRequired", { n: i + 1 })); return }
@@ -126,6 +135,7 @@ export function FacilityGroupDialog({
         code: form.code.trim().toUpperCase(),
         sort_order: Number(form.sort_order) || 0,
         ...fromIconValue(form.icon),
+        scope_ids: form.scope_ids,
         locales: form.locales.map((row) => ({
           locale_id: Number(row.locale_id),
           name: row.name.trim(),
@@ -210,6 +220,18 @@ export function FacilityGroupDialog({
                   readOnly={!iconEditing && mode !== "create"}
                 />
               </div>
+
+              <FacilityGroupScopeAssignments
+                mode={mode}
+                form={form}
+                onFormChange={(patch) => onFormChange({ ...form, ...patch })}
+                facilityGroupId={facilityGroupId}
+                availableScopes={availableScopes}
+                onSaved={onSaved}
+                editing={scopesEditing}
+                onEditingChange={setScopesEditing}
+                open={open}
+              />
 
               <FacilityGroupLocaleTranslations
                 mode={mode}

@@ -3,18 +3,19 @@ import { Badge } from "@resort/shadcn-ui"
 import { Button } from "@resort/shadcn-ui"
 import { Card } from "@resort/shadcn-ui"
 import { IconRenderer } from "@/components/shared/icon-picker"
-import type { FacilityGroupSummary } from "@/services/facility-groups"
+import type { FacilityGroupSummary, ScopeAssignment } from "@/services/facility-groups"
 import { toIconValue } from "./types"
 
 export interface FacilityGroupCardProps {
   group: FacilityGroupSummary
   defaultName?: string
+  scopeAssignments?: ScopeAssignment[]
   onNavigate?: (group: FacilityGroupSummary) => void
   onView?: (group: FacilityGroupSummary) => void
   onDelete?: (group: FacilityGroupSummary) => void
 }
 
-export function FacilityGroupCard({ group, defaultName, onNavigate, onView, onDelete }: FacilityGroupCardProps) {
+export function FacilityGroupCard({ group, defaultName, scopeAssignments, onNavigate, onView, onDelete }: FacilityGroupCardProps) {
   const icon = toIconValue(group)
   const accentColor = icon.meta?.color || undefined
   const title = defaultName?.trim() || group.code
@@ -89,6 +90,16 @@ export function FacilityGroupCard({ group, defaultName, onNavigate, onView, onDe
           )}
         </div>
       </div>
+
+      {scopeAssignments && scopeAssignments.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1">
+          {scopeAssignments.map((a) => (
+            <Badge key={a.facility_scope_id} variant="outline" className="font-mono text-[10px] px-1.5 py-0 h-5">
+              {a.locales[0]?.name ?? a.code}
+            </Badge>
+          ))}
+        </div>
+      )}
 
       <div className="mt-4 pt-3 border-t flex items-center justify-between">
         <Badge variant="secondary">#{group.sort_order}</Badge>

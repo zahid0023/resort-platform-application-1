@@ -60,6 +60,7 @@ export function ResortRoomCategoryCard({ roomCategory: rc, defaultName, onView, 
             <div className="min-w-0">
               <h3 className="font-bold text-base leading-tight truncate">{title}</h3>
               <p className="text-xs text-muted-foreground font-mono mt-0.5">{rc.code} · #{rc.id}</p>
+              <p className="text-[11px] text-muted-foreground/70 mt-0.5">{rc.room_category.code}</p>
             </div>
           </div>
 
@@ -97,40 +98,40 @@ export function ResortRoomCategoryCard({ roomCategory: rc, defaultName, onView, 
         <div className="grid grid-cols-3 gap-2">
           <div className="flex flex-col items-center gap-1 rounded-lg bg-muted/60 py-2.5">
             <Users className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-base font-bold tabular-nums leading-none">{rc.max_adults}</span>
+            <span className="text-base font-bold tabular-nums leading-none">{rc.meta.max_adults}</span>
             <span className="text-[10px] text-muted-foreground leading-none">Adults</span>
           </div>
           <div className="flex flex-col items-center gap-1 rounded-lg bg-muted/60 py-2.5">
             <Baby className="h-3.5 w-3.5 text-muted-foreground" />
-            <span className="text-base font-bold tabular-nums leading-none">{rc.max_children}</span>
+            <span className="text-base font-bold tabular-nums leading-none">{rc.meta.max_children}</span>
             <span className="text-[10px] text-muted-foreground leading-none">Children</span>
           </div>
           <div className="flex flex-col items-center gap-1 rounded-lg bg-primary/10 py-2.5 ring-1 ring-primary/15">
             <BedDouble className="h-3.5 w-3.5 text-primary" />
-            <span className="text-base font-bold tabular-nums leading-none text-primary">{rc.max_occupancy}</span>
+            <span className="text-base font-bold tabular-nums leading-none text-primary">{rc.meta.max_occupancy}</span>
             <span className="text-[10px] text-primary/70 leading-none">Max</span>
           </div>
         </div>
 
         {/* Check-in / Check-out times */}
-        {(rc.default_check_in_time || rc.default_check_out_time) && (
+        {(rc.meta.default_check_in_time || rc.meta.default_check_out_time) && (
           <div className="rounded-lg border border-border/50 bg-muted/20 divide-y divide-border/40 text-xs overflow-hidden">
-            {rc.default_check_in_time && (
+            {rc.meta.default_check_in_time && (
               <div className="flex items-center justify-between gap-2 px-3 py-2">
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <LogIn className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                   <span>Check-in</span>
                 </div>
-                <span className="font-mono font-semibold text-foreground">{formatTime(rc.default_check_in_time)}</span>
+                <span className="font-mono font-semibold text-foreground">{formatTime(rc.meta.default_check_in_time)}</span>
               </div>
             )}
-            {rc.default_check_out_time && (
+            {rc.meta.default_check_out_time && (
               <div className="flex items-center justify-between gap-2 px-3 py-2">
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <LogOut className="h-3.5 w-3.5 text-orange-400 shrink-0" />
                   <span>Check-out</span>
                 </div>
-                <span className="font-mono font-semibold text-foreground">{formatTime(rc.default_check_out_time)}</span>
+                <span className="font-mono font-semibold text-foreground">{formatTime(rc.meta.default_check_out_time)}</span>
               </div>
             )}
           </div>
@@ -138,24 +139,32 @@ export function ResortRoomCategoryCard({ roomCategory: rc, defaultName, onView, 
 
         {/* Policy pills */}
         <div className="flex items-center gap-1.5 flex-wrap">
-          <PolicyPip icon={BedDouble} label="Extra bed" active={rc.is_extra_bed_allowed} />
-          <PolicyPip icon={Cigarette} label="Smoking" active={rc.is_smoking_allowed} />
-          <PolicyPip icon={PawPrint} label="Pets" active={rc.is_pets_allowed} />
+          {!rc.meta.is_extra_bed_allowed && !rc.meta.is_smoking_allowed && !rc.meta.is_pets_allowed ? (
+            <span className="text-[11px] text-muted-foreground/50 italic">No policies assigned</span>
+          ) : (
+            <>
+              {rc.meta.is_extra_bed_allowed && (
+                <PolicyPip
+                  icon={BedDouble}
+                  label={rc.meta.max_extra_beds > 0 ? `Extra bed ×${rc.meta.max_extra_beds}` : "Extra bed"}
+                  active
+                />
+              )}
+              {rc.meta.is_smoking_allowed && (
+                <PolicyPip icon={Cigarette} label="Smoking" active />
+              )}
+              {rc.meta.is_pets_allowed && (
+                <PolicyPip icon={PawPrint} label="Pets" active />
+              )}
+            </>
+          )}
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between pt-1 border-t border-border/60">
-          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <Globe className="h-3 w-3" />
-              <span>{rc.locales.length} lang{rc.locales.length !== 1 ? "s" : ""}</span>
-            </div>
-            {rc.is_extra_bed_allowed && rc.max_extra_beds > 0 && (
-              <>
-                <span className="text-border select-none">·</span>
-                <span>{rc.max_extra_beds} extra bed{rc.max_extra_beds !== 1 ? "s" : ""}</span>
-              </>
-            )}
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Globe className="h-3 w-3" />
+            <span>{rc.locales.length} lang{rc.locales.length !== 1 ? "s" : ""}</span>
           </div>
           <span className="text-[11px] text-muted-foreground/60 font-mono">sort {rc.sort_order}</span>
         </div>

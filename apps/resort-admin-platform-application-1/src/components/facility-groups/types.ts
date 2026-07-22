@@ -1,5 +1,5 @@
 import type { IconValue } from "@/components/shared/icon-picker"
-import type { FacilityGroup, FacilityGroupSummary, IconType } from "@/services/facility-groups"
+import type { FacilityGroup, FacilityGroupSummary, IconType, ScopeAssignment } from "@/services/facility-groups"
 
 export type FacilityGroupDialogMode = "create" | "view"
 
@@ -17,7 +17,11 @@ export interface FacilityGroupFormState {
   sort_order: number
   icon: IconValue
   locales: LocaleRow[]
+  scope_ids: number[]
+  scope_assignments: ScopeAssignment[]
 }
+
+export type { ScopeAssignment }
 
 /** Convert API entity → IconValue for the icon system. */
 export function toIconValue(group: FacilityGroupSummary | FacilityGroup): IconValue {

@@ -1,21 +1,24 @@
 import { api } from "./api"
+import type { PriceType } from "./price-types"
+import type { PriceUnit } from "./price-units"
+import type { Currency } from "./currencies"
+
+export type PriceTypeCode = "BAS" | "WKD" | "WKE" | "HOL" | "SPE"
 
 export interface ResortRoomCategoryPrice {
   id: number
-  resort_room_category_id: number
-  price_type_id: number
-  price_unit_id: number
-  amount: number
-  priority: number
+  price_type: PriceType
+  price_unit: PriceUnit
+  currency: Currency
+  name: string
+  description?: string
+  price: number
+  day_of_week_ids?: number[]
   valid_from?: string
   valid_to?: string
-  monday: boolean
-  tuesday: boolean
-  wednesday: boolean
-  thursday: boolean
-  friday: boolean
-  saturday: boolean
-  sunday: boolean
+  priority: number
+  discount_amount?: number
+  discount_percentage?: number
 }
 
 export interface ResortRoomCategoryPriceListResponse {
@@ -33,29 +36,38 @@ export interface MutationResponse {
   id: number
 }
 
-export interface PriceRequest {
+export interface CreatePriceRequest {
   price_type_id: number
+  currency_id: number
   price_unit_id: number
-  amount: number
-  priority: number
+  name: string
+  description?: string | null
+  price: number
+  day_of_week_ids?: number[]
   valid_from?: string | null
   valid_to?: string | null
-  monday: boolean
-  tuesday: boolean
-  wednesday: boolean
-  thursday: boolean
-  friday: boolean
-  saturday: boolean
-  sunday: boolean
+  priority?: number
+}
+
+export interface UpdatePriceRequest {
+  price_unit_id: number
+  name: string
+  description?: string | null
+  price: number
+  day_of_week_ids?: number[]
+  valid_from?: string | null
+  valid_to?: string | null
+  priority?: number
 }
 
 export interface ListParams {
   page?: number
   size?: number
-  sort_by?: "id" | "amount" | "priority" | "validFrom" | "validTo" | "createdAt"
+  sort_by?: "id" | "price" | "priority" | "validFrom" | "validTo" | "createdAt"
   sort_dir?: "ASC" | "DESC"
   priceTypeId?: number
   priceUnitId?: number
+  currencyId?: number
   validFrom?: string
   validTo?: string
 }
@@ -69,20 +81,25 @@ export const resortRoomCategoryPricesService = {
     const q = new URLSearchParams()
     if (params.page !== undefined) q.set("page", String(params.page))
     if (params.size !== undefined) q.set("size", String(params.size))
-    if (params.sort_by) q.set("sort_by", params.sort_by)
-    if (params.sort_dir) q.set("sort_dir", params.sort_dir)
+    if (params.sort_by) q.set("sortBy", params.sort_by)
+    if (params.sort_dir) q.set("sortDir", params.sort_dir)
     if (params.priceTypeId !== undefined) q.set("priceTypeId", String(params.priceTypeId))
     if (params.priceUnitId !== undefined) q.set("priceUnitId", String(params.priceUnitId))
+    if (params.currencyId !== undefined) q.set("currencyId", String(params.currencyId))
     if (params.validFrom) q.set("validFrom", params.validFrom)
     if (params.validTo) q.set("validTo", params.validTo)
     return api.get<ResortRoomCategoryPriceListResponse>(`${base(resortId, rcId)}?${q}`)
   },
 
-  create(resortId: number, rcId: number, body: PriceRequest): Promise<MutationResponse> {
+  get(resortId: number, rcId: number, id: number): Promise<{ data: ResortRoomCategoryPrice }> {
+    return api.get<{ data: ResortRoomCategoryPrice }>(`${base(resortId, rcId)}/${id}`)
+  },
+
+  create(resortId: number, rcId: number, body: CreatePriceRequest): Promise<MutationResponse> {
     return api.post<MutationResponse>(base(resortId, rcId), body)
   },
 
-  update(resortId: number, rcId: number, id: number, body: PriceRequest): Promise<MutationResponse> {
+  update(resortId: number, rcId: number, id: number, body: UpdatePriceRequest): Promise<MutationResponse> {
     return api.put<MutationResponse>(`${base(resortId, rcId)}/${id}`, body)
   },
 

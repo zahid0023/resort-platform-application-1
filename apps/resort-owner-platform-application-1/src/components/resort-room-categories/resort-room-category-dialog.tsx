@@ -8,7 +8,7 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   Button, Dialog, DialogContent, DialogTitle,
 } from "@resort/shadcn-ui"
-import { resortRoomCategoriesService } from "@/services/resort-room-categories"
+import { resortRoomCategoriesService, type ResortRoomCategoryMeta, type ResortRoomCategoryBed } from "@/services/resort-room-categories"
 import type { Locale } from "@/services/locales"
 import { toast } from "sonner"
 import type { ResortRoomCategoryDialogMode, ResortRoomCategoryFormState } from "./types"
@@ -16,6 +16,8 @@ import { emptyForm } from "./types"
 import { ResortRoomCategoryGeneralInfo } from "./resort-room-category-general-info"
 import { ResortRoomCategoryLocaleTranslations } from "./resort-room-category-locale-translations"
 import { ResortRoomCategoryPricesSection } from "@/components/resort-room-category-prices/resort-room-category-prices-section"
+import { ResortRoomCategoryBedsSection } from "./resort-room-category-beds-section"
+import { ResortRoomCategoryMetaSection } from "./resort-room-category-meta-section"
 
 export interface ResortRoomCategoryDialogProps {
   resortId: number
@@ -27,6 +29,8 @@ export interface ResortRoomCategoryDialogProps {
   onFormChange: (form: ResortRoomCategoryFormState) => void
   availableLocales: Locale[]
   onSaved?: () => void | Promise<void>
+  meta?: ResortRoomCategoryMeta
+  beds?: ResortRoomCategoryBed[]
 }
 
 export function ResortRoomCategoryDialog({
@@ -39,6 +43,8 @@ export function ResortRoomCategoryDialog({
   onFormChange,
   availableLocales,
   onSaved,
+  meta,
+  beds,
 }: ResortRoomCategoryDialogProps) {
   const { t } = useTranslation()
   const [submitting, setSubmitting] = useState(false)
@@ -57,6 +63,7 @@ export function ResortRoomCategoryDialog({
   const isDirty = mode === "create"
     ? form.room_category_id !== "" || form.code.trim() !== "" || form.sort_order !== 0
       || form.locales.length > 1 || form.locales.some((l) => l.locale_id !== "" || l.name.trim() !== "")
+      || form.max_adults !== 2 || form.max_children !== 0 || form.max_infants !== 0 || form.max_occupancy !== 2
     : generalEditing || translationsEditing
 
   function requestClose() {
@@ -75,7 +82,7 @@ export function ResortRoomCategoryDialog({
       toast.error(t("resortRoomCategory.errCode"))
       return
     }
-    if (form.max_occupancy < form.max_adults + form.max_children) {
+    if (form.max_occupancy < form.max_adults + form.max_children + form.max_infants) {
       toast.error(t("resortRoomCategory.errMaxOccupancy"))
       return
     }
@@ -89,21 +96,30 @@ export function ResortRoomCategoryDialog({
         room_category_id: Number(form.room_category_id),
         code: form.code.trim(),
         sort_order: Number(form.sort_order) || 0,
-        max_adults: Number(form.max_adults),
-        max_children: Number(form.max_children),
-        max_occupancy: Number(form.max_occupancy),
-        default_check_in_time: form.default_check_in_time || undefined,
-        default_check_out_time: form.default_check_out_time || undefined,
-        is_extra_bed_allowed: form.is_extra_bed_allowed,
-        max_extra_beds: Number(form.max_extra_beds),
-        is_smoking_allowed: form.is_smoking_allowed,
-        is_pets_allowed: form.is_pets_allowed,
         locales: form.locales.map((row) => ({
           locale_id: Number(row.locale_id),
           name: row.name.trim(),
           description: row.description.trim() || undefined,
           sort_order: Number(row.sort_order) || 0,
         })),
+        meta: {
+          max_adults: Number(form.max_adults),
+          max_children: Number(form.max_children),
+          max_infants: Number(form.max_infants),
+          max_occupancy: Number(form.max_occupancy),
+          room_size: form.room_size.trim() ? Number(form.room_size) : undefined,
+          room_size_unit_id: form.room_size_unit_id ? Number(form.room_size_unit_id) : undefined,
+          bedroom_count: form.bedroom_count.trim() ? Number(form.bedroom_count) : 0,
+          bathroom_count: form.bathroom_count.trim() ? Number(form.bathroom_count) : 0,
+          default_check_in_time: form.default_check_in_time || undefined,
+          default_check_out_time: form.default_check_out_time || undefined,
+          is_extra_bed_allowed: form.is_extra_bed_allowed,
+          max_extra_beds: Number(form.max_extra_beds),
+          is_smoking_allowed: form.is_smoking_allowed,
+          is_pets_allowed: form.is_pets_allowed,
+          minimum_stay_nights: form.minimum_stay_nights.trim() ? Number(form.minimum_stay_nights) : undefined,
+          maximum_stay_nights: form.maximum_stay_nights.trim() ? Number(form.maximum_stay_nights) : undefined,
+        },
       })
       toast.success(t("resortRoomCategory.created"))
       onOpenChange(false)
@@ -174,11 +190,27 @@ export function ResortRoomCategoryDialog({
               />
 
               {mode !== "create" && resortRoomCategoryId != null && (
-                <ResortRoomCategoryPricesSection
-                  resortId={resortId}
-                  resortRoomCategoryId={resortRoomCategoryId}
-                  open={open}
-                />
+                <>
+                  <ResortRoomCategoryMetaSection
+                    resortId={resortId}
+                    resortRoomCategoryId={resortRoomCategoryId}
+                    open={open}
+                    initialMeta={meta}
+                  />
+
+                  <ResortRoomCategoryBedsSection
+                    resortId={resortId}
+                    resortRoomCategoryId={resortRoomCategoryId}
+                    open={open}
+                    initialBeds={beds}
+                  />
+
+                  <ResortRoomCategoryPricesSection
+                    resortId={resortId}
+                    resortRoomCategoryId={resortRoomCategoryId}
+                    open={open}
+                  />
+                </>
               )}
             </div>
 

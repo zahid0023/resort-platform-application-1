@@ -24,6 +24,8 @@ import { toFormState } from "@/components/resort-room-categories/types"
 import {
   resortRoomCategoriesService,
   type ResortRoomCategory,
+  type ResortRoomCategoryMeta,
+  type ResortRoomCategoryBed,
   type ListParams,
 } from "@/services/resort-room-categories"
 import { localesService, type Locale } from "@/services/locales"
@@ -56,6 +58,8 @@ export default function ResortRoomCategoriesPage() {
   const [form, setForm] = useState<ResortRoomCategoryFormState>(emptyResortRoomCategoryForm)
   const [deleteTarget, setDeleteTarget] = useState<ResortRoomCategory | null>(null)
   const [pricesTarget, setPricesTarget] = useState<ResortRoomCategory | null>(null)
+  const [activeMeta, setActiveMeta] = useState<ResortRoomCategoryMeta | undefined>(undefined)
+  const [activeBeds, setActiveBeds] = useState<ResortRoomCategoryBed[] | undefined>(undefined)
 
   const dialogOpenRef = useRef(dialogOpen)
   const activeIdRef = useRef(activeId)
@@ -90,12 +94,11 @@ export default function ResortRoomCategoriesPage() {
       setHasNext(res.has_next)
       setHasPrevious(res.has_previous)
 
-      setForm((prev) => {
-        if (!dialogOpenRef.current || activeIdRef.current == null) return prev
-        const updated = res.data.find((rc) => rc.id === activeIdRef.current)
-        if (!updated) return prev
-        return { ...prev, locales: toFormState(updated).locales }
-      })
+      if (dialogOpenRef.current && activeIdRef.current != null) {
+        resortRoomCategoriesService.get(resortId, activeIdRef.current)
+          .then(({ data }) => setForm(toFormState(data)))
+          .catch(() => {})
+      }
     } catch (err) {
       toast.error((err as Error).message)
     } finally {
@@ -137,6 +140,8 @@ export default function ResortRoomCategoriesPage() {
     setMode("view")
     setActiveId(rc.id)
     setForm(toFormState(rc))
+    setActiveMeta(rc.meta)
+    setActiveBeds(rc.beds)
     setDialogOpen(true)
   }
 
@@ -242,6 +247,8 @@ export default function ResortRoomCategoriesPage() {
         onFormChange={setForm}
         availableLocales={availableLocales}
         onSaved={() => refresh()}
+        meta={activeMeta}
+        beds={activeBeds}
       />
 
       {/* Prices dialog */}

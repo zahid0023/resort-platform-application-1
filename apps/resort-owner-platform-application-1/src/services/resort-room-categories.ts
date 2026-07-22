@@ -8,22 +8,28 @@ export interface ResortRoomCategoryLocale {
   sort_order: number
 }
 
+export interface ResortRoomCategoryEmbeddedRoomCategory {
+  id: number
+  code: string
+  sort_order: number
+}
+
+export interface ResortRoomCategoryEmbeddedUnit {
+  id: number
+  code: string
+  symbol: string
+  sort_order: number
+}
+
 export interface ResortRoomCategory {
   id: number
   resort_id: number
-  room_category_id: number
+  room_category: ResortRoomCategoryEmbeddedRoomCategory
   code: string
   sort_order: number
-  max_adults: number
-  max_children: number
-  max_occupancy: number
-  default_check_in_time?: string
-  default_check_out_time?: string
-  is_extra_bed_allowed: boolean
-  max_extra_beds: number
-  is_smoking_allowed: boolean
-  is_pets_allowed: boolean
   locales: ResortRoomCategoryLocale[]
+  meta: ResortRoomCategoryMeta
+  beds: ResortRoomCategoryBed[]
 }
 
 export interface ResortRoomCategoryListResponse {
@@ -43,39 +49,105 @@ export interface CreateResortRoomCategoryLocaleRequest {
   sort_order: number
 }
 
-export interface CreateResortRoomCategoryRequest {
-  room_category_id: number
-  code: string
-  sort_order: number
+export interface CreateResortRoomCategoryMetaRequest {
   max_adults: number
   max_children: number
+  max_infants: number
   max_occupancy: number
+  room_size?: number
+  room_size_unit_id?: number
+  bedroom_count: number
+  bathroom_count: number
   default_check_in_time?: string
   default_check_out_time?: string
   is_extra_bed_allowed: boolean
   max_extra_beds: number
   is_smoking_allowed: boolean
   is_pets_allowed: boolean
+  minimum_stay_nights?: number
+  maximum_stay_nights?: number
+}
+
+export interface CreateResortRoomCategoryRequest {
+  room_category_id: number
+  code: string
+  sort_order: number
   locales?: CreateResortRoomCategoryLocaleRequest[]
+  meta: CreateResortRoomCategoryMetaRequest
 }
 
 export interface UpdateResortRoomCategoryRequest {
   sort_order: number
-  max_adults: number
-  max_children: number
-  max_occupancy: number
-  default_check_in_time?: string | null
-  default_check_out_time?: string | null
-  is_extra_bed_allowed: boolean
-  max_extra_beds: number
-  is_smoking_allowed: boolean
-  is_pets_allowed: boolean
 }
 
 export interface UpdateResortRoomCategoryLocaleRequest {
   name: string
   description?: string
   sort_order: number
+}
+
+export interface ResortRoomCategoryBedEmbeddedType {
+  id: number
+  code: string
+  sort_order: number
+}
+
+export interface ResortRoomCategoryBed {
+  id: number
+  bed_type_id: number
+  bed_type: ResortRoomCategoryBedEmbeddedType
+  quantity: number
+  sort_order: number
+}
+
+export interface ResortRoomCategoryMeta {
+  id: number
+  max_adults: number
+  max_children: number
+  max_infants: number
+  max_occupancy: number
+  room_size?: number
+  room_size_unit?: ResortRoomCategoryEmbeddedUnit
+  bedroom_count?: number
+  bathroom_count?: number
+  default_check_in_time?: string
+  default_check_out_time?: string
+  is_extra_bed_allowed: boolean
+  max_extra_beds: number
+  is_smoking_allowed: boolean
+  is_pets_allowed: boolean
+  minimum_stay_nights?: number
+  maximum_stay_nights?: number
+}
+
+export interface AddResortRoomCategoryBedRequest {
+  bed_type_id: number
+  quantity: number
+  sort_order?: number
+}
+
+export interface UpdateResortRoomCategoryBedRequest {
+  quantity: number
+  sort_order?: number
+}
+
+export interface UpdateResortRoomCategoryMetaRequest {
+  max_adults: number
+  max_children: number
+  max_infants: number
+  max_occupancy: number
+  room_size?: number | null
+  room_size_unit_id?: number | null
+  bedroom_count?: number | null
+  bathroom_count?: number | null
+  default_check_in_time?: string | null
+  default_check_out_time?: string | null
+  is_extra_bed_allowed: boolean
+  max_extra_beds: number
+  is_smoking_allowed: boolean
+  is_pets_allowed: boolean
+  minimum_stay_nights?: number | null
+  maximum_stay_nights?: number | null
 }
 
 export interface MutationResponse {
@@ -86,13 +158,10 @@ export interface MutationResponse {
 export interface ListParams {
   page?: number
   size?: number
-  sort_by?: "id" | "code" | "sortOrder" | "maxAdults" | "maxOccupancy" | "createdAt"
+  sort_by?: "id" | "code" | "sortOrder" | "createdAt"
   sort_dir?: "ASC" | "DESC"
   code?: string
   roomCategoryId?: number
-  isExtraBedAllowed?: boolean
-  isSmokingAllowed?: boolean
-  isPetsAllowed?: boolean
 }
 
 function base(resortId: number) {
@@ -108,9 +177,6 @@ export const resortRoomCategoriesService = {
     if (params.sort_dir) q.set("sort_dir", params.sort_dir)
     if (params.code) q.set("code", params.code)
     if (params.roomCategoryId !== undefined) q.set("roomCategoryId", String(params.roomCategoryId))
-    if (params.isExtraBedAllowed !== undefined) q.set("isExtraBedAllowed", String(params.isExtraBedAllowed))
-    if (params.isSmokingAllowed !== undefined) q.set("isSmokingAllowed", String(params.isSmokingAllowed))
-    if (params.isPetsAllowed !== undefined) q.set("isPetsAllowed", String(params.isPetsAllowed))
     return api.get<ResortRoomCategoryListResponse>(`${base(resortId)}?${q}`)
   },
 
@@ -140,5 +206,33 @@ export const resortRoomCategoriesService = {
 
   removeLocale(resortId: number, resortRoomCategoryId: number, localeId: number): Promise<MutationResponse> {
     return api.delete<MutationResponse>(`${base(resortId)}/${resortRoomCategoryId}/locales/${localeId}`)
+  },
+
+  // ── Beds sub-resource ──────────────────────────────────────────────────────
+
+  listBeds(resortId: number, resortRoomCategoryId: number): Promise<{ data: ResortRoomCategoryBed[] }> {
+    return api.get<{ data: ResortRoomCategoryBed[] }>(`${base(resortId)}/${resortRoomCategoryId}/beds`)
+  },
+
+  addBed(resortId: number, resortRoomCategoryId: number, body: AddResortRoomCategoryBedRequest): Promise<MutationResponse> {
+    return api.post<MutationResponse>(`${base(resortId)}/${resortRoomCategoryId}/beds`, body)
+  },
+
+  updateBed(resortId: number, resortRoomCategoryId: number, bedId: number, body: UpdateResortRoomCategoryBedRequest): Promise<MutationResponse> {
+    return api.put<MutationResponse>(`${base(resortId)}/${resortRoomCategoryId}/beds/${bedId}`, body)
+  },
+
+  removeBed(resortId: number, resortRoomCategoryId: number, bedId: number): Promise<MutationResponse> {
+    return api.delete<MutationResponse>(`${base(resortId)}/${resortRoomCategoryId}/beds/${bedId}`)
+  },
+
+  // ── Meta sub-resource ──────────────────────────────────────────────────────
+
+  getMeta(resortId: number, resortRoomCategoryId: number): Promise<{ data: ResortRoomCategoryMeta }> {
+    return api.get<{ data: ResortRoomCategoryMeta }>(`${base(resortId)}/${resortRoomCategoryId}/meta`)
+  },
+
+  updateMeta(resortId: number, resortRoomCategoryId: number, body: UpdateResortRoomCategoryMetaRequest): Promise<MutationResponse> {
+    return api.put<MutationResponse>(`${base(resortId)}/${resortRoomCategoryId}/meta`, body)
   },
 }

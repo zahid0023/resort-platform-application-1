@@ -15,8 +15,32 @@ export interface ContactType {
   locales: ContactTypeLocale[]
 }
 
-interface ContactTypeListResponse {
+export interface ContactTypeListResponse {
   data: ContactType[]
+  current_page: number
+  total_pages: number
+  total_elements: number
+  page_size: number
+  has_next: boolean
+  has_previous: boolean
+}
+
+export const contactTypesService = {
+  list(params: {
+    page?: number
+    size?: number
+    sort_by?: string
+    sort_dir?: "ASC" | "DESC"
+    code?: string
+  } = {}): Promise<ContactTypeListResponse> {
+    const q = new URLSearchParams()
+    if (params.page !== undefined) q.set("page", String(params.page))
+    if (params.size !== undefined) q.set("size", String(params.size))
+    if (params.sort_by) q.set("sort_by", params.sort_by)
+    if (params.sort_dir) q.set("sort_dir", params.sort_dir)
+    if (params.code) q.set("code", params.code)
+    return api.get<ContactTypeListResponse>(`/contact-types?${q}`)
+  },
 }
 
 export function listContactTypes(size = 50): Promise<ContactTypeListResponse> {

@@ -6,63 +6,12 @@ import { BedDouble, Check, ChevronDown, Cigarette, Loader2, Minus, PawPrint, Pen
 import { Button, Card, CardContent, Dialog, DialogContent, DialogTitle, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@resort/shadcn-ui"
 import { resortRoomCategoriesService } from "@/services/resort-room-categories"
 import { platformRoomCategoriesService, type PlatformRoomCategorySummary } from "@/services/platform-room-categories"
+import type { Unit } from "@/services/units"
+import { UnitPickerDialog } from "@/components/units/unit-picker-dialog"
 import { toast } from "sonner"
 import type { ResortRoomCategoryDialogMode, ResortRoomCategoryFormState } from "./types"
 
 const PLAT_PAGE_SIZE = 20
-
-interface LocalState {
-  sort_order: number
-  max_adults: number
-  max_children: number
-  max_occupancy: number
-  default_check_in_time: string
-  default_check_out_time: string
-  is_extra_bed_allowed: boolean
-  max_extra_beds: number
-  is_smoking_allowed: boolean
-  is_pets_allowed: boolean
-}
-
-function PolicyCard({
-  icon: Icon,
-  label,
-  value,
-  onChange,
-  disabled,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  label: string
-  value: boolean
-  onChange: (v: boolean) => void
-  disabled: boolean
-}) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={() => onChange(!value)}
-      className={`relative flex flex-col items-center gap-2.5 rounded-xl border p-4 text-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-50
-        ${value
-          ? "border-primary bg-primary/10 shadow-sm"
-          : "border-border bg-muted/30 hover:border-primary/40 hover:bg-muted/50"
-        }`}
-    >
-      {value && (
-        <span className="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary">
-          <Check className="h-2.5 w-2.5 text-primary-foreground" />
-        </span>
-      )}
-      <div className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors
-        ${value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-        <Icon className="h-5 w-5" />
-      </div>
-      <span className={`text-xs font-semibold leading-tight ${value ? "text-primary" : "text-muted-foreground"}`}>
-        {label}
-      </span>
-    </button>
-  )
-}
 
 const HOURS_12 = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, "0"))
 const MINUTES = Array.from({ length: 60 }, (_, i) => String(i).padStart(2, "0"))
@@ -96,35 +45,23 @@ function TimeHHMM({
 
   return (
     <div className="flex items-center gap-1.5">
-      <Select
-        value={h12}
-        onValueChange={(h) => onChange(`${to24h(h, ampm)}:${mm}`)}
-        disabled={disabled}
-      >
+      <Select value={h12} onValueChange={(h) => onChange(`${to24h(h, ampm)}:${mm}`)} disabled={disabled}>
         <SelectTrigger className="w-16 font-mono justify-center gap-0 [&>svg]:hidden">
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-48">
-          {HOURS_12.map((h) => (
-            <SelectItem key={h} value={h} className="font-mono">{h}</SelectItem>
-          ))}
+          {HOURS_12.map((h) => <SelectItem key={h} value={h} className="font-mono">{h}</SelectItem>)}
         </SelectContent>
       </Select>
 
       <span className="text-sm text-muted-foreground font-semibold select-none">:</span>
 
-      <Select
-        value={mm}
-        onValueChange={(m) => onChange(`${to24h(h12, ampm)}:${m}`)}
-        disabled={disabled}
-      >
+      <Select value={mm} onValueChange={(m) => onChange(`${to24h(h12, ampm)}:${m}`)} disabled={disabled}>
         <SelectTrigger className="w-16 font-mono justify-center gap-0 [&>svg]:hidden">
           <SelectValue />
         </SelectTrigger>
         <SelectContent className="max-h-48">
-          {MINUTES.map((m) => (
-            <SelectItem key={m} value={m} className="font-mono">{m}</SelectItem>
-          ))}
+          {MINUTES.map((m) => <SelectItem key={m} value={m} className="font-mono">{m}</SelectItem>)}
         </SelectContent>
       </Select>
 
@@ -135,12 +72,9 @@ function TimeHHMM({
             type="button"
             disabled={disabled}
             onClick={() => onChange(`${to24h(h12, period)}:${mm}`)}
-            className={`px-2.5 py-1.5 transition-colors disabled:cursor-default
-              ${i > 0 ? "border-l" : ""}
-              ${ampm === period
-                ? "bg-primary text-primary-foreground"
-                : "bg-background text-muted-foreground hover:bg-muted/40"
-              }`}
+            className={`px-2.5 py-1.5 transition-colors disabled:cursor-default ${i > 0 ? "border-l" : ""} ${
+              ampm === period ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted/40"
+            }`}
           >
             {period}
           </button>
@@ -150,37 +84,76 @@ function TimeHHMM({
   )
 }
 
-function BooleanToggle({
+function PolicyCard({
+  icon: Icon,
+  label,
   value,
   onChange,
-  readOnly,
-  yesLabel = "Yes",
-  noLabel = "No",
+  disabled,
 }: {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
   value: boolean
   onChange: (v: boolean) => void
-  readOnly: boolean
-  yesLabel?: string
-  noLabel?: string
+  disabled: boolean
 }) {
   return (
-    <div className="flex rounded-md border overflow-hidden text-sm">
-      <button
-        type="button"
-        disabled={readOnly}
-        onClick={() => onChange(true)}
-        className={`flex-1 py-2 transition-colors ${value ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted/40"} disabled:cursor-default`}
-      >
-        {yesLabel}
-      </button>
-      <button
-        type="button"
-        disabled={readOnly}
-        onClick={() => onChange(false)}
-        className={`flex-1 py-2 border-l transition-colors ${!value ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:bg-muted/40"} disabled:cursor-default`}
-      >
-        {noLabel}
-      </button>
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => onChange(!value)}
+      className={`relative flex flex-col items-center gap-2.5 rounded-xl border p-4 text-center transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-default disabled:opacity-50
+        ${value
+          ? "border-primary bg-primary/10 shadow-sm"
+          : "border-border bg-muted/30 hover:border-primary/40 hover:bg-muted/50"
+        }`}
+    >
+      {value && (
+        <span className="absolute top-2 right-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary">
+          <Check className="h-2.5 w-2.5 text-primary-foreground" />
+        </span>
+      )}
+      <div className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${
+        value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+      }`}>
+        <Icon className="h-5 w-5" />
+      </div>
+      <span className={`text-xs font-semibold leading-tight ${value ? "text-primary" : "text-muted-foreground"}`}>
+        {label}
+      </span>
+    </button>
+  )
+}
+
+function Counter({
+  label,
+  value,
+  onChange,
+  disabled,
+  min = 0,
+}: {
+  label: string
+  value: number
+  onChange: (v: number) => void
+  disabled: boolean
+  min?: number
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <Label className="text-xs font-medium shrink-0">{label}</Label>
+      <div className="flex items-center gap-2">
+        <Button type="button" size="icon" variant="outline" className="h-8 w-8 shrink-0"
+          disabled={disabled || value <= min}
+          onClick={() => onChange(value - 1)}>
+          <Minus className="h-3.5 w-3.5" />
+        </Button>
+        <span className="w-8 text-center text-sm font-medium tabular-nums">{value}</span>
+        <Button type="button" size="icon" variant="outline" className="h-8 w-8 shrink-0"
+          disabled={disabled}
+          onClick={() => onChange(value + 1)}>
+          <Plus className="h-3.5 w-3.5" />
+        </Button>
+      </div>
     </div>
   )
 }
@@ -209,18 +182,7 @@ export function ResortRoomCategoryGeneralInfo({
   open,
 }: ResortRoomCategoryGeneralInfoProps) {
   const { t } = useTranslation()
-  const [local, setLocal] = useState<LocalState>({
-    sort_order: 0,
-    max_adults: 2,
-    max_children: 0,
-    max_occupancy: 2,
-    default_check_in_time: "",
-    default_check_out_time: "",
-    is_extra_bed_allowed: false,
-    max_extra_beds: 0,
-    is_smoking_allowed: false,
-    is_pets_allowed: false,
-  })
+  const [localSortOrder, setLocalSortOrder] = useState(0)
   const [submitting, setSubmitting] = useState(false)
 
   // Platform room category picker
@@ -232,6 +194,10 @@ export function ResortRoomCategoryGeneralInfo({
   const [platDialogOpen, setPlatDialogOpen] = useState(false)
   const platLoadedRef = useRef(false)
 
+  // Unit picker (create mode only, for room_size_unit)
+  const [selectedRoomSizeUnit, setSelectedRoomSizeUnit] = useState<Unit | null>(null)
+  const [unitPickerOpen, setUnitPickerOpen] = useState(false)
+
   useEffect(() => {
     if (!open) {
       setSubmitting(false)
@@ -241,9 +207,8 @@ export function ResortRoomCategoryGeneralInfo({
       setPlatSearch("")
       setPlatDialogOpen(false)
       platLoadedRef.current = false
-    } else if (mode !== "create" && !platLoadedRef.current && form.room_category_id !== "") {
-      platLoadedRef.current = true
-      loadPlatCategories(0, true)
+      setSelectedRoomSizeUnit(null)
+      setUnitPickerOpen(false)
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -281,60 +246,21 @@ export function ResortRoomCategoryGeneralInfo({
     ? `${selectedPlatCategory.locales[0]?.name ?? selectedPlatCategory.code} (${selectedPlatCategory.code})`
     : t("resortRoomCategory.selectPlatformCategory")
 
-  // Edit handlers
   function startEdit() {
-    setLocal({
-      sort_order: form.sort_order,
-      max_adults: form.max_adults,
-      max_children: form.max_children,
-      max_occupancy: form.max_occupancy,
-      default_check_in_time: form.default_check_in_time,
-      default_check_out_time: form.default_check_out_time,
-      is_extra_bed_allowed: form.is_extra_bed_allowed,
-      max_extra_beds: form.max_extra_beds,
-      is_smoking_allowed: form.is_smoking_allowed,
-      is_pets_allowed: form.is_pets_allowed,
-    })
+    setLocalSortOrder(form.sort_order)
     onEditingChange(true)
   }
 
   async function save() {
     if (resortRoomCategoryId == null) return
-    const adults = Number(local.max_adults) || 1
-    const children = Number(local.max_children) || 0
-    const occupancy = Number(local.max_occupancy) || 1
-    if (occupancy < adults + children) {
-      toast.error(t("resortRoomCategory.errOccupancy"))
-      return
-    }
     setSubmitting(true)
     try {
       await resortRoomCategoriesService.update(resortId, resortRoomCategoryId, {
-        sort_order: Number(local.sort_order) || 0,
-        max_adults: adults,
-        max_children: children,
-        max_occupancy: occupancy,
-        default_check_in_time: local.default_check_in_time || null,
-        default_check_out_time: local.default_check_out_time || null,
-        is_extra_bed_allowed: local.is_extra_bed_allowed,
-        max_extra_beds: Number(local.max_extra_beds) || 0,
-        is_smoking_allowed: local.is_smoking_allowed,
-        is_pets_allowed: local.is_pets_allowed,
+        sort_order: Number(localSortOrder) || 0,
       })
       toast.success(t("resortRoomCategory.updated"))
       onEditingChange(false)
-      onFormChange({
-        sort_order: Number(local.sort_order) || 0,
-        max_adults: adults,
-        max_children: children,
-        max_occupancy: occupancy,
-        default_check_in_time: local.default_check_in_time,
-        default_check_out_time: local.default_check_out_time,
-        is_extra_bed_allowed: local.is_extra_bed_allowed,
-        max_extra_beds: Number(local.max_extra_beds) || 0,
-        is_smoking_allowed: local.is_smoking_allowed,
-        is_pets_allowed: local.is_pets_allowed,
-      })
+      onFormChange({ sort_order: Number(localSortOrder) || 0 })
       await onSaved?.()
     } catch (err) {
       toast.error((err as Error).message)
@@ -346,14 +272,9 @@ export function ResortRoomCategoryGeneralInfo({
   const isReadOnly = !editing && mode !== "create"
   const noPlatformSelected = mode === "create" && !form.room_category_id
   const fieldDisabled = isReadOnly || noPlatformSelected
-  const vals = editing ? local : form
 
-  function patch(p: Partial<LocalState>) {
-    if (mode === "create") {
-      onFormChange(p)
-    } else {
-      setLocal((prev) => ({ ...prev, ...p }))
-    }
+  function patchForm(p: Partial<ResortRoomCategoryFormState>) {
+    onFormChange(p)
   }
 
   return (
@@ -398,7 +319,7 @@ export function ResortRoomCategoryGeneralInfo({
           )}
 
           {/* Platform room category — view mode */}
-          {mode !== "create" && selectedPlatCategory && (
+          {mode !== "create" && form.room_category_id !== "" && (
             <div className="space-y-2">
               <Label className="text-xs font-medium">{t("resortRoomCategory.platformCategory")}</Label>
               <div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3">
@@ -406,20 +327,9 @@ export function ResortRoomCategoryGeneralInfo({
                   <BedDouble className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold truncate">{selectedPlatCategory.locales[0]?.name ?? selectedPlatCategory.code}</p>
-                  <p className="text-xs text-muted-foreground font-mono">{selectedPlatCategory.code} · #{selectedPlatCategory.id}</p>
+                  <p className="text-sm font-semibold truncate font-mono">{form.room_category_code || `#${form.room_category_id}`}</p>
+                  <p className="text-xs text-muted-foreground font-mono">#{form.room_category_id}</p>
                 </div>
-              </div>
-            </div>
-          )}
-          {mode !== "create" && !selectedPlatCategory && form.room_category_id !== "" && (
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">{t("resortRoomCategory.platformCategory")}</Label>
-              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
-                {platLoading
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
-                  : <span className="text-sm font-mono">#{form.room_category_id}</span>
-                }
               </div>
             </div>
           )}
@@ -458,6 +368,7 @@ export function ResortRoomCategoryGeneralInfo({
                           onClick={() => {
                             onFormChange({
                               room_category_id: c.id,
+                              room_category_code: c.code,
                               locales: c.locales.map((l) => ({
                                 locale_id: l.locale_id,
                                 name: l.name,
@@ -531,129 +442,149 @@ export function ResortRoomCategoryGeneralInfo({
               id="rrc-sort"
               type="number"
               min={0}
-              value={vals.sort_order}
-              onChange={(e) => patch({ sort_order: Number(e.target.value) })}
-              disabled={fieldDisabled}
+              value={editing ? localSortOrder : form.sort_order}
+              onChange={(e) => {
+                if (mode === "create") onFormChange({ sort_order: Number(e.target.value) })
+                else setLocalSortOrder(Number(e.target.value))
+              }}
+              disabled={isReadOnly || noPlatformSelected}
             />
           </div>
 
-          {/* Occupancy */}
-          <div className="space-y-3">
-            {(
-              [
-                { key: "max_adults",   label: t("resortRoomCategory.maxAdults"),   min: 1 },
-                { key: "max_children", label: t("resortRoomCategory.maxChildren"), min: 0 },
-                { key: "max_occupancy",label: t("resortRoomCategory.maxOccupancy"),min: 1 },
-              ] as const
-            ).map(({ key, label, min }) => (
-              <div key={key} className="flex items-center justify-between gap-4">
-                <Label className="text-xs font-medium shrink-0">{label} *</Label>
+          {/* ── Meta fields — create mode only ─────────────────────────────── */}
+          {mode === "create" && (
+            <>
+              {/* Occupancy */}
+              <div className="space-y-3">
+                <Label className="text-xs font-medium">{t("resortRoomCategory.occupancy")} *</Label>
+                <Counter label={t("resortRoomCategory.maxAdults")}   value={form.max_adults}   onChange={(v) => patchForm({ max_adults: v })}   disabled={fieldDisabled} min={1} />
+                <Counter label={t("resortRoomCategory.maxChildren")} value={form.max_children} onChange={(v) => patchForm({ max_children: v })} disabled={fieldDisabled} />
+                <Counter label={t("resortRoomCategory.maxInfants")}  value={form.max_infants}  onChange={(v) => patchForm({ max_infants: v })}  disabled={fieldDisabled} />
+                <Counter label={t("resortRoomCategory.maxOccupancy")} value={form.max_occupancy} onChange={(v) => patchForm({ max_occupancy: v })} disabled={fieldDisabled} min={1} />
+              </div>
+
+              {/* Room size */}
+              <div className="space-y-2">
+                <Label className="text-xs font-medium">{t("resortRoomCategory.roomSize")}</Label>
                 <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    className="h-8 w-8 shrink-0"
-                    disabled={fieldDisabled || vals[key] <= min}
-                    onClick={() => patch({ [key]: vals[key] - 1 })}
-                  >
-                    <Minus className="h-3.5 w-3.5" />
-                  </Button>
-                  <span className="w-8 text-center text-sm font-medium tabular-nums">{vals[key]}</span>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="outline"
-                    className="h-8 w-8 shrink-0"
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.room_size}
+                    onChange={(e) => patchForm({ room_size: e.target.value })}
+                    placeholder="e.g. 32"
                     disabled={fieldDisabled}
-                    onClick={() => patch({ [key]: vals[key] + 1 })}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="shrink-0 gap-1.5 font-normal min-w-[120px] justify-between"
+                    disabled={fieldDisabled}
+                    onClick={() => setUnitPickerOpen(true)}
                   >
-                    <Plus className="h-3.5 w-3.5" />
+                    <span className={selectedRoomSizeUnit ? "" : "text-muted-foreground"}>
+                      {selectedRoomSizeUnit ? (selectedRoomSizeUnit.symbol || selectedRoomSizeUnit.code) : t("resortRoomCategory.selectUnit")}
+                    </span>
+                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
                   </Button>
                 </div>
               </div>
-            ))}
-          </div>
 
-          {/* Check-in / Check-out times */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between gap-4">
-              <Label className="text-xs font-medium shrink-0">{t("resortRoomCategory.checkInTime")}</Label>
-              <TimeHHMM
-                value={vals.default_check_in_time}
-                onChange={(v) => patch({ default_check_in_time: v })}
-                disabled={fieldDisabled}
-              />
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <Label className="text-xs font-medium shrink-0">{t("resortRoomCategory.checkOutTime")}</Label>
-              <TimeHHMM
-                value={vals.default_check_out_time}
-                onChange={(v) => patch({ default_check_out_time: v })}
-                disabled={fieldDisabled}
-              />
-            </div>
-          </div>
-
-          {/* Policies */}
-          <div className="space-y-3">
-            <Label className="text-xs font-medium">{t("resortRoomCategory.policies")} *</Label>
-            <div className="grid grid-cols-3 gap-3">
-              <PolicyCard
-                icon={BedDouble}
-                label={t("resortRoomCategory.extraBedAllowed")}
-                value={vals.is_extra_bed_allowed}
-                onChange={(v) => patch({ is_extra_bed_allowed: v })}
-                disabled={fieldDisabled}
-              />
-              <PolicyCard
-                icon={Cigarette}
-                label={t("resortRoomCategory.smokingAllowed")}
-                value={vals.is_smoking_allowed}
-                onChange={(v) => patch({ is_smoking_allowed: v })}
-                disabled={fieldDisabled}
-              />
-              <PolicyCard
-                icon={PawPrint}
-                label={t("resortRoomCategory.petsAllowed")}
-                value={vals.is_pets_allowed}
-                onChange={(v) => patch({ is_pets_allowed: v })}
-                disabled={fieldDisabled}
-              />
-            </div>
-          </div>
-
-          {vals.is_extra_bed_allowed && (
-            <div className="flex items-center justify-between gap-4">
-              <Label className="text-xs font-medium shrink-0">{t("resortRoomCategory.maxExtraBeds")} *</Label>
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8 shrink-0"
-                  disabled={fieldDisabled || vals.max_extra_beds <= 0}
-                  onClick={() => patch({ max_extra_beds: vals.max_extra_beds - 1 })}
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </Button>
-                <span className="w-8 text-center text-sm font-medium tabular-nums">{vals.max_extra_beds}</span>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8 shrink-0"
-                  disabled={fieldDisabled}
-                  onClick={() => patch({ max_extra_beds: vals.max_extra_beds + 1 })}
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
+              {/* Bedroom / Bathroom count */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">{t("resortRoomCategory.bedroomCount")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.bedroom_count}
+                    onChange={(e) => patchForm({ bedroom_count: e.target.value })}
+                    placeholder="0"
+                    disabled={fieldDisabled}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">{t("resortRoomCategory.bathroomCount")}</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.bathroom_count}
+                    onChange={(e) => patchForm({ bathroom_count: e.target.value })}
+                    placeholder="0"
+                    disabled={fieldDisabled}
+                  />
+                </div>
               </div>
-            </div>
+
+              {/* Check-in / Check-out times */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-4">
+                  <Label className="text-xs font-medium shrink-0">{t("resortRoomCategory.checkInTime")}</Label>
+                  <TimeHHMM value={form.default_check_in_time} onChange={(v) => patchForm({ default_check_in_time: v })} disabled={fieldDisabled} />
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <Label className="text-xs font-medium shrink-0">{t("resortRoomCategory.checkOutTime")}</Label>
+                  <TimeHHMM value={form.default_check_out_time} onChange={(v) => patchForm({ default_check_out_time: v })} disabled={fieldDisabled} />
+                </div>
+              </div>
+
+              {/* Policies */}
+              <div className="space-y-3">
+                <Label className="text-xs font-medium">{t("resortRoomCategory.policies")}</Label>
+                <div className="grid grid-cols-3 gap-3">
+                  <PolicyCard icon={BedDouble} label={t("resortRoomCategory.extraBedAllowed")} value={form.is_extra_bed_allowed} onChange={(v) => patchForm({ is_extra_bed_allowed: v })} disabled={fieldDisabled} />
+                  <PolicyCard icon={Cigarette} label={t("resortRoomCategory.smokingAllowed")} value={form.is_smoking_allowed} onChange={(v) => patchForm({ is_smoking_allowed: v })} disabled={fieldDisabled} />
+                  <PolicyCard icon={PawPrint} label={t("resortRoomCategory.petsAllowed")} value={form.is_pets_allowed} onChange={(v) => patchForm({ is_pets_allowed: v })} disabled={fieldDisabled} />
+                </div>
+              </div>
+
+              {form.is_extra_bed_allowed && (
+                <Counter label={t("resortRoomCategory.maxExtraBeds")} value={form.max_extra_beds} onChange={(v) => patchForm({ max_extra_beds: v })} disabled={fieldDisabled} />
+              )}
+
+              {/* Min / Max stay */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">{t("resortRoomCategory.minimumStayNights")}</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={form.minimum_stay_nights}
+                    onChange={(e) => patchForm({ minimum_stay_nights: e.target.value })}
+                    placeholder="—"
+                    disabled={fieldDisabled}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium">{t("resortRoomCategory.maximumStayNights")}</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={form.maximum_stay_nights}
+                    onChange={(e) => patchForm({ maximum_stay_nights: e.target.value })}
+                    placeholder="—"
+                    disabled={fieldDisabled}
+                  />
+                </div>
+              </div>
+            </>
           )}
 
         </CardContent>
       </Card>
+
+      <UnitPickerDialog
+        open={unitPickerOpen}
+        onOpenChange={setUnitPickerOpen}
+        selectedId={selectedRoomSizeUnit?.id}
+        onSelect={(u) => {
+          setSelectedRoomSizeUnit(u)
+          patchForm({ room_size_unit_id: u.id })
+          setUnitPickerOpen(false)
+        }}
+      />
     </div>
   )
 }

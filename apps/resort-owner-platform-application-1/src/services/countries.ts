@@ -1,6 +1,6 @@
 import { api } from "./api";
 
-interface CountryLocale {
+export interface CountryLocale {
   id: number;
   locale_id: number;
   name: string;
@@ -8,7 +8,7 @@ interface CountryLocale {
   sort_order: number;
 }
 
-interface Country {
+export interface Country {
   id: number;
   code: string;
   iso3_code?: string;
@@ -17,7 +17,7 @@ interface Country {
   locales: CountryLocale[];
 }
 
-interface CountryListResponse {
+export interface CountryListResponse {
   data: Country[];
   current_page: number;
   total_pages: number;
@@ -41,6 +41,20 @@ interface ListParams {
   iso3Code?: string;
   phoneCode?: string;
 }
+
+export const countriesService = {
+  list(params: ListParams = {}): Promise<CountryListResponse> {
+    const q = new URLSearchParams();
+    if (params.page !== undefined) q.set("page", String(params.page));
+    if (params.size !== undefined) q.set("size", String(params.size));
+    if (params.sort_by) q.set("sort_by", params.sort_by);
+    if (params.sort_dir) q.set("sort_dir", params.sort_dir);
+    if (params.code) q.set("code", params.code);
+    if (params.iso3Code) q.set("iso3Code", params.iso3Code);
+    if (params.phoneCode) q.set("phoneCode", params.phoneCode);
+    return api.get<CountryListResponse>(`/countries?${q}`);
+  },
+};
 
 export async function listCountries(
   params: ListParams = {},

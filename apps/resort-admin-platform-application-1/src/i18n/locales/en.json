@@ -70,6 +70,19 @@
     "facilityGroupRequired": "Please select a facility group.",
     "commChannelTypeRequired": "Please select a value type (Phone, Email, or URL)."
   },
+  "facilityScope": {
+    "title": "Facility Scopes",
+    "subtitle": "Pre-seeded scopes that define where a facility can be applied (e.g. Resort, Room Category, Room).",
+    "loading": "Loading facility scopes…",
+    "empty": "No facility scopes found.",
+    "updatedToast": "Facility scope updated successfully."
+  },
+  "facilityScopeDialog": {
+    "edit": "Edit Facility Scope",
+    "view": "Facility Scope Details",
+    "descEdit": "Update sort order and locale translations.",
+    "descView": "Facility scope details and locale translations."
+  },
   "locale": {
     "translations": "Translations",
     "add": "Add",
@@ -92,7 +105,8 @@
       "resortAccessType": "No locale translations for this resort access type.",
       "resortPermissionType": "No locale translations for this resort permission type.",
       "contactType": "No locale translations for this contact type.",
-      "commChannel": "No locale translations for this communication channel."
+      "commChannel": "No locale translations for this communication channel.",
+      "facilityScope": "No locale translations for this facility scope."
     },
     "row": {
       "label": "Locale {{n}}",
@@ -116,7 +130,9 @@
     "resortAccessTypeName": "Access type name in this language",
     "resortAccessTypeDescription": "Optional description...",
     "resortPermissionTypeName": "Permission type name in this language",
-    "resortPermissionTypeDescription": "Optional description..."
+    "resortPermissionTypeDescription": "Optional description...",
+    "facilityScopeName": "Scope name in this language",
+    "facilityScopeDescription": "Optional description..."
   },
   "dialog": {
     "city": {
@@ -229,7 +245,14 @@
     "order": "Order: {{n}}",
     "notFound": "Facility group not found.",
     "back": "Back to Facility Groups",
-    "noFacilities": "No facilities in this group yet."
+    "noFacilities": "No facilities in this group yet.",
+    "scopes": "Scope Assignments",
+    "scopeEmpty": "No scopes assigned.",
+    "scopeRequired": "Please assign at least one scope.",
+    "scopeAssigned": "Scope assigned.",
+    "scopeUnassigned": "Scope unassigned.",
+    "scopeUnassignTitle": "Remove scope assignment?",
+    "scopeUnassignDesc": "Are you sure you want to unassign {{code}}? This action cannot be undone."
   },
   "facilityGroupDialog": {
     "create": "New Facility Group",

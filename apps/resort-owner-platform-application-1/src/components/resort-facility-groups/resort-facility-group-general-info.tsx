@@ -82,7 +82,7 @@ export function ResortFacilityGroupGeneralInfo({
   async function loadPlatGroups(page: number, reset = false) {
     setPlatLoading(true)
     try {
-      const res = await platformFacilityGroupsService.list({ page, size: PLAT_PAGE_SIZE, sort_by: "sortOrder" })
+      const res = await platformFacilityGroupsService.list({ page, size: PLAT_PAGE_SIZE, sort_by: "sortOrder", scope_code: "RESORT" })
       setPlatGroups((prev) => (reset ? res.data : [...prev, ...res.data]))
       setPlatPage(page)
       setPlatHasNext(res.has_next)

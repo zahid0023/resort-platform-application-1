@@ -1,6 +1,6 @@
 import { api } from "./api";
 
-interface CityLocale {
+export interface CityLocale {
   id: number;
   locale_id: number;
   name: string;
@@ -8,7 +8,7 @@ interface CityLocale {
   sort_order: number;
 }
 
-interface City {
+export interface City {
   id: number;
   country_id: number;
   code?: string;
@@ -16,7 +16,7 @@ interface City {
   locales: CityLocale[];
 }
 
-interface CityListResponse {
+export interface CityListResponse {
   data: City[];
   current_page: number;
   total_pages: number;
@@ -25,6 +25,26 @@ interface CityListResponse {
   has_next: boolean;
   has_previous: boolean;
 }
+
+export const citiesService = {
+  list(params: {
+    page?: number;
+    size?: number;
+    sort_by?: string;
+    sort_dir?: "ASC" | "DESC";
+    code?: string;
+    countryId?: number;
+  } = {}): Promise<CityListResponse> {
+    const q = new URLSearchParams();
+    if (params.page !== undefined) q.set("page", String(params.page));
+    if (params.size !== undefined) q.set("size", String(params.size));
+    if (params.sort_by) q.set("sort_by", params.sort_by);
+    if (params.sort_dir) q.set("sort_dir", params.sort_dir);
+    if (params.code) q.set("code", params.code);
+    if (params.countryId) q.set("countryId", String(params.countryId));
+    return api.get<CityListResponse>(`/cities?${q}`);
+  },
+};
 
 export interface CitySummary {
   id: number;
