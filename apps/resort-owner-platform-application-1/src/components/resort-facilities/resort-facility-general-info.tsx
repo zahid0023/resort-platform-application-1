@@ -1,17 +1,19 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useTranslation } from "react-i18next"
-import { Check, ChevronDown, Link2, Loader2, Pencil, Star, StarOff, X } from "lucide-react"
-import { Button, Card, CardContent, Input, Label, Popover, PopoverContent, PopoverTrigger } from "@resort/shadcn-ui"
+import { Check, ChevronDown, Link2, Pencil, Star, StarOff, X } from "lucide-react"
+import { Button, Card, CardContent, Input, Label } from "@resort/shadcn-ui"
+import { LucideIconRenderer } from "ui-blocks"
 import { resortFacilitiesService } from "@/services/resort-facilities"
-import { platformFacilitiesService, type PlatformFacilitySummary } from "@/services/platform-facilities"
-import { resortFacilityGroupsService, type ResortFacilityGroupSummary } from "@/services/resort-facility-groups"
+import { type PlatformFacilitySummary } from "@/services/platform-facilities"
+import { type ResortFacilityGroupSummary } from "@/services/resort-facility-groups"
+import { ResortFacilityGroupPickerDialog } from "@/components/resort-facility-groups/resort-facility-group-picker-dialog"
+import { PlatformFacilityPickerDialog } from "./platform-facility-picker-dialog"
 import { toast } from "sonner"
 import type { ResortFacilityDialogMode, ResortFacilityFormState, FacilityMode } from "./types"
 import { toApiIconPayload } from "./types"
 
-const PLAT_PAGE_SIZE = 20
 
 export interface ResortFacilityGeneralInfoProps {
   resortId: number
@@ -52,82 +54,38 @@ export function ResortFacilityGeneralInfo({
   const [localFacilityMode, setLocalFacilityMode] = useState<FacilityMode>("custom")
   const [submitting, setSubmitting] = useState(false)
 
-  // Platform facility picker
-  const [platFacilities, setPlatFacilities] = useState<PlatformFacilitySummary[]>([])
-  const [platPage, setPlatPage] = useState(0)
-  const [platHasNext, setPlatHasNext] = useState(false)
-  const [platLoading, setPlatLoading] = useState(false)
-  const [platSearch, setPlatSearch] = useState("")
-  const [platPopoverOpen, setPlatPopoverOpen] = useState(false)
-  const platLoadedRef = useRef(false)
+  // Platform facility picker dialog state
+  const [platPickerOpen, setPlatPickerOpen] = useState(false)
+  const [selectedPlatFacility, setSelectedPlatFacility] = useState<PlatformFacilitySummary | null>(null)
 
-  // Group picker (create mode when group not pre-set)
-  const [groups, setGroups] = useState<ResortFacilityGroupSummary[]>([])
-  const [groupSearch, setGroupSearch] = useState("")
-  const [groupPopoverOpen, setGroupPopoverOpen] = useState(false)
-  const [groupLoading, setGroupLoading] = useState(false)
-  const groupLoadedRef = useRef(false)
+  // Group picker dialog (create mode when group not pre-set)
+  const [groupPickerOpen, setGroupPickerOpen] = useState(false)
+  const [selectedGroup, setSelectedGroup] = useState<ResortFacilityGroupSummary | null>(null)
 
   useEffect(() => {
     if (!open) {
       setSubmitting(false)
-      setPlatFacilities([])
-      setPlatPage(0)
-      setPlatHasNext(false)
-      setPlatSearch("")
-      setPlatPopoverOpen(false)
-      platLoadedRef.current = false
-      setGroups([])
-      setGroupSearch("")
-      setGroupPopoverOpen(false)
-      groupLoadedRef.current = false
+      setPlatPickerOpen(false)
+      setSelectedPlatFacility(null)
+      setGroupPickerOpen(false)
+      setSelectedGroup(null)
     }
   }, [open])
 
   // ── Platform facility picker ──────────────────────────────────────────────
 
-  async function loadPlatFacilities(page: number, reset = false) {
-    setPlatLoading(true)
-    try {
-      const res = await platformFacilitiesService.list({
-        page,
-        size: PLAT_PAGE_SIZE,
-        sort_by: "sortOrder",
-        ...(platformFacilityGroupId !== undefined ? { facilityGroupId: platformFacilityGroupId } : {}),
-      })
-      setPlatFacilities((prev) => (reset ? res.data : [...prev, ...res.data]))
-      setPlatPage(page)
-      setPlatHasNext(res.has_next)
-    } catch (err) {
-      toast.error((err as Error).message)
-    } finally {
-      setPlatLoading(false)
-    }
-  }
-
-  function handlePlatPopoverOpen(v: boolean) {
-    setPlatPopoverOpen(v)
-    if (v && !platLoadedRef.current) {
-      platLoadedRef.current = true
-      loadPlatFacilities(0, true)
-    }
-  }
-
   function handleCreateModeChange(m: FacilityMode) {
     onFacilityModeChange(m)
-    if (m === "custom") onFormChange({ facility_id: "" })
-    setPlatPopoverOpen(false)
-    setPlatSearch("")
+    if (m === "custom") { onFormChange({ facility_id: "" }); setSelectedPlatFacility(null) }
   }
 
   function handleEditModeChange(m: FacilityMode) {
     setLocalFacilityMode(m)
-    if (m === "custom") setLocal((p) => ({ ...p, facility_id: "" }))
-    setPlatPopoverOpen(false)
-    setPlatSearch("")
+    if (m === "custom") { setLocal((p) => ({ ...p, facility_id: "" })); setSelectedPlatFacility(null) }
   }
 
-  function selectPlatFacility(f: PlatformFacilitySummary) {
+  function handlePlatFacilitySelect(f: PlatformFacilitySummary) {
+    setSelectedPlatFacility(f)
     if (mode === "create") {
       onFormChange({
         facility_id: f.id,
@@ -147,51 +105,21 @@ export function ResortFacilityGeneralInfo({
     } else {
       setLocal((p) => ({ ...p, facility_id: f.id }))
     }
-    setPlatPopoverOpen(false)
-    setPlatSearch("")
   }
-
-  const filteredPlatFacilities = platSearch.trim()
-    ? platFacilities.filter((f) => {
-        const q = platSearch.toLowerCase()
-        return f.code.toLowerCase().includes(q) || (f.locales[0]?.name ?? "").toLowerCase().includes(q)
-      })
-    : platFacilities
 
   const activeMode = mode === "create" ? facilityMode : localFacilityMode
   const activeFacilityId = mode === "create" ? form.facility_id : (editing ? local.facility_id : form.facility_id)
-  const selectedPlatFacility = platFacilities.find((f) => f.id === activeFacilityId)
-  const selectedPlatLabel = selectedPlatFacility
-    ? `${selectedPlatFacility.locales[0]?.name ?? selectedPlatFacility.code} (${selectedPlatFacility.code})`
-    : t("resortFacility.selectPlatformFacility")
 
   // ── Group picker ──────────────────────────────────────────────────────────
 
-  async function loadGroups() {
-    setGroupLoading(true)
-    try {
-      const res = await resortFacilityGroupsService.list(resortId, { size: 50, sort_by: "sortOrder" })
-      setGroups(res.data)
-    } catch (err) {
-      toast.error((err as Error).message)
-    } finally {
-      setGroupLoading(false)
-    }
+  function handleGroupSelect(group: ResortFacilityGroupSummary) {
+    setSelectedGroup(group)
+    setSelectedPlatFacility(null)
+    onFormChange({ resort_facility_group_id: group.id, facility_id: "", resort_facility_group: group })
   }
 
-  function handleGroupPopoverOpen(v: boolean) {
-    setGroupPopoverOpen(v)
-    if (v && !groupLoadedRef.current) {
-      groupLoadedRef.current = true
-      loadGroups()
-    }
-  }
+  const effectivePlatFacilityGroupId = selectedGroup?.facility_group_id ?? platformFacilityGroupId
 
-  const filteredGroups = groupSearch.trim()
-    ? groups.filter((g) => (g.locales[0]?.name ?? "").toLowerCase().includes(groupSearch.toLowerCase()))
-    : groups
-
-  const selectedGroup = groups.find((g) => g.id === form.resort_facility_group_id)
   const selectedGroupLabel = selectedGroup
     ? (selectedGroup.locales[0]?.name ?? `Group #${selectedGroup.id}`)
     : form.resort_facility_group_id
@@ -203,6 +131,7 @@ export function ResortFacilityGeneralInfo({
   function startEdit() {
     setLocal({ sort_order: form.sort_order, facility_id: form.facility_id })
     setLocalFacilityMode(form.facility_id ? "platform" : "custom")
+    setSelectedPlatFacility(form.platform_facility as PlatformFacilitySummary | null)
     onEditingChange(true)
   }
 
@@ -212,12 +141,17 @@ export function ResortFacilityGeneralInfo({
     try {
       await resortFacilitiesService.update(resortId, facilityId, {
         facility_id: local.facility_id ? Number(local.facility_id) : null,
+        facility_price_type_id: Number(form.facility_price_type_id) || 0,
         sort_order: Number(local.sort_order) || 0,
         ...toApiIconPayload(form),
       })
       toast.success(t("resortFacility.updated"))
       onEditingChange(false)
-      onFormChange({ sort_order: Number(local.sort_order) || 0, facility_id: local.facility_id })
+      onFormChange({
+        sort_order: Number(local.sort_order) || 0,
+        facility_id: local.facility_id,
+        platform_facility: local.facility_id ? (selectedPlatFacility ?? form.platform_facility) : null,
+      })
       await onSaved?.()
     } catch (err) {
       toast.error((err as Error).message)
@@ -279,7 +213,9 @@ export function ResortFacilityGeneralInfo({
                 <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
                   <Link2 className="h-3.5 w-3.5 text-primary shrink-0" />
                   <span className="text-sm font-medium">{t("resortFacility.fromPlatform")}</span>
-                  <span className="ml-auto text-xs text-muted-foreground font-mono">#{form.facility_id}</span>
+                  <span className="ml-auto text-xs text-muted-foreground truncate max-w-[160px]">
+                    {form.platform_facility?.locales[0]?.name ?? form.platform_facility?.code ?? `#${form.facility_id}`}
+                  </span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
@@ -332,60 +268,26 @@ export function ResortFacilityGeneralInfo({
                     <span className="ml-auto text-xs text-muted-foreground font-mono">#{form.resort_facility_group_id}</span>
                   </div>
                 ) : (
-                  <Popover open={groupPopoverOpen} onOpenChange={handleGroupPopoverOpen}>
-                    <PopoverTrigger asChild>
-                      <Button type="button" variant="outline" className="w-full justify-between font-normal">
-                        <span className={form.resort_facility_group_id ? "" : "text-muted-foreground"}>
-                          {selectedGroupLabel}
-                        </span>
-                        <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                      <div className="p-2 border-b">
-                        <Input
-                          placeholder={t("resortFacility.searchGroup")}
-                          value={groupSearch}
-                          onChange={(e) => setGroupSearch(e.target.value)}
-                          className="h-8 text-sm"
-                          autoFocus
-                        />
-                      </div>
-                      <div className="max-h-52 overflow-y-auto">
-                        {groupLoading && groups.length === 0 ? (
-                          <div className="flex items-center justify-center py-6">
-                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                          </div>
-                        ) : filteredGroups.length === 0 ? (
-                          <p className="text-sm text-muted-foreground text-center py-4">{t("resortFacility.noGroups")}</p>
-                        ) : (
-                          filteredGroups.map((g) => {
-                            const label = g.locales[0]?.name ?? `Group #${g.id}`
-                            const isSelected = form.resort_facility_group_id === g.id
-                            return (
-                              <button
-                                key={g.id}
-                                type="button"
-                                className={`w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 ${isSelected ? "bg-accent" : ""}`}
-                                onClick={() => {
-                                  onFormChange({ resort_facility_group_id: g.id })
-                                  setGroupPopoverOpen(false)
-                                  setGroupSearch("")
-                                }}
-                              >
-                                {isSelected
-                                  ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-                                  : <span className="w-3.5 shrink-0" />
-                                }
-                                <span>{label}</span>
-                                <span className="ml-auto text-xs text-muted-foreground">#{g.id}</span>
-                              </button>
-                            )
-                          })
-                        )}
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-between font-normal"
+                      onClick={() => setGroupPickerOpen(true)}
+                    >
+                      <span className={form.resort_facility_group_id ? "" : "text-muted-foreground"}>
+                        {selectedGroupLabel}
+                      </span>
+                      <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                    </Button>
+                    <ResortFacilityGroupPickerDialog
+                      resortId={resortId}
+                      open={groupPickerOpen}
+                      onOpenChange={setGroupPickerOpen}
+                      selectedId={form.resort_facility_group_id || undefined}
+                      onSelect={handleGroupSelect}
+                    />
+                  </>
                 )}
               </div>
             )}
@@ -395,74 +297,56 @@ export function ResortFacilityGeneralInfo({
               <div className="space-y-2">
                 <Label className="text-xs font-medium">{t("resortFacility.group")}</Label>
                 <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
-                  <span className="text-sm font-mono">Group #{form.resort_facility_group_id}</span>
+                  <span className="text-sm">
+                    {form.resort_facility_group?.locales[0]?.name ?? `Group #${form.resort_facility_group_id}`}
+                  </span>
+                  <span className="ml-auto text-xs text-muted-foreground font-mono shrink-0">#{form.resort_facility_group_id}</span>
                 </div>
               </div>
             )}
 
             {/* Platform facility picker */}
             {showChooser && activeMode === "platform" && !!form.resort_facility_group_id && (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <Label className="text-xs font-medium">{t("resortFacility.platformFacility")} *</Label>
-                <Popover open={platPopoverOpen} onOpenChange={handlePlatPopoverOpen}>
-                  <PopoverTrigger asChild>
-                    <Button type="button" variant="outline" className="w-full justify-between font-normal">
-                      <span className={activeFacilityId ? "" : "text-muted-foreground"}>{selectedPlatLabel}</span>
-                      <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                    <div className="p-2 border-b">
-                      <Input
-                        placeholder={t("resortFacility.searchPlatformFacility")}
-                        value={platSearch}
-                        onChange={(e) => setPlatSearch(e.target.value)}
-                        className="h-8 text-sm"
-                        autoFocus
-                      />
-                    </div>
-                    <div className="max-h-52 overflow-y-auto">
-                      {platLoading && platFacilities.length === 0 ? (
-                        <div className="flex items-center justify-center py-6">
-                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                        </div>
-                      ) : filteredPlatFacilities.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">{t("resortFacility.noPlatformFacilities")}</p>
+                {selectedPlatFacility ? (
+                  <div className="flex items-center gap-3 rounded-lg border border-primary bg-primary/5 px-3 py-2.5">
+                    <div
+                      className="h-8 w-8 shrink-0 rounded-md flex items-center justify-center bg-primary/10"
+                      style={String(selectedPlatFacility.icon_meta?.color ?? "") ? { background: `linear-gradient(135deg, ${String(selectedPlatFacility.icon_meta?.color ?? "")}, ${String(selectedPlatFacility.icon_meta?.color ?? "")}cc)` } : undefined}
+                    >
+                      {selectedPlatFacility.icon_type === "LUCIDE" && selectedPlatFacility.icon_value ? (
+                        <LucideIconRenderer name={selectedPlatFacility.icon_value} size={15} style={{ color: String(selectedPlatFacility.icon_meta?.color ?? "") ? "white" : undefined }} />
+                      ) : (selectedPlatFacility.icon_type === "IMAGE" || selectedPlatFacility.icon_type === "EXTERNAL") && selectedPlatFacility.icon_value ? (
+                        <img src={selectedPlatFacility.icon_value} alt={selectedPlatFacility.code} className="h-4 w-4 object-contain" />
                       ) : (
-                        filteredPlatFacilities.map((f) => {
-                          const label = f.locales[0]?.name ?? f.code
-                          const isSelected = activeFacilityId === f.id
-                          return (
-                            <button
-                              key={f.id}
-                              type="button"
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 ${isSelected ? "bg-accent" : ""}`}
-                              onClick={() => selectPlatFacility(f)}
-                            >
-                              {isSelected
-                                ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-                                : <span className="w-3.5 shrink-0" />
-                              }
-                              <span>{label}</span>
-                              <span className="ml-auto text-xs text-muted-foreground font-mono">{f.code}</span>
-                            </button>
-                          )
-                        })
-                      )}
-                      {platHasNext && !platSearch.trim() && (
-                        <button
-                          type="button"
-                          className="w-full px-3 py-2 text-sm text-muted-foreground hover:bg-accent flex items-center justify-center gap-1.5 border-t"
-                          onClick={() => loadPlatFacilities(platPage + 1)}
-                          disabled={platLoading}
-                        >
-                          {platLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                          {t("common.loadMore")}
-                        </button>
+                        <span className="text-xs font-bold text-muted-foreground">{(selectedPlatFacility.locales[0]?.name ?? selectedPlatFacility.code)[0]?.toUpperCase() ?? "?"}</span>
                       )}
                     </div>
-                  </PopoverContent>
-                </Popover>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{selectedPlatFacility.locales[0]?.name ?? selectedPlatFacility.code}</p>
+                      <p className="text-xs text-muted-foreground font-mono">{selectedPlatFacility.code}</p>
+                    </div>
+                    <Button type="button" size="sm" variant="outline" onClick={() => setPlatPickerOpen(true)} className="h-7 text-xs px-2.5 shrink-0">
+                      {t("common.change")}
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setPlatPickerOpen(true)}
+                    className="w-full flex items-center justify-between rounded-lg border border-dashed px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent/50 transition-colors"
+                  >
+                    <span>{t("resortFacility.selectPlatformFacility")}</span>
+                  </button>
+                )}
+                <PlatformFacilityPickerDialog
+                  open={platPickerOpen}
+                  onOpenChange={setPlatPickerOpen}
+                  selectedId={activeFacilityId || undefined}
+                  facilityGroupId={effectivePlatFacilityGroupId}
+                  onSelect={handlePlatFacilitySelect}
+                />
               </div>
             )}
 

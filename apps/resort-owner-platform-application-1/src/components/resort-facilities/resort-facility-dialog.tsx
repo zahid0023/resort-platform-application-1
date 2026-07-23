@@ -17,6 +17,7 @@ import { toast } from "sonner"
 import type { ResortFacilityDialogMode, ResortFacilityFormState, FacilityMode } from "./types"
 import { emptyForm, toApiIconPayload } from "./types"
 import { ResortFacilityGeneralInfo } from "./resort-facility-general-info"
+import { ResortFacilityPriceSection } from "./resort-facility-price-section"
 import { ResortFacilityLocaleTranslations } from "./resort-facility-locale-translations"
 
 const ICON_TYPES: { value: IconType; label: string }[] = [
@@ -281,12 +282,13 @@ export function ResortFacilityDialog({
   availableLocales,
   onSaved,
   lockedGroupName,
-  defaultFacilityMode = "custom",
+  defaultFacilityMode = "platform",
   platformFacilityGroupId,
 }: ResortFacilityDialogProps) {
   const { t } = useTranslation()
   const [submitting, setSubmitting] = useState(false)
   const [generalEditing, setGeneralEditing] = useState(false)
+  const [priceEditing, setPriceEditing] = useState(false)
   const [iconEditing, setIconEditing] = useState(false)
   const [iconSubmitting, setIconSubmitting] = useState(false)
   const [localIcon, setLocalIcon] = useState<Pick<ResortFacilityFormState, "icon_type" | "icon_value" | "icon_color">>({
@@ -303,6 +305,7 @@ export function ResortFacilityDialog({
   useEffect(() => {
     if (!open) {
       setGeneralEditing(false)
+      setPriceEditing(false)
       setIconEditing(false)
       setIconSubmitting(false)
       setTranslationsEditing(false)
@@ -315,7 +318,7 @@ export function ResortFacilityDialog({
   const isDirty = mode === "create"
     ? form.resort_facility_group_id !== "" || form.icon_type !== "" || form.icon_value !== "" || form.sort_order !== 0
       || form.locales.length > 1 || form.locales.some((l) => l.locale_id !== "" || l.name.trim() !== "")
-    : generalEditing || iconEditing || translationsEditing
+    : generalEditing || priceEditing || iconEditing || translationsEditing
 
   function requestClose() {
     if (isDirty) setConfirmClose(true)
@@ -338,6 +341,7 @@ export function ResortFacilityDialog({
       await resortFacilitiesService.update(resortId, facilityId, {
         sort_order: form.sort_order,
         facility_id: form.facility_id ? Number(form.facility_id) : null,
+        facility_price_type_id: Number(form.facility_price_type_id) || 0,
         ...toApiIconPayload(localIcon as ResortFacilityFormState),
       })
       toast.success(t("resortFacility.updated"))
@@ -358,9 +362,28 @@ export function ResortFacilityDialog({
       toast.error(t("resortFacility.errGroupRequired"))
       return
     }
+    if (!form.facility_price_type_id) {
+      toast.error(t("resortFacility.errPriceType"))
+      return
+    }
     if (form.icon_type && !form.icon_value) {
       toast.error(t("resortFacility.errIconValue"))
       return
+    }
+    const isPaid = form.facility_price_type?.code === "PAID"
+    if (isPaid) {
+      if (!form.resort_facility_price?.price_unit_id) {
+        toast.error(t("resortFacility.errPriceUnit"))
+        return
+      }
+      if (!form.resort_facility_price?.currency_id) {
+        toast.error(t("resortFacility.errCurrency"))
+        return
+      }
+      if (form.resort_facility_price.amount === "" || Number(form.resort_facility_price.amount) < 0) {
+        toast.error(t("resortFacility.errAmount"))
+        return
+      }
     }
     for (const [i, row] of form.locales.entries()) {
       if (!row.locale_id) { toast.error(t("locale.errLang", { n: i + 1 })); return }
@@ -371,14 +394,27 @@ export function ResortFacilityDialog({
       await resortFacilitiesService.create(resortId, {
         resort_facility_group_id: Number(form.resort_facility_group_id),
         facility_id: form.facility_id ? Number(form.facility_id) : undefined,
+        facility_price_type_id: Number(form.facility_price_type_id),
         sort_order: Number(form.sort_order) || 0,
+        is_highlighted: form.is_highlighted,
         ...toApiIconPayload(form),
-        locales: form.locales.map((row) => ({
-          locale_id: Number(row.locale_id),
-          name: row.name.trim(),
-          description: row.description.trim(),
-          sort_order: Number(row.sort_order) || 0,
-        })),
+        resort_facility_price: isPaid && form.resort_facility_price
+          ? {
+              price_unit_id: Number(form.resort_facility_price.price_unit_id),
+              currency_id: Number(form.resort_facility_price.currency_id),
+              amount: Number(form.resort_facility_price.amount),
+              notes: form.resort_facility_price.notes.trim() || undefined,
+              sort_order: Number(form.resort_facility_price.sort_order) || 0,
+            }
+          : undefined,
+        locales: form.locales
+          .filter((row) => row.locale_id !== "" && row.name.trim() !== "")
+          .map((row) => ({
+            locale_id: Number(row.locale_id),
+            name: row.name.trim(),
+            description: row.description.trim(),
+            sort_order: Number(row.sort_order) || 0,
+          })),
       })
       toast.success(t("resortFacility.created"))
       onOpenChange(false)
@@ -390,7 +426,7 @@ export function ResortFacilityDialog({
     }
   }
 
-  const isEditing = generalEditing || iconEditing || translationsEditing
+  const isEditing = generalEditing || priceEditing || iconEditing || translationsEditing
   const headerTitle = mode === "create"
     ? t("resortFacility.dialogCreate")
     : (isEditing ? t("resortFacility.dialogEdit") : t("resortFacility.dialogView"))
@@ -488,6 +524,19 @@ export function ResortFacilityDialog({
                 editing={translationsEditing}
                 onEditingChange={setTranslationsEditing}
                 open={open}
+                disabled={inputsDisabled}
+              />
+
+              {/* Price section */}
+              <ResortFacilityPriceSection
+                resortId={resortId}
+                mode={mode}
+                form={form}
+                onFormChange={(patch) => onFormChange({ ...form, ...patch })}
+                facilityId={facilityId}
+                onSaved={onSaved}
+                editing={priceEditing}
+                onEditingChange={setPriceEditing}
                 disabled={inputsDisabled}
               />
             </div>

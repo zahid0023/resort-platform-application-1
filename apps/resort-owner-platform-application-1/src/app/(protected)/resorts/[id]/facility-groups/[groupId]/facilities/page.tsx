@@ -177,12 +177,18 @@ export default function ResortFacilitiesPage() {
     setDialogOpen(true)
   }
 
-  function openView(f: ResortFacilitySummary) {
+  async function openView(f: ResortFacilitySummary) {
     loadLocales()
     setMode("view")
     setActiveId(f.id)
     setForm(toFormState(f))
     setDialogOpen(true)
+    try {
+      const res = await resortFacilitiesService.get(resortId, f.id)
+      setForm(toFormState(res.data))
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
   }
 
   function handleSortByChange(value: string) {

@@ -27,12 +27,13 @@ export interface PlatformFacilityListResponse {
 }
 
 export const platformFacilitiesService = {
-  list(params: { page?: number; size?: number; sort_by?: string; facilityGroupId?: number } = {}): Promise<PlatformFacilityListResponse> {
+  list(params: { page?: number; size?: number; sort_by?: string; scope_code?: "RESORT" | "ROOM_CATEGORY" | "ROOM"; facilityGroupId?: number } = {}): Promise<PlatformFacilityListResponse> {
     const q = new URLSearchParams()
     if (params.page !== undefined) q.set("page", String(params.page))
     if (params.size !== undefined) q.set("size", String(params.size))
     if (params.sort_by) q.set("sort_by", params.sort_by)
-    if (params.facilityGroupId !== undefined) q.set("facilityGroupId", String(params.facilityGroupId))
+    if (params.scope_code) q.set("scope-code", params.scope_code)
+    if (params.facilityGroupId !== undefined) q.set("facility-group-id", String(params.facilityGroupId))
     return api.get<PlatformFacilityListResponse>(`/facilities?${q}`)
   },
 }

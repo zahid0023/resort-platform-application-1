@@ -299,13 +299,19 @@ export default function ResortFacilitiesOverviewPage() {
     setDialogOpen(true)
   }
 
-  function openView(f: ResortFacilitySummary) {
+  async function openView(f: ResortFacilitySummary) {
     loadLocales()
-    setDialogGroupId(f.resort_facility_group_id)
+    setDialogGroupId(f.resort_facility_group.id)
     setMode("view")
     setActiveId(f.id)
     setForm(toFormState(f))
     setDialogOpen(true)
+    try {
+      const res = await resortFacilitiesService.get(resortId, f.id)
+      setForm(toFormState(res.data))
+    } catch (err) {
+      toast.error((err as Error).message)
+    }
   }
 
   function handleSortByChange(value: string) {
@@ -435,7 +441,7 @@ export default function ResortFacilitiesOverviewPage() {
                   facility={f}
                   defaultName={facilityNames[f.id]}
                   onView={openView}
-                  onDelete={(f) => setDeleteTarget({ facility: f, groupId: f.resort_facility_group_id })}
+                  onDelete={(f) => setDeleteTarget({ facility: f, groupId: f.resort_facility_group.id })}
                 />
               ))}
             </div>

@@ -1,17 +1,16 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useTranslation } from "react-i18next"
-import { Check, Link2, Loader2, Pencil, Star, X } from "lucide-react"
+import { Check, Link2, Pencil, Star, X } from "lucide-react"
 import { Button, Card, CardContent, Input, Label } from "@resort/shadcn-ui"
 import { LucideIconRenderer } from "ui-blocks"
 import { resortFacilityGroupsService } from "@/services/resort-facility-groups"
-import { platformFacilityGroupsService, type PlatformFacilityGroupSummary } from "@/services/platform-facility-groups"
+import { type PlatformFacilityGroupSummary } from "@/services/platform-facility-groups"
+import { PlatformFacilityGroupPickerDialog } from "./platform-facility-group-picker-dialog"
 import { toast } from "sonner"
 import type { ResortFacilityGroupDialogMode, ResortFacilityGroupFormState } from "./types"
 import { toApiIconPayload } from "./types"
-
-const PLAT_PAGE_SIZE = 20
 
 export type GroupMode = "platform" | "custom"
 
@@ -50,53 +49,21 @@ export function ResortFacilityGroupGeneralInfo({
   const [localGroupMode, setLocalGroupMode] = useState<GroupMode>("custom")
   const [submitting, setSubmitting] = useState(false)
 
-  // Platform group picker state
-  const [platGroups, setPlatGroups] = useState<PlatformFacilityGroupSummary[]>([])
-  const [platPage, setPlatPage] = useState(0)
-  const [platHasNext, setPlatHasNext] = useState(false)
-  const [platLoading, setPlatLoading] = useState(false)
-  const [platSearch, setPlatSearch] = useState("")
-  const [platOpen, setPlatOpen] = useState(false)
-  const platLoadedRef = useRef(false)
+  // Platform group picker dialog state
+  const [platPickerOpen, setPlatPickerOpen] = useState(false)
+  const [selectedPlatGroup, setSelectedPlatGroup] = useState<PlatformFacilityGroupSummary | null>(null)
 
   useEffect(() => {
     if (!open) {
       setSubmitting(false)
-      setPlatGroups([])
-      setPlatPage(0)
-      setPlatHasNext(false)
-      setPlatSearch("")
-      setPlatOpen(false)
-      platLoadedRef.current = false
+      setPlatPickerOpen(false)
+      setSelectedPlatGroup(null)
     }
   }, [open])
 
-  function openPlatPicker() {
-    setPlatOpen(true)
-    if (!platLoadedRef.current) {
-      platLoadedRef.current = true
-      loadPlatGroups(0, true)
-    }
-  }
-
-  async function loadPlatGroups(page: number, reset = false) {
-    setPlatLoading(true)
-    try {
-      const res = await platformFacilityGroupsService.list({ page, size: PLAT_PAGE_SIZE, sort_by: "sortOrder", scope_code: "RESORT" })
-      setPlatGroups((prev) => (reset ? res.data : [...prev, ...res.data]))
-      setPlatPage(page)
-      setPlatHasNext(res.has_next)
-    } catch (err) {
-      toast.error((err as Error).message)
-    } finally {
-      setPlatLoading(false)
-    }
-  }
-
   function handleCreateGroupModeChange(m: GroupMode) {
     onCreateGroupModeChange(m)
-    if (m === "custom") { onFormChange({ facility_group_id: "" }); setPlatOpen(false) }
-    setPlatSearch("")
+    if (m === "custom") { onFormChange({ facility_group_id: "" }); setSelectedPlatGroup(null) }
   }
 
   function startEdit() {
@@ -107,8 +74,7 @@ export function ResortFacilityGroupGeneralInfo({
 
   function handleEditGroupModeChange(m: GroupMode) {
     setLocalGroupMode(m)
-    if (m === "custom") { setLocal((p) => ({ ...p, facility_group_id: "" })); setPlatOpen(false) }
-    setPlatSearch("")
+    if (m === "custom") { setLocal((p) => ({ ...p, facility_group_id: "" })); setSelectedPlatGroup(null) }
   }
 
   async function save() {
@@ -136,14 +102,8 @@ export function ResortFacilityGroupGeneralInfo({
   const activeGroupMode = mode === "create" ? createGroupMode : localGroupMode
   const activeFgId = mode === "create" ? form.facility_group_id : (editing ? local.facility_group_id : form.facility_group_id)
 
-  const filteredPlatGroups = platSearch.trim()
-    ? platGroups.filter((g) => {
-        const q = platSearch.toLowerCase()
-        return g.code.toLowerCase().includes(q) || (g.locales[0]?.name ?? "").toLowerCase().includes(q)
-      })
-    : platGroups
-
-  function selectPlatGroup(g: PlatformFacilityGroupSummary) {
+  function handlePlatGroupSelect(g: PlatformFacilityGroupSummary) {
+    setSelectedPlatGroup(g)
     if (mode === "create") {
       onFormChange({
         facility_group_id: g.id,
@@ -163,137 +123,37 @@ export function ResortFacilityGroupGeneralInfo({
     } else {
       setLocal((p) => ({ ...p, facility_group_id: g.id }))
     }
-    setPlatSearch("")
-    setPlatOpen(false)
   }
 
   const showGroupChooser = mode === "create" || editing
 
-  // ── Shared platform group card grid ──────────────────────────────────────
-  function renderPlatPicker() {
-    const sel = platGroups.find((g) => g.id === activeFgId)
-
+  // ── Selected platform group display ───────────────────────────────────────
+  function renderSelectedPlatGroup() {
+    const g = selectedPlatGroup
+    if (!g) return null
+    const name = g.locales[0]?.name ?? g.code
+    const accentColor = String(g.icon_meta?.color ?? "") || undefined
     return (
-      <div className="space-y-2">
-        {/* Selected display */}
-        {activeFgId && !platOpen && sel && (() => {
-          const name = sel.locales[0]?.name ?? sel.code
-          const accentColor = String(sel.icon_meta?.color ?? "") || undefined
-          return (
-            <div className="flex items-center gap-3 rounded-lg border border-primary bg-primary/5 px-3 py-2.5">
-              <div
-                className="h-8 w-8 shrink-0 rounded-md flex items-center justify-center bg-primary/10"
-                style={accentColor ? { background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)` } : undefined}
-              >
-                {sel.icon_type === "LUCIDE" && sel.icon_value ? (
-                  <LucideIconRenderer name={sel.icon_value} size={15} style={{ color: accentColor ? "white" : undefined }} />
-                ) : (sel.icon_type === "IMAGE" || sel.icon_type === "EXTERNAL") && sel.icon_value ? (
-                  <img src={sel.icon_value} alt={name} className="h-4 w-4 object-contain" />
-                ) : (
-                  <span className="text-xs font-bold text-muted-foreground">{name[0]?.toUpperCase() ?? "?"}</span>
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium truncate">{name}</p>
-                <p className="text-xs text-muted-foreground font-mono">{sel.code}</p>
-              </div>
-              <Button type="button" size="sm" variant="outline" onClick={openPlatPicker} className="h-7 text-xs px-2.5 shrink-0">
-                {t("common.change")}
-              </Button>
-            </div>
-          )
-        })()}
-
-        {/* Trigger when nothing selected */}
-        {!activeFgId && !platOpen && (
-          <button
-            type="button"
-            onClick={openPlatPicker}
-            className="w-full flex items-center justify-between rounded-lg border border-dashed px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent/50 transition-colors"
-          >
-            <span>{t("resortFacilityGroup.selectPlatformGroup")}</span>
-            {platLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-          </button>
-        )}
-
-        {/* Card grid */}
-        {platOpen && (
-          <div className="space-y-2">
-            <Input
-              placeholder={t("resortFacilityGroup.searchPlatformGroup")}
-              value={platSearch}
-              onChange={(e) => setPlatSearch(e.target.value)}
-              className="h-8 text-sm"
-              autoFocus
-            />
-            <div className="max-h-64 overflow-y-auto rounded-lg border border-border p-2">
-              {platLoading && platGroups.length === 0 ? (
-                <div className="flex items-center justify-center py-10">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : filteredPlatGroups.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  {t("resortFacilityGroup.noPlatformGroups")}
-                </p>
-              ) : (
-                <>
-                  <div className="grid grid-cols-2 gap-2">
-                    {filteredPlatGroups.map((g) => {
-                      const name = g.locales[0]?.name ?? g.code
-                      const isSelected = activeFgId === g.id
-                      const accentColor = String(g.icon_meta?.color ?? "") || undefined
-                      return (
-                        <button
-                          key={g.id}
-                          type="button"
-                          onClick={() => selectPlatGroup(g)}
-                          className={[
-                            "flex items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-all",
-                            isSelected ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border hover:bg-accent/50",
-                          ].join(" ")}
-                        >
-                          <div
-                            className="h-7 w-7 shrink-0 rounded-md flex items-center justify-center bg-primary/10"
-                            style={accentColor ? { background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)` } : undefined}
-                          >
-                            {g.icon_type === "LUCIDE" && g.icon_value ? (
-                              <LucideIconRenderer name={g.icon_value} size={13} style={{ color: accentColor ? "white" : undefined }} />
-                            ) : (g.icon_type === "IMAGE" || g.icon_type === "EXTERNAL") && g.icon_value ? (
-                              <img src={g.icon_value} alt={name} className="h-4 w-4 object-contain" />
-                            ) : (
-                              <span className="text-xs font-bold text-muted-foreground">{name[0]?.toUpperCase() ?? "?"}</span>
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-medium leading-tight truncate">{name}</p>
-                            <p className="text-[10px] text-muted-foreground font-mono">{g.code}</p>
-                          </div>
-                          {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-primary" />}
-                        </button>
-                      )
-                    })}
-                  </div>
-                  {platHasNext && !platSearch.trim() && (
-                    <button
-                      type="button"
-                      onClick={() => loadPlatGroups(platPage + 1)}
-                      disabled={platLoading}
-                      className="w-full mt-2 py-1.5 text-xs text-muted-foreground hover:text-foreground flex items-center justify-center gap-1.5 border-t"
-                    >
-                      {platLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                      {t("common.loadMore")}
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-            {activeFgId && (
-              <Button type="button" size="sm" variant="ghost" onClick={() => setPlatOpen(false)} className="h-7 text-xs w-full text-muted-foreground">
-                {t("common.cancel")}
-              </Button>
-            )}
-          </div>
-        )}
+      <div className="flex items-center gap-3 rounded-lg border border-primary bg-primary/5 px-3 py-2.5">
+        <div
+          className="h-8 w-8 shrink-0 rounded-md flex items-center justify-center bg-primary/10"
+          style={accentColor ? { background: `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)` } : undefined}
+        >
+          {g.icon_type === "LUCIDE" && g.icon_value ? (
+            <LucideIconRenderer name={g.icon_value} size={15} style={{ color: accentColor ? "white" : undefined }} />
+          ) : (g.icon_type === "IMAGE" || g.icon_type === "EXTERNAL") && g.icon_value ? (
+            <img src={g.icon_value} alt={name} className="h-4 w-4 object-contain" />
+          ) : (
+            <span className="text-xs font-bold text-muted-foreground">{name[0]?.toUpperCase() ?? "?"}</span>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium truncate">{name}</p>
+          <p className="text-xs text-muted-foreground font-mono">{g.code}</p>
+        </div>
+        <Button type="button" size="sm" variant="outline" onClick={() => setPlatPickerOpen(true)} className="h-7 text-xs px-2.5 shrink-0">
+          {t("common.change")}
+        </Button>
       </div>
     )
   }
@@ -393,7 +253,21 @@ export function ResortFacilityGroupGeneralInfo({
             {showGroupChooser && activeGroupMode === "platform" && (
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">{t("resortFacilityGroup.platformGroup")} *</Label>
-                {renderPlatPicker()}
+                {selectedPlatGroup ? renderSelectedPlatGroup() : (
+                  <button
+                    type="button"
+                    onClick={() => setPlatPickerOpen(true)}
+                    className="w-full flex items-center justify-between rounded-lg border border-dashed px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent/50 transition-colors"
+                  >
+                    <span>{t("resortFacilityGroup.selectPlatformGroup")}</span>
+                  </button>
+                )}
+                <PlatformFacilityGroupPickerDialog
+                  open={platPickerOpen}
+                  onOpenChange={setPlatPickerOpen}
+                  selectedId={activeFgId || undefined}
+                  onSelect={handlePlatGroupSelect}
+                />
               </div>
             )}
 

@@ -48,7 +48,7 @@ export function ResortFacilityCard({ facility, defaultName, onView, onDelete }: 
             <h3 className="font-semibold truncate">{title}</h3>
             <p className="text-xs text-muted-foreground truncate">
               {"ID #"}{facility.id}
-              {facility.facility_id ? ` · Platform #${facility.facility_id}` : " · Custom"}
+              {facility.platform_facility ? ` · Platform #${facility.platform_facility.id}` : " · Custom"}
             </p>
           </div>
         </div>

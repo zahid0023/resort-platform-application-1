@@ -203,7 +203,7 @@ export function ResortFacilityHighlightsDialog({
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium truncate">{name}</p>
                       <p className="text-xs text-muted-foreground truncate">
-                        {f.facility_id ? `Platform #${f.facility_id}` : t("resortFacility.custom")}
+                        {f.platform_facility ? `Platform #${f.platform_facility.id}` : t("resortFacility.custom")}
                         {" · "}#{f.sort_order}
                       </p>
                     </div>

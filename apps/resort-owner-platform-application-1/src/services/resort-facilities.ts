@@ -10,17 +10,55 @@ export interface ResortFacilityLocale {
   sort_order: number
 }
 
+export interface ResortFacilityGroupRef {
+  id: number
+  resort_id: number
+  facility_group_id?: number
+  sort_order: number
+  locales: Array<{ id: number; locale_id: number; name: string; sort_order: number }>
+}
+
+export interface PlatformFacilityRef {
+  id: number
+  facility_group_id: number
+  code: string
+  sort_order?: number
+  icon_type?: string
+  icon_value?: string
+  icon_meta?: Record<string, unknown>
+  locales: Array<{ id: number; locale_id: number; name: string; sort_order: number }>
+}
+
+export interface FacilityPriceTypeRef {
+  id: number
+  code: string
+  sort_order: number
+  locales: Array<{ id: number; locale_id: number; name: string; sort_order: number }>
+}
+
+export interface ResortFacilityPrice {
+  id: number
+  resort_facility_id: number
+  price_unit: { id: number; code: string }
+  currency: { id: number; code: string }
+  amount: number
+  notes?: string
+  sort_order: number
+}
+
 export interface ResortFacilitySummary {
   id: number
   resort_id: number
-  resort_facility_group_id: number
-  facility_id?: number
+  resort_facility_group: ResortFacilityGroupRef
+  platform_facility?: PlatformFacilityRef
+  facility_price_type: FacilityPriceTypeRef
   sort_order: number
   is_highlighted: boolean
   icon_type?: IconType
   icon_value?: string
   icon_meta?: Record<string, unknown>
   locales: ResortFacilityLocale[]
+  prices?: ResortFacilityPrice[]
 }
 
 export interface ResortFacilityListResponse {
@@ -40,18 +78,30 @@ export interface CreateResortFacilityLocaleRequest {
   sort_order: number
 }
 
+export interface ResortFacilityPriceRequest {
+  price_unit_id: number
+  currency_id: number
+  amount: number
+  notes?: string
+  sort_order: number
+}
+
 export interface CreateResortFacilityRequest {
   resort_facility_group_id: number
   facility_id?: number
+  facility_price_type_id: number
   sort_order: number
+  is_highlighted?: boolean
   icon_type?: IconType | null
   icon_value?: string | null
   icon_meta?: Record<string, unknown> | null
+  resort_facility_price?: ResortFacilityPriceRequest
   locales?: CreateResortFacilityLocaleRequest[]
 }
 
 export interface UpdateResortFacilityRequest {
   facility_id?: number | null
+  facility_price_type_id: number
   sort_order: number
   icon_type?: IconType | null
   icon_value?: string | null
