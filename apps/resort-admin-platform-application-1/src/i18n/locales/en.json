@@ -7,6 +7,7 @@
     "saving": "Saving...",
     "create": "Create",
     "creating": "Creating...",
+    "next": "Next",
     "edit": "Edit",
     "delete": "Delete",
     "view": "View",
@@ -65,10 +66,19 @@
   },
   "toast": {
     "codeRequired": "Code is required.",
+    "codeInvalid": "Code must be exactly 2 letters (e.g. BD).",
     "localeSelectLang": "Locale row {{n}}: please select a language.",
     "localeNameRequired": "Locale row {{n}}: name is required.",
+    "localeDescriptionRequired": "Locale row {{n}}: description is required.",
+    "localeNameEnglishOnly": "Name must be in English — the initial translation is always the English one.",
+    "localeDescriptionEnglishOnly": "Description must be in English — the initial translation is always the English one.",
     "facilityGroupRequired": "Please select a facility group.",
-    "commChannelTypeRequired": "Please select a value type (Phone, Email, or URL)."
+    "commChannelTypeRequired": "Please select a value type (Phone, Email, or URL).",
+    "iso3Invalid": "ISO3 code must be exactly 3 uppercase letters (e.g. BGD).",
+    "phoneInvalid": "Phone code must be 1-3 digits (e.g. 880).",
+    "codeMaxLength": "Code can only be 2 letters.",
+    "iso3MaxLength": "ISO3 code can only be 3 letters.",
+    "phoneMaxLength": "Phone code can only be 3 numbers."
   },
   "facilityScope": {
     "title": "Facility Scopes",
@@ -110,7 +120,8 @@
     },
     "row": {
       "label": "Locale {{n}}",
-      "new": "New"
+      "new": "New",
+      "english": "English (en)"
     },
     "removedToast": "Translation removed.",
     "delete": {
@@ -159,7 +170,15 @@
       "title": "Discard changes?",
       "desc": "You have unsaved changes. Are you sure you want to discard them?",
       "confirm": "Discard"
-    }
+    },
+    "restoreDraft": {
+      "title": "Resume draft?",
+      "desc": "You have an unsaved draft for a new country. Would you like to restore it or start fresh?",
+      "restore": "Restore draft",
+      "discard": "Start fresh"
+    },
+    "draftSaved": "Draft saved at {{time}}",
+    "draftSyncing": "Syncing draft…"
   },
   "cities": {
     "title": "Cities",
@@ -179,7 +198,8 @@
     "loading": "Loading countries…",
     "empty": "No countries found.",
     "createdToast": "Country created successfully!",
-    "updatedToast": "Country updated successfully."
+    "updatedToast": "Country updated successfully.",
+    "viewCities": "View Cities"
   },
   "country": {
     "back": "Back to Countries",

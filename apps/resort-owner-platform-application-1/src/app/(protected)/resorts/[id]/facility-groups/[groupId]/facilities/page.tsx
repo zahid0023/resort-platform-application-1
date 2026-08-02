@@ -31,6 +31,7 @@ import {
   type ResortFacilityGroupSummary,
 } from "@/services/resort-facility-groups"
 import { localesService, type Locale } from "@/services/locales"
+import { pickTranslation } from "@/lib/locale"
 
 const PAGE_SIZE = 20
 const ALL_FIELD = "all"
@@ -167,7 +168,7 @@ export default function ResortFacilitiesPage() {
     return facilities.filter((f) => (defaultNames[f.id] ?? "").toLowerCase().includes(q))
   }, [facilities, defaultNames, search])
 
-  const groupName = group?.locales[0]?.name ?? `Group #${groupId}`
+  const groupName = pickTranslation(group?.locales, availableLocales)?.name ?? `Group #${groupId}`
 
   function openCreate() {
     loadLocales()

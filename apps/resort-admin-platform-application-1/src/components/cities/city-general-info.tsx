@@ -73,7 +73,7 @@ export function CityGeneralInfo({
   async function loadCountryPage(page: number, reset = false) {
     setLoadingCountries(true);
     try {
-      const res = await countriesService.list({ page, size: COUNTRY_PAGE_SIZE, sort_by: "sortOrder" });
+      const res = await countriesService.list({ page, size: COUNTRY_PAGE_SIZE, sort_by: "code" });
       setCountries((prev) => (reset ? res.data : [...prev, ...res.data]));
       setCountryPage(page);
       setHasNextCountry(res.has_next);

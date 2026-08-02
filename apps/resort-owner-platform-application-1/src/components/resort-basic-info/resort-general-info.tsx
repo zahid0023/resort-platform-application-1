@@ -20,6 +20,8 @@ import { listCountries, type CountrySummary } from "@/services/countries"
 import { listCities, type CitySummary } from "@/services/cities"
 import { toast } from "sonner"
 import type { ResortBasicInfoFormState } from "./types"
+import type { Locale } from "@/services/locales"
+import { pickTranslation } from "@/lib/locale"
 
 interface LocalDraft {
   sort_order: number | ""
@@ -36,6 +38,7 @@ export interface ResortGeneralInfoProps {
   onSaved?: () => void | Promise<void>
   editing: boolean
   onEditingChange: (v: boolean) => void
+  availableLocales: Locale[]
 }
 
 export function ResortGeneralInfo({
@@ -44,6 +47,7 @@ export function ResortGeneralInfo({
   onSaved,
   editing,
   onEditingChange,
+  availableLocales,
 }: ResortGeneralInfoProps) {
   const { t } = useTranslation()
 
@@ -140,8 +144,8 @@ export function ResortGeneralInfo({
     onEditingChange(false)
   }
 
-  const displayCountry = form.country.locales[0]?.name ?? form.country.code
-  const displayCity = form.city.locales[0]?.name ?? form.city.code
+  const displayCountry = pickTranslation(form.country.locales, availableLocales)?.name ?? form.country.code
+  const displayCity = pickTranslation(form.city.locales, availableLocales)?.name ?? form.city.code
 
   return (
     <div className="space-y-4">

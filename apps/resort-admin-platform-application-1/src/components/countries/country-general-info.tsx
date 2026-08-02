@@ -9,6 +9,9 @@ import { countriesService } from "@/services/countries";
 import { toast } from "sonner";
 import type { CountryDialogMode, CountryFormState } from "./types";
 
+const ISO3_PATTERN = /^[A-Z]{3}$/;
+const PHONE_PATTERN = /^[0-9]{1,3}$/;
+
 export interface CountryGeneralInfoProps {
   mode: CountryDialogMode;
   form: CountryFormState;
@@ -45,18 +48,22 @@ export function CountryGeneralInfo({
 
   async function save() {
     if (countryId == null) return;
+    const iso3 = local.iso3_code.trim().toUpperCase();
+    const phone = local.phone_code.trim();
+    if (!ISO3_PATTERN.test(iso3)) { toast.error(t("toast.iso3Invalid")); return; }
+    if (!PHONE_PATTERN.test(phone)) { toast.error(t("toast.phoneInvalid")); return; }
     setSubmitting(true);
     try {
       await countriesService.update(countryId, {
-        iso3_code: local.iso3_code.trim() || undefined,
-        phone_code: local.phone_code.trim() || undefined,
+        iso3_code: iso3,
+        phone_code: phone,
         sort_order: Number(local.sort_order) || 0,
       });
       toast.success(t("countries.updatedToast"));
       onEditingChange(false);
       onFormChange({
-        iso3_code: local.iso3_code.trim(),
-        phone_code: local.phone_code.trim(),
+        iso3_code: iso3,
+        phone_code: phone,
         sort_order: Number(local.sort_order) || 0,
       });
       await onSaved?.();
@@ -104,24 +111,39 @@ export function CountryGeneralInfo({
           <div className="space-y-2">
             <Label htmlFor="code" className="text-xs font-medium">{t("common.code")} *</Label>
             <Input id="code" value={form.code}
-              onChange={(e) => onFormChange({ code: e.target.value })}
+              onChange={(e) => {
+                const letters = e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase();
+                if (letters.length > 2) { toast.error(t("toast.codeMaxLength")); return; }
+                onFormChange({ code: letters });
+              }}
               placeholder="BD" required disabled={mode !== "create"} className="font-mono"
             />
           </div>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="iso3" className="text-xs font-medium">{t("field.iso3")}</Label>
+              <Label htmlFor="iso3" className="text-xs font-medium">{t("field.iso3")} *</Label>
               <Input id="iso3" value={iso3Value}
-                onChange={(e) => mode === "create" ? onFormChange({ iso3_code: e.target.value }) : setLocal((p) => ({ ...p, iso3_code: e.target.value }))}
-                placeholder="BGD" disabled={isReadOnly} className="font-mono"
+                onChange={(e) => {
+                  const letters = e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase();
+                  if (letters.length > 3) { toast.error(t("toast.iso3MaxLength")); return; }
+                  mode === "create" ? onFormChange({ iso3_code: letters }) : setLocal((p) => ({ ...p, iso3_code: letters }));
+                }}
+                placeholder="BGD" required disabled={isReadOnly} className="font-mono"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone" className="text-xs font-medium">{t("field.phone")}</Label>
-              <Input id="phone" value={phoneValue}
-                onChange={(e) => mode === "create" ? onFormChange({ phone_code: e.target.value }) : setLocal((p) => ({ ...p, phone_code: e.target.value }))}
-                placeholder="+880" disabled={isReadOnly}
-              />
+              <Label htmlFor="phone" className="text-xs font-medium">{t("field.phone")} *</Label>
+              <div className="relative">
+                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">+</span>
+                <Input id="phone" value={phoneValue}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/[^0-9]/g, "");
+                    if (digits.length > 3) { toast.error(t("toast.phoneMaxLength")); return; }
+                    mode === "create" ? onFormChange({ phone_code: digits }) : setLocal((p) => ({ ...p, phone_code: digits }));
+                  }}
+                  placeholder="880" required disabled={isReadOnly} className="pl-6"
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="sort" className="text-xs font-medium">{t("field.sort")} *</Label>

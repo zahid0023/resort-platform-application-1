@@ -24,6 +24,7 @@ import { FacilityDialog, emptyFacilityForm } from "@/components/facilities/facil
 import type { FacilityDialogMode, FacilityFormState } from "@/components/facilities/types";
 import { toIconValue } from "@/components/facilities/types";
 import { getFacilityGroup, type FacilityGroup } from "@/services/facility-groups";
+import { pickTranslation } from "@/lib/locale";
 import {
   listFacilities,
   deleteFacility,
@@ -186,7 +187,7 @@ export default function FacilityGroupDetailPage() {
     });
   }, [facilities, facilityNames, search, searchField]);
 
-  const groupName = group?.locales[0]?.name ?? group?.code ?? "";
+  const groupName = pickTranslation(group?.locales, availableLocales)?.name ?? group?.code ?? "";
 
   function openCreate() {
     setMode("create");

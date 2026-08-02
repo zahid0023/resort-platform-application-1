@@ -18,6 +18,8 @@ import { assignScope, unassignScope } from "@/services/facility-groups"
 import type { FacilityScope } from "@/services/facility-scopes"
 import { toast } from "sonner"
 import type { FacilityGroupDialogMode, FacilityGroupFormState, ScopeAssignment } from "./types"
+import type { Locale } from "@/services/locales"
+import { pickTranslation } from "@/lib/locale"
 
 export interface FacilityGroupScopeAssignmentsProps {
   mode: FacilityGroupDialogMode
@@ -25,6 +27,7 @@ export interface FacilityGroupScopeAssignmentsProps {
   onFormChange: (patch: Partial<FacilityGroupFormState>) => void
   facilityGroupId?: number
   availableScopes: FacilityScope[]
+  availableLocales: Locale[]
   onSaved?: () => void | Promise<void>
   editing: boolean
   onEditingChange: (v: boolean) => void
@@ -37,6 +40,7 @@ export function FacilityGroupScopeAssignments({
   onFormChange,
   facilityGroupId,
   availableScopes,
+  availableLocales,
   onSaved,
   editing,
   onEditingChange,
@@ -183,7 +187,7 @@ export function FacilityGroupScopeAssignments({
             ) : (
               <div className="flex flex-wrap gap-2">
                 {form.scope_assignments.map((a) => {
-                  const scopeName = a.locales[0]?.name
+                  const scopeName = pickTranslation(a.locales, availableLocales)?.name
                   return (
                     <Badge key={a.facility_scope_id} variant="secondary" className="gap-1.5 font-mono text-xs">
                       {a.code}

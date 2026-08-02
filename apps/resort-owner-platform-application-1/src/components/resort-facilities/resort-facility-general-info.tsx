@@ -13,6 +13,8 @@ import { PlatformFacilityPickerDialog } from "./platform-facility-picker-dialog"
 import { toast } from "sonner"
 import type { ResortFacilityDialogMode, ResortFacilityFormState, FacilityMode } from "./types"
 import { toApiIconPayload } from "./types"
+import type { Locale } from "@/services/locales"
+import { pickTranslation } from "@/lib/locale"
 
 
 export interface ResortFacilityGeneralInfoProps {
@@ -29,6 +31,7 @@ export interface ResortFacilityGeneralInfoProps {
   onFacilityModeChange: (m: FacilityMode) => void
   lockedGroupName?: string
   platformFacilityGroupId?: number
+  availableLocales: Locale[]
 }
 
 export function ResortFacilityGeneralInfo({
@@ -45,6 +48,7 @@ export function ResortFacilityGeneralInfo({
   onFacilityModeChange,
   lockedGroupName,
   platformFacilityGroupId,
+  availableLocales,
 }: ResortFacilityGeneralInfoProps) {
   const { t } = useTranslation()
   const [local, setLocal] = useState<{ sort_order: number; facility_id: number | "" }>({
@@ -214,7 +218,7 @@ export function ResortFacilityGeneralInfo({
                   <Link2 className="h-3.5 w-3.5 text-primary shrink-0" />
                   <span className="text-sm font-medium">{t("resortFacility.fromPlatform")}</span>
                   <span className="ml-auto text-xs text-muted-foreground truncate max-w-[160px]">
-                    {form.platform_facility?.locales[0]?.name ?? form.platform_facility?.code ?? `#${form.facility_id}`}
+                    {pickTranslation(form.platform_facility?.locales, availableLocales)?.name ?? form.platform_facility?.code ?? `#${form.facility_id}`}
                   </span>
                 </div>
               ) : (
@@ -298,7 +302,7 @@ export function ResortFacilityGeneralInfo({
                 <Label className="text-xs font-medium">{t("resortFacility.group")}</Label>
                 <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
                   <span className="text-sm">
-                    {form.resort_facility_group?.locales[0]?.name ?? `Group #${form.resort_facility_group_id}`}
+                    {pickTranslation(form.resort_facility_group?.locales, availableLocales)?.name ?? `Group #${form.resort_facility_group_id}`}
                   </span>
                   <span className="ml-auto text-xs text-muted-foreground font-mono shrink-0">#{form.resort_facility_group_id}</span>
                 </div>
@@ -320,11 +324,11 @@ export function ResortFacilityGeneralInfo({
                       ) : (selectedPlatFacility.icon_type === "IMAGE" || selectedPlatFacility.icon_type === "EXTERNAL") && selectedPlatFacility.icon_value ? (
                         <img src={selectedPlatFacility.icon_value} alt={selectedPlatFacility.code} className="h-4 w-4 object-contain" />
                       ) : (
-                        <span className="text-xs font-bold text-muted-foreground">{(selectedPlatFacility.locales[0]?.name ?? selectedPlatFacility.code)[0]?.toUpperCase() ?? "?"}</span>
+                        <span className="text-xs font-bold text-muted-foreground">{(pickTranslation(selectedPlatFacility.locales, availableLocales)?.name ?? selectedPlatFacility.code)[0]?.toUpperCase() ?? "?"}</span>
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{selectedPlatFacility.locales[0]?.name ?? selectedPlatFacility.code}</p>
+                      <p className="text-sm font-medium truncate">{pickTranslation(selectedPlatFacility.locales, availableLocales)?.name ?? selectedPlatFacility.code}</p>
                       <p className="text-xs text-muted-foreground font-mono">{selectedPlatFacility.code}</p>
                     </div>
                     <Button type="button" size="sm" variant="outline" onClick={() => setPlatPickerOpen(true)} className="h-7 text-xs px-2.5 shrink-0">

@@ -1,0 +1,29 @@
+@Override
+public PaginatedResponse<CountryDto> getAll(
+        CountryFilterRequest request) {
+
+    LocaleEntity englishLocale = localeRepository
+            .findByCodeAndIsActiveAndIsDeleted("en",true,false)
+            .orElseThrow(() ->
+                    new EntityNotFoundException(
+                            "English locale not found"
+                    )
+            );
+
+    Page<@NonNull CountryDto> page = countryRepository
+            .findAll(
+                    CountrySpecification.filter(request),
+                    request.toPageable(ALLOWED_SORT_FIELDS)
+            )
+            .map(entity -> CountryMapper.toDto(
+                    entity,
+                    request.getLocaleId(),
+                    englishLocale.getId()
+            ));
+
+    return Pagination.buildPaginatedResponse(
+            page,
+            ALLOWED_SORT_FIELDS,
+            ALLOWED_SEARCH_FIELDS
+    );
+}

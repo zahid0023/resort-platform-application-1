@@ -471,6 +471,7 @@ export function ResortFacilityDialog({
                 onFacilityModeChange={setFacilityMode}
                 lockedGroupName={lockedGroupName}
                 platformFacilityGroupId={platformFacilityGroupId}
+                availableLocales={availableLocales}
               />
 
               {/* Icon section */}
@@ -538,6 +539,7 @@ export function ResortFacilityDialog({
                 editing={priceEditing}
                 onEditingChange={setPriceEditing}
                 disabled={inputsDisabled}
+                availableLocales={availableLocales}
               />
             </div>
 

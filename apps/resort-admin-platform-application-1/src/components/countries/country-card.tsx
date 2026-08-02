@@ -1,7 +1,7 @@
-import { Eye, Trash2 } from "lucide-react";
-import { Card } from "@resort/shadcn-ui";
+import { useTranslation } from "react-i18next";
+import { ArrowRight, Eye, Trash2 } from "lucide-react";
+import { Card, CardHeader, CardAction, CardContent, CardFooter } from "@resort/shadcn-ui";
 import { Button } from "@resort/shadcn-ui";
-import { Badge } from "@resort/shadcn-ui";
 import type { Country } from "@/services/countries";
 
 export interface CountryCardProps {
@@ -13,10 +13,9 @@ export interface CountryCardProps {
 }
 
 export function CountryCard({ country, defaultName, onNavigate, onView, onDelete }: CountryCardProps) {
+  const { t } = useTranslation();
   const title = defaultName?.trim() || country.iso3_code || country.code;
-  const subtitle = defaultName?.trim()
-    ? `${country.iso3_code ?? country.code} · ID #${country.id}`
-    : `ID #${country.id}`;
+  const subtitle = defaultName?.trim() ? (country.iso3_code ?? country.code) : undefined;
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -28,53 +27,63 @@ export function CountryCard({ country, defaultName, onNavigate, onView, onDelete
     <Card
       role="button"
       tabIndex={0}
-      onClick={() => onNavigate?.(country)}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigate?.(country); } }}
-      className="group p-5 hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      onClick={() => onView?.(country)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onView?.(country); } }}
+      className="group hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <div className="flex items-start justify-between">
+      <CardHeader>
         <div className="flex items-center gap-3 min-w-0">
           <div className="h-11 w-11 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-semibold shrink-0">
             {country.code}
           </div>
           <div className="min-w-0">
             <h3 className="font-semibold truncate">{title}</h3>
-            <p className="text-xs text-muted-foreground truncate">{subtitle}</p>
+            {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
           </div>
         </div>
-        <div
-          className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {onView && (
-            <Button size="icon" variant="ghost" className="h-8 w-8" onClick={(e) => { e.stopPropagation(); onView(country); }}>
-              <Eye className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          {onDelete && (
-            <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={handleDelete}>
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
-      </div>
+        {(onView || onDelete) && (
+          <CardAction
+            className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {onView && (
+              <Button size="icon" variant="ghost" className="h-8 w-8"
+                onClick={(e) => { e.stopPropagation(); onView(country); }}
+                title="View details"
+              >
+                <Eye className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive hover:text-destructive" onClick={handleDelete}>
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </CardAction>
+        )}
+      </CardHeader>
 
-      <div className="grid grid-cols-2 gap-3 text-sm mt-4">
-        <div>
-          <p className="text-xs text-muted-foreground">ISO3</p>
-          <p className="font-medium">{country.iso3_code ?? "—"}</p>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-3 text-sm">
+          <div>
+            <p className="text-xs text-muted-foreground">ISO3</p>
+            <p className="font-medium">{country.iso3_code ?? "—"}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Phone</p>
+            <p className="font-medium">{country.phone_code ? `+${country.phone_code}` : "—"}</p>
+          </div>
         </div>
-        <div>
-          <p className="text-xs text-muted-foreground">Phone</p>
-          <p className="font-medium">{country.phone_code ?? "—"}</p>
-        </div>
-      </div>
+      </CardContent>
 
-      <div className="mt-4 pt-3 border-t flex items-center justify-between">
-        <Badge variant="secondary">#{country.sort_order}</Badge>
-        <span className="text-xs text-muted-foreground">{country.locales.length} locale{country.locales.length !== 1 ? "s" : ""}</span>
-      </div>
+      <CardFooter
+        className="justify-between text-xs font-medium text-primary hover:underline"
+        onClick={(e) => { e.stopPropagation(); onNavigate?.(country); }}
+      >
+        <span>{t("countries.viewCities")}</span>
+        <ArrowRight className="h-3.5 w-3.5" />
+      </CardFooter>
     </Card>
   );
 }

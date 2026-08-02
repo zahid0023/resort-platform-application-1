@@ -5,17 +5,20 @@ import { Card } from "@resort/shadcn-ui"
 import { IconRenderer } from "@/components/shared/icon-picker"
 import type { FacilityGroupSummary, ScopeAssignment } from "@/services/facility-groups"
 import { toIconValue } from "./types"
+import type { Locale } from "@/services/locales"
+import { pickTranslation } from "@/lib/locale"
 
 export interface FacilityGroupCardProps {
   group: FacilityGroupSummary
   defaultName?: string
   scopeAssignments?: ScopeAssignment[]
+  availableLocales?: Locale[]
   onNavigate?: (group: FacilityGroupSummary) => void
   onView?: (group: FacilityGroupSummary) => void
   onDelete?: (group: FacilityGroupSummary) => void
 }
 
-export function FacilityGroupCard({ group, defaultName, scopeAssignments, onNavigate, onView, onDelete }: FacilityGroupCardProps) {
+export function FacilityGroupCard({ group, defaultName, scopeAssignments, availableLocales, onNavigate, onView, onDelete }: FacilityGroupCardProps) {
   const icon = toIconValue(group)
   const accentColor = icon.meta?.color || undefined
   const title = defaultName?.trim() || group.code
@@ -95,7 +98,7 @@ export function FacilityGroupCard({ group, defaultName, scopeAssignments, onNavi
         <div className="mt-3 flex flex-wrap gap-1">
           {scopeAssignments.map((a) => (
             <Badge key={a.facility_scope_id} variant="outline" className="font-mono text-[10px] px-1.5 py-0 h-5">
-              {a.locales[0]?.name ?? a.code}
+              {pickTranslation(a.locales, availableLocales ?? [])?.name ?? a.code}
             </Badge>
           ))}
         </div>

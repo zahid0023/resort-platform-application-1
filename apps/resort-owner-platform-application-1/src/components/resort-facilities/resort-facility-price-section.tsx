@@ -14,6 +14,8 @@ import { CurrencyPickerDialog } from "@/components/currencies/currency-picker-di
 import { toast } from "sonner"
 import type { ResortFacilityDialogMode, ResortFacilityFormState, ResortFacilityPriceFormRow } from "./types"
 import { toApiIconPayload } from "./types"
+import type { Locale } from "@/services/locales"
+import { pickTranslation } from "@/lib/locale"
 
 export interface ResortFacilityPriceSectionProps {
   resortId: number
@@ -25,6 +27,7 @@ export interface ResortFacilityPriceSectionProps {
   editing: boolean
   onEditingChange: (v: boolean) => void
   disabled?: boolean
+  availableLocales: Locale[]
 }
 
 export function ResortFacilityPriceSection({
@@ -37,6 +40,7 @@ export function ResortFacilityPriceSection({
   editing,
   onEditingChange,
   disabled,
+  availableLocales,
 }: ResortFacilityPriceSectionProps) {
   const { t } = useTranslation()
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -156,7 +160,7 @@ export function ResortFacilityPriceSection({
   const isPaid = effectivePriceTypeCode === "PAID"
 
   function renderSelectedPriceType(pt: FacilityPriceType) {
-    const name = pt.locales[0]?.name ?? pt.code
+    const name = pickTranslation(pt.locales, availableLocales)?.name ?? pt.code
     return (
       <div className="flex items-center gap-3 rounded-lg border border-primary bg-primary/5 px-3 py-2.5">
         <div className="h-8 w-8 shrink-0 rounded-md flex items-center justify-center bg-primary/10">

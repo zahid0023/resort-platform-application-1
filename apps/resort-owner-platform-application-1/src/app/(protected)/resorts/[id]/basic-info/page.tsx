@@ -101,6 +101,7 @@ export default function ResortBasicInfoPage() {
             onSaved={refresh}
             editing={generalEditing}
             onEditingChange={setGeneralEditing}
+            availableLocales={availableLocales}
           />
           <ResortLocaleTranslations
             resortId={resortId}

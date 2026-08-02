@@ -227,6 +227,7 @@ export function FacilityGroupDialog({
                 onFormChange={(patch) => onFormChange({ ...form, ...patch })}
                 facilityGroupId={facilityGroupId}
                 availableScopes={availableScopes}
+                availableLocales={availableLocales}
                 onSaved={onSaved}
                 editing={scopesEditing}
                 onEditingChange={setScopesEditing}

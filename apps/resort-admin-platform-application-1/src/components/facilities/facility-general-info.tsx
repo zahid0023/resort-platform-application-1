@@ -8,6 +8,8 @@ import { Label } from "@resort/shadcn-ui"
 import { Popover, PopoverContent, PopoverTrigger } from "@resort/shadcn-ui"
 import { updateFacility } from "@/services/facilities"
 import { listFacilityGroups, getFacilityGroup, type FacilityGroupSummary } from "@/services/facility-groups"
+import { localesService, type Locale } from "@/services/locales"
+import { pickTranslation } from "@/lib/locale"
 import { toast } from "sonner"
 import type { FacilityDialogMode, FacilityFormState } from "./types"
 import { fromIconValue } from "./types"
@@ -55,6 +57,13 @@ export function FacilityGeneralInfo({
 
   // View mode: display group name
   const [viewGroupName, setViewGroupName] = useState("")
+  const [locales, setLocales] = useState<Locale[]>([])
+
+  useEffect(() => {
+    localesService.list({ size: 50, sort_by: "sortOrder" })
+      .then((res) => setLocales(res.data))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!open) {
@@ -73,10 +82,10 @@ export function FacilityGeneralInfo({
   useEffect(() => {
     if (open && mode !== "create" && form.facility_group_id) {
       getFacilityGroup(Number(form.facility_group_id))
-        .then((res) => setViewGroupName(res.data.locales[0]?.name || res.data.code))
+        .then((res) => setViewGroupName(pickTranslation(res.data.locales, locales)?.name || res.data.code))
         .catch(() => setViewGroupName(String(form.facility_group_id)))
     }
-  }, [open, mode, form.facility_group_id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, mode, form.facility_group_id, locales]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadGroupPage(page: number, reset = false) {
     setLoadingGroups(true)

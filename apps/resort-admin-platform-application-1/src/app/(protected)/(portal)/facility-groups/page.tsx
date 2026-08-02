@@ -296,6 +296,7 @@ export default function FacilityGroupsPage() {
                 group={g}
                 defaultName={groupNames[g.id]}
                 scopeAssignments={scopeMap[g.id]}
+                availableLocales={availableLocales}
                 onNavigate={(g) => router.push(`/facility-groups/${g.id}`)}
                 onView={openDialog}
                 onDelete={setDeleteTarget}

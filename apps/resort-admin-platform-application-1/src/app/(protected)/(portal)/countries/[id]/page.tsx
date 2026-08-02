@@ -25,6 +25,7 @@ import type { CityDialogMode, CityFormState } from "@/components/cities/types";
 import { countriesService, type Country } from "@/services/countries";
 import { citiesService, type City, type ListCitiesParams } from "@/services/cities";
 import { localesService, type Locale } from "@/services/locales";
+import { pickTranslation } from "@/lib/locale";
 
 const PAGE_SIZE = 20;
 
@@ -121,7 +122,7 @@ export default function CountryDetailPage() {
   useEffect(() => {
     if (!countryId) return;
     countriesService.get(countryId)
-      .then((res) => setCountry(res.country))
+      .then((res) => setCountry(res.data))
       .catch((err) => {
         const msg = (err as Error).message ?? "";
         if (msg.toLowerCase().includes("not found")) setNotFound(true);
@@ -159,7 +160,7 @@ export default function CountryDetailPage() {
     [cities],
   );
 
-  const countryName = country?.locales[0]?.name ?? country?.code ?? "";
+  const countryName = pickTranslation(country?.locales, availableLocales)?.name ?? country?.code ?? "";
 
   function openCreate() {
     setMode("create");

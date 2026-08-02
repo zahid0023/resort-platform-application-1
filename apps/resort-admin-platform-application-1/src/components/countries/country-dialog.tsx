@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Globe } from "lucide-react";
-import { Dialog, DialogContent } from "@resort/shadcn-ui";
+import { ArrowRight, Globe, RefreshCw, Save, X } from "lucide-react";
+import { Button, Sheet, SheetContent } from "@resort/shadcn-ui";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@resort/shadcn-ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,7 +16,6 @@ import {
 import { DialogEntityHeader } from "@/components/shared/dialog-entity-header";
 import { DialogCreateFooter } from "@/components/shared/dialog-create-footer";
 import { countriesService } from "@/services/countries";
-import type { Locale } from "@/services/locales";
 import { toast } from "sonner";
 import type { CountryDialogMode, CountryFormState } from "./types";
 import { CountryGeneralInfo } from "./country-general-info";
@@ -26,8 +26,39 @@ export const emptyCountryForm: CountryFormState = {
   iso3_code: "",
   phone_code: "",
   sort_order: 0,
-  locales: [{ locale_id: "", name: "", description: "", sort_order: 0 }],
+  locale: { name: "", description: "", sort_order: 0 },
+  locales: [],
 };
+
+const CODE_PATTERN = /^[A-Z]{2}$/;
+const ISO3_PATTERN = /^[A-Z]{3}$/;
+const PHONE_PATTERN = /^[0-9]{1,3}$/;
+// Create only ever submits the "en" translation — keep it English/ASCII.
+const ENGLISH_TEXT_PATTERN = /^[\x00-\x7F]*$/;
+
+// Local autosave for the create form — never sent to the backend, just a browser-local checkpoint.
+const DRAFT_STORAGE_KEY = "country-dialog-draft";
+const DRAFT_SAVE_DEBOUNCE_MS = 500;
+
+function hasDraftContent(f: CountryFormState): boolean {
+  return f.code.trim() !== "" || f.iso3_code.trim() !== "" || f.phone_code.trim() !== ""
+    || f.locale.name.trim() !== "" || f.locale.description.trim() !== "";
+}
+
+function readDraft(): CountryFormState | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CountryFormState;
+    return hasDraftContent(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function clearDraft() {
+  localStorage.removeItem(DRAFT_STORAGE_KEY);
+}
 
 export interface CountryDialogProps {
   open: boolean;
@@ -36,7 +67,6 @@ export interface CountryDialogProps {
   countryId?: number;
   form: CountryFormState;
   onFormChange: (form: CountryFormState) => void;
-  availableLocales: Locale[];
   onSaved?: () => void | Promise<void>;
 }
 
@@ -47,7 +77,6 @@ export function CountryDialog({
   countryId,
   form,
   onFormChange,
-  availableLocales,
   onSaved,
 }: CountryDialogProps) {
   const { t } = useTranslation();
@@ -55,49 +84,144 @@ export function CountryDialog({
   const [generalEditing, setGeneralEditing] = useState(false);
   const [translationsEditing, setTranslationsEditing] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
+  const [activeTab, setActiveTab] = useState<"general" | "locales">("general");
+  const [draftPrompt, setDraftPrompt] = useState<CountryFormState | null>(null);
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
+  const [draftSyncing, setDraftSyncing] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setGeneralEditing(false);
       setTranslationsEditing(false);
       setConfirmClose(false);
+      setActiveTab("general");
+      setDraftPrompt(null);
+      setDraftSavedAt(null);
+      setDraftSyncing(false);
     }
   }, [open]);
 
-  const isDirty = mode === "create"
-    ? form.code.trim() !== "" || form.iso3_code.trim() !== "" || form.phone_code.trim() !== ""
-      || form.locales.length > 1
-      || form.locales.some((l) => l.locale_id !== "" || l.name.trim() !== "")
-    : generalEditing || translationsEditing;
+  // On opening a fresh create form, offer to resume a locally-saved draft.
+  useEffect(() => {
+    if (open && mode === "create") {
+      setDraftPrompt(readDraft());
+    }
+  }, [open, mode]);
+
+  // Debounced local autosave of the create form — skipped while the restore prompt is pending,
+  // otherwise the still-empty parent form would immediately overwrite the draft we're offering.
+  useEffect(() => {
+    if (!open || mode !== "create" || draftPrompt) return;
+    if (hasDraftContent(form)) setDraftSyncing(true);
+    const timer = setTimeout(() => {
+      if (hasDraftContent(form)) {
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(form));
+        setDraftSavedAt(new Date());
+      } else {
+        clearDraft();
+        setDraftSavedAt(null);
+      }
+      setDraftSyncing(false);
+    }, DRAFT_SAVE_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [form, open, mode, draftPrompt]);
+
+  function restoreDraft() {
+    if (draftPrompt) {
+      onFormChange(draftPrompt);
+      setDraftSavedAt(new Date());
+    }
+    setDraftPrompt(null);
+  }
+
+  function discardDraft() {
+    clearDraft();
+    setDraftSavedAt(null);
+    setDraftSyncing(false);
+    setDraftPrompt(null);
+  }
+
+  const draftIndicator = mode === "create" && (draftSyncing || draftSavedAt) ? (
+    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      {draftSyncing ? (
+        <>
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" /> {t("dialog.draftSyncing")}
+        </>
+      ) : (
+        <>
+          <Save className="h-3.5 w-3.5" />
+          {t("dialog.draftSaved", { time: draftSavedAt!.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" }) })}
+        </>
+      )}
+    </span>
+  ) : undefined;
+
+  // Edit/view only — in-progress section edits still warn before discarding, since those aren't
+  // autosaved. Create is covered by the local draft (see draftIndicator above), so closing it
+  // never needs a confirm: the in-progress data is already safely persisted to resume later.
+  const isDirty = generalEditing || translationsEditing;
 
   function requestClose() {
+    if (mode === "create") { onOpenChange(false); return; }
     if (isDirty) setConfirmClose(true);
     else onOpenChange(false);
+  }
+
+  // Silent check — drives the "locales" tab's disabled state without firing toasts on every render.
+  function isGeneralInfoValid(): boolean {
+    const code = form.code.trim().toUpperCase();
+    const iso3 = form.iso3_code.trim().toUpperCase();
+    const phone = form.phone_code.trim();
+    return CODE_PATTERN.test(code) && ISO3_PATTERN.test(iso3) && PHONE_PATTERN.test(phone);
+  }
+
+  // Same checks, but reports which field is missing/invalid — used by both the Next button and submit.
+  function validateGeneralInfo(): boolean {
+    const code = form.code.trim().toUpperCase();
+    const iso3 = form.iso3_code.trim().toUpperCase();
+    const phone = form.phone_code.trim();
+    if (!CODE_PATTERN.test(code)) { toast.error(t("toast.codeInvalid")); return false; }
+    if (!ISO3_PATTERN.test(iso3)) { toast.error(t("toast.iso3Invalid")); return false; }
+    if (!PHONE_PATTERN.test(phone)) { toast.error(t("toast.phoneInvalid")); return false; }
+    return true;
+  }
+
+  function handleNext() {
+    if (!validateGeneralInfo()) return;
+    setActiveTab("locales");
+  }
+
+  // Silent check — drives the Create button's disabled state without firing toasts on every render.
+  function isLocaleValid(): boolean {
+    return form.locale.name.trim() !== "" && form.locale.description.trim() !== ""
+      && ENGLISH_TEXT_PATTERN.test(form.locale.name) && ENGLISH_TEXT_PATTERN.test(form.locale.description);
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (mode !== "create") return;
-    if (!form.code.trim()) { toast.error(t("toast.codeRequired")); return; }
-    for (const [i, row] of form.locales.entries()) {
-      if (!row.locale_id) { toast.error(t("toast.localeSelectLang", { n: i + 1 })); return; }
-      if (!row.name.trim()) { toast.error(t("toast.localeNameRequired", { n: i + 1 })); return; }
-    }
+    if (!validateGeneralInfo()) { setActiveTab("general"); return; }
+    const iso3 = form.iso3_code.trim().toUpperCase();
+    const phone = form.phone_code.trim();
+    if (!form.locale.name.trim()) { toast.error(t("toast.localeNameRequired", { n: 1 })); return; }
+    if (!ENGLISH_TEXT_PATTERN.test(form.locale.name)) { toast.error(t("toast.localeNameEnglishOnly")); return; }
+    if (!form.locale.description.trim()) { toast.error(t("toast.localeDescriptionRequired", { n: 1 })); return; }
+    if (!ENGLISH_TEXT_PATTERN.test(form.locale.description)) { toast.error(t("toast.localeDescriptionEnglishOnly")); return; }
     setSubmitting(true);
     try {
       const code = form.code.trim().toUpperCase();
       await countriesService.create({
         code,
-        iso3_code: form.iso3_code.trim() || undefined,
-        phone_code: form.phone_code.trim() || undefined,
+        iso3_code: iso3,
+        phone_code: phone,
         sort_order: Number(form.sort_order) || 0,
-        locales: form.locales.map((row) => ({
-          locale_id: Number(row.locale_id),
-          name: row.name.trim(),
-          description: row.description.trim() || undefined,
-          sort_order: Number(row.sort_order) || 0,
-        })),
+        locale: {
+          name: form.locale.name.trim(),
+          description: form.locale.description.trim(),
+          sort_order: Number(form.locale.sort_order) || 0,
+        },
       });
+      clearDraft();
       toast.success(t("countries.createdToast"));
       onOpenChange(false);
       await onSaved?.();
@@ -114,9 +238,10 @@ export function CountryDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(v) => { if (!v) requestClose(); }}>
-        <DialogContent
-          className="max-w-3xl p-0 gap-0 overflow-hidden flex flex-col max-h-[90vh]"
+      <Sheet open={open} onOpenChange={(v) => { if (!v) requestClose(); }}>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-xl p-0 gap-0 overflow-hidden flex flex-col h-full"
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => { e.preventDefault(); requestClose(); }}
         >
@@ -124,37 +249,66 @@ export function CountryDialog({
 
             <DialogEntityHeader icon={<Globe className="h-4 w-4" />} title={headerTitle} description={headerDesc} />
 
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
-              <CountryGeneralInfo
-                mode={mode}
-                form={form}
-                onFormChange={(patch) => onFormChange({ ...form, ...patch })}
-                countryId={countryId}
-                onSaved={onSaved}
-                editing={generalEditing}
-                onEditingChange={setGeneralEditing}
-                open={open}
-              />
-              <CountryLocaleTranslations
-                mode={mode}
-                form={form}
-                onFormChange={onFormChange}
-                countryId={countryId}
-                availableLocales={availableLocales}
-                onSaved={onSaved}
-                editing={translationsEditing}
-                onEditingChange={setTranslationsEditing}
-                open={open}
-              />
-            </div>
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setActiveTab(v as "general" | "locales")}
+              className="flex-1 min-h-0 flex-col"
+            >
+              <TabsList className="mx-6 mt-4 w-fit shrink-0">
+                <TabsTrigger value="general">{t("common.generalInfo")}</TabsTrigger>
+                <TabsTrigger value="locales" disabled={mode === "create" && !isGeneralInfoValid()}>
+                  {t("locale.translations")}
+                </TabsTrigger>
+              </TabsList>
 
-            {mode === "create" && (
-              <DialogCreateFooter submitting={submitting} onCancel={requestClose} />
+              <TabsContent value="general" className="min-h-0 overflow-y-auto px-6 py-5">
+                <CountryGeneralInfo
+                  mode={mode}
+                  form={form}
+                  onFormChange={(patch) => onFormChange({ ...form, ...patch })}
+                  countryId={countryId}
+                  onSaved={onSaved}
+                  editing={generalEditing}
+                  onEditingChange={setGeneralEditing}
+                  open={open}
+                />
+              </TabsContent>
+
+              <TabsContent value="locales" className="min-h-0 overflow-y-auto px-6 py-5">
+                <CountryLocaleTranslations
+                  mode={mode}
+                  form={form}
+                  onFormChange={onFormChange}
+                  countryId={countryId}
+                  onSaved={onSaved}
+                  editing={translationsEditing}
+                  onEditingChange={setTranslationsEditing}
+                  open={open}
+                />
+              </TabsContent>
+            </Tabs>
+
+            {mode === "create" && activeTab === "general" && (
+              <div className={`shrink-0 px-6 py-4 border-t bg-muted/40 flex items-center gap-2 ${draftIndicator ? "justify-between" : "justify-end"}`}>
+                {draftIndicator}
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={requestClose} className="gap-1.5">
+                    <X className="h-3.5 w-3.5" /> {t("common.cancel")}
+                  </Button>
+                  <Button type="button" size="sm" onClick={handleNext} disabled={!isGeneralInfoValid()} className="gap-1.5">
+                    {t("common.next")} <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {mode === "create" && activeTab === "locales" && (
+              <DialogCreateFooter submitting={submitting} onCancel={requestClose} disabled={!isLocaleValid()} indicator={draftIndicator} />
             )}
 
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
         <AlertDialogContent>
@@ -164,7 +318,22 @@ export function CountryDialog({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => onOpenChange(false)}>{t("dialog.discardChanges.confirm")}</AlertDialogAction>
+            <AlertDialogAction onClick={() => onOpenChange(false)}>
+              {t("dialog.discardChanges.confirm")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!draftPrompt} onOpenChange={(v) => { if (!v) discardDraft(); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("dialog.restoreDraft.title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("dialog.restoreDraft.desc")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={discardDraft}>{t("dialog.restoreDraft.discard")}</AlertDialogCancel>
+            <AlertDialogAction onClick={restoreDraft}>{t("dialog.restoreDraft.restore")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
