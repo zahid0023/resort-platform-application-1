@@ -1,25 +1,25 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronDown, Loader2, Pencil, X } from "lucide-react";
+import { Check, Globe, Pencil, RefreshCw, X } from "lucide-react";
 import { Button } from "@resort/shadcn-ui";
 import { Card, CardContent } from "@resort/shadcn-ui";
 import { Input } from "@resort/shadcn-ui";
 import { Label } from "@resort/shadcn-ui";
-import { Popover, PopoverContent, PopoverTrigger } from "@resort/shadcn-ui";
 import { citiesService } from "@/services/cities";
-import { countriesService, type Country } from "@/services/countries";
+import type { Country } from "@/services/countries";
 import { toast } from "sonner";
 import type { CityDialogMode, CityFormState } from "./types";
-
-const COUNTRY_PAGE_SIZE = 20;
+import { CountryPickerDialog } from "./country-picker-dialog";
 
 export interface CityGeneralInfoProps {
   mode: CityDialogMode;
   form: CityFormState;
   onFormChange: (patch: Partial<CityFormState>) => void;
   cityId?: number;
-  /** When provided, country field is hidden and this value is used for create */
+  /** Pre-set country (e.g. opened from a country's own detail page) — hides the picker entirely */
   fixedCountryId?: number;
+  /** Display label for the resolved country ("Bangladesh (BD)") — used in view/edit and when fixedCountryId is set */
+  countryLabel?: string;
   onSaved?: () => void | Promise<void>;
   editing: boolean;
   onEditingChange: (v: boolean) => void;
@@ -32,6 +32,7 @@ export function CityGeneralInfo({
   onFormChange,
   cityId,
   fixedCountryId,
+  countryLabel,
   onSaved,
   editing,
   onEditingChange,
@@ -40,68 +41,18 @@ export function CityGeneralInfo({
   const { t } = useTranslation();
   const [localSortOrder, setLocalSortOrder] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [selectedCountry, setSelectedCountry] = useState<Country | null>(null);
 
-  // Country selector state
-  const [countries, setCountries] = useState<Country[]>([]);
-  const [countryPage, setCountryPage] = useState(0);
-  const [hasNextCountry, setHasNextCountry] = useState(false);
-  const [loadingCountries, setLoadingCountries] = useState(false);
-  const [countrySearch, setCountrySearch] = useState("");
-  const [countryPopoverOpen, setCountryPopoverOpen] = useState(false);
+  const showCountryPicker = mode === "create" && fixedCountryId == null;
 
-  const showCountrySelector = mode === "create" && fixedCountryId == null;
-
-  // Reset edit state when dialog closes
   useEffect(() => {
     if (!open) {
       setSubmitting(false);
-      setCountries([]);
-      setCountryPage(0);
-      setHasNextCountry(false);
-      setCountrySearch("");
-      setCountryPopoverOpen(false);
+      setPickerOpen(false);
+      setSelectedCountry(null);
     }
   }, [open]);
-
-  // Load first page of countries when dialog opens in create mode (no fixed country)
-  useEffect(() => {
-    if (open && showCountrySelector) {
-      loadCountryPage(0, true);
-    }
-  }, [open, showCountrySelector]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function loadCountryPage(page: number, reset = false) {
-    setLoadingCountries(true);
-    try {
-      const res = await countriesService.list({ page, size: COUNTRY_PAGE_SIZE, sort_by: "code" });
-      setCountries((prev) => (reset ? res.data : [...prev, ...res.data]));
-      setCountryPage(page);
-      setHasNextCountry(res.has_next);
-    } catch (err) {
-      toast.error((err as Error).message);
-    } finally {
-      setLoadingCountries(false);
-    }
-  }
-
-  function loadMoreCountries() {
-    loadCountryPage(countryPage + 1);
-  }
-
-  const filteredCountries = countrySearch.trim()
-    ? countries.filter((c) => {
-        const q = countrySearch.toLowerCase();
-        return (
-          c.code.toLowerCase().includes(q) ||
-          (c.locales[0]?.name ?? "").toLowerCase().includes(q)
-        );
-      })
-    : countries;
-
-  const selectedCountry = countries.find((c) => c.id === form.country_id);
-  const selectedLabel = selectedCountry
-    ? `${selectedCountry.locales[0]?.name ?? selectedCountry.code} (${selectedCountry.code})`
-    : "Select country…";
 
   function startEdit() {
     setLocalSortOrder(form.sort_order);
@@ -124,8 +75,16 @@ export function CityGeneralInfo({
     }
   }
 
+  function handleCountrySelect(country: Country) {
+    setSelectedCountry(country);
+    onFormChange({ country_id: country.id });
+  }
+
   const sortValue = editing ? localSortOrder : form.sort_order;
   const isReadOnly = !editing && mode !== "create";
+  const resolvedCountryLabel = selectedCountry
+    ? `${selectedCountry.locale?.name ?? selectedCountry.code} (${selectedCountry.code})`
+    : countryLabel;
 
   return (
     <div className="space-y-4">
@@ -156,96 +115,51 @@ export function CityGeneralInfo({
 
       <Card>
         <CardContent className="space-y-4">
-
-          {/* Country selector — only in create mode when no fixedCountryId */}
-          {showCountrySelector && (
-            <div className="space-y-2">
-              <Label className="text-xs font-medium">Country *</Label>
-              <Popover open={countryPopoverOpen} onOpenChange={setCountryPopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-between font-normal"
-                  >
-                    <span className={form.country_id ? "" : "text-muted-foreground"}>
-                      {selectedLabel}
-                    </span>
-                    <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+          <div className="space-y-2">
+            <Label className="text-xs font-medium">{t("field.country")} *</Label>
+            {showCountryPicker ? (
+              form.country_id !== "" && resolvedCountryLabel ? (
+                <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2">
+                  <span className="flex items-center gap-2 text-sm min-w-0">
+                    <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                    <span className="truncate">{resolvedCountryLabel}</span>
+                  </span>
+                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2.5 shrink-0" onClick={() => setPickerOpen(true)}>
+                    <RefreshCw className="h-3 w-3 mr-1" /> {t("countryPicker.change")}
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                  {/* Search */}
-                  <div className="p-2 border-b">
-                    <Input
-                      placeholder="Search by name or code…"
-                      value={countrySearch}
-                      onChange={(e) => setCountrySearch(e.target.value)}
-                      className="h-8 text-sm"
-                      autoFocus
-                    />
-                  </div>
-
-                  {/* Country list */}
-                  <div className="max-h-52 overflow-y-auto">
-                    {loadingCountries && countries.length === 0 ? (
-                      <div className="flex items-center justify-center py-6">
-                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : filteredCountries.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">No countries found.</p>
-                    ) : (
-                      filteredCountries.map((c) => {
-                        const name = c.locales[0]?.name ?? c.code;
-                        const isSelected = form.country_id === c.id;
-                        return (
-                          <button
-                            key={c.id}
-                            type="button"
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2 ${isSelected ? "bg-accent" : ""}`}
-                            onClick={() => {
-                              onFormChange({ country_id: c.id });
-                              setCountryPopoverOpen(false);
-                              setCountrySearch("");
-                            }}
-                          >
-                            {isSelected
-                              ? <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-                              : <span className="w-3.5 shrink-0" />
-                            }
-                            {name} ({c.code})
-                          </button>
-                        );
-                      })
-                    )}
-
-                    {/* Load more — only shown when not filtering client-side */}
-                    {hasNextCountry && !countrySearch.trim() && (
-                      <button
-                        type="button"
-                        className="w-full px-3 py-2 text-sm text-muted-foreground hover:bg-accent flex items-center justify-center gap-1.5 border-t"
-                        onClick={loadMoreCountries}
-                        disabled={loadingCountries}
-                      >
-                        {loadingCountries && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                        Load more
-                      </button>
-                    )}
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
-          )}
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setPickerOpen(true)}
+                  className="w-full rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground hover:border-primary/40 hover:text-foreground transition-colors flex items-center gap-2"
+                >
+                  <Globe className="h-3.5 w-3.5" />
+                  {t("countryPicker.selectPrompt")}
+                </button>
+              )
+            ) : (
+              <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm bg-muted/40">
+                <Globe className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="truncate">{resolvedCountryLabel ?? "—"}</span>
+              </div>
+            )}
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="city-code" className="text-xs font-medium">
-              {t("common.code")}
+              {t("common.code")} *
             </Label>
             <Input
               id="city-code"
               value={form.code}
-              onChange={(e) => onFormChange({ code: e.target.value })}
+              onChange={(e) => {
+                const letters = e.target.value.replace(/[^a-zA-Z]/g, "").toUpperCase();
+                if (letters.length > 3) { toast.error(t("toast.cityCodeMaxLength")); return; }
+                onFormChange({ code: letters });
+              }}
               placeholder={t("placeholder.cityCode")}
+              required
               disabled={mode !== "create"}
               className="font-mono"
             />
@@ -267,9 +181,17 @@ export function CityGeneralInfo({
               disabled={isReadOnly}
             />
           </div>
-
         </CardContent>
       </Card>
+
+      {showCountryPicker && (
+        <CountryPickerDialog
+          open={pickerOpen}
+          onOpenChange={setPickerOpen}
+          selectedId={form.country_id !== "" ? Number(form.country_id) : undefined}
+          onSelect={handleCountrySelect}
+        />
+      )}
     </div>
   );
 }

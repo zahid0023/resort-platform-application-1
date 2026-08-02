@@ -23,11 +23,13 @@ import { CityCard } from "@/components/cities/city-card";
 import { CityDialog, emptyCityForm } from "@/components/cities/city-dialog";
 import type { CityDialogMode, CityFormState } from "@/components/cities/types";
 import { countriesService, type Country } from "@/services/countries";
-import { citiesService, type City, type ListCitiesParams } from "@/services/cities";
-import { localesService, type Locale } from "@/services/locales";
-import { pickTranslation } from "@/lib/locale";
+import { citiesService, type City, type ListParams } from "@/services/cities";
 
 const PAGE_SIZE = 20;
+
+function toFieldOption(t: (key: string) => string, key: string) {
+  return { value: key, label: t(`apiFields.${key}`) };
+}
 
 export default function CountryDetailPage() {
   const { t } = useTranslation();
@@ -51,43 +53,40 @@ export default function CountryDetailPage() {
 
   // Search / sort
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("sortOrder");
+  const [searchField, setSearchField] = useState<"code" | "name">("code");
+  const [sortBy, setSortBy] = useState<NonNullable<ListParams["sort_by"]>>("sortOrder");
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC");
 
   // Dialog
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<CityDialogMode>("create");
   const [activeId, setActiveId] = useState<number | undefined>(undefined);
   const [form, setForm] = useState<CityFormState>(emptyCityForm);
   const [deleteTarget, setDeleteTarget] = useState<City | null>(null);
 
-  const dialogOpenRef = useRef(dialogOpen);
-  const activeIdRef = useRef(activeId);
-  useEffect(() => { dialogOpenRef.current = dialogOpen; }, [dialogOpen]);
-  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
-
-  const isFirstRender = useRef(true);
-
   const searchFields = useMemo(() => [
-    { value: "code", label: t("apiFields.code") },
+    toFieldOption(t, "code"),
+    toFieldOption(t, "name"),
   ], [t]);
 
   const sortFields = useMemo(() => [
-    { value: "sortOrder", label: t("apiFields.sortOrder") },
-    { value: "code", label: t("apiFields.code") },
-    { value: "createdAt", label: t("apiFields.createdAt") },
+    toFieldOption(t, "sortOrder"),
+    toFieldOption(t, "code"),
+    toFieldOption(t, "name"),
+    toFieldOption(t, "createdAt"),
   ], [t]);
 
-  async function refreshCities(overrides: Partial<ListCitiesParams> = {}) {
+  async function refreshCities(overrides: Partial<ListParams> = {}) {
+    if (!countryId) return;
     setCitiesLoading(true);
     try {
-      const res = await citiesService.list(countryId, {
+      const res = await citiesService.list({
         page,
         size: PAGE_SIZE,
         sort_by: sortBy,
         sort_dir: sortDir,
-        code: search.trim() || undefined,
+        countryId,
+        [searchField]: search.trim() || undefined,
         ...overrides,
       });
       setCities(res.data);
@@ -95,22 +94,6 @@ export default function CountryDetailPage() {
       setTotalElements(res.total_elements);
       setHasNext(res.has_next);
       setHasPrevious(res.has_previous);
-
-      setForm((prev) => {
-        if (!dialogOpenRef.current || activeIdRef.current == null) return prev;
-        const updated = res.data.find((c) => c.id === activeIdRef.current);
-        if (!updated) return prev;
-        return {
-          ...prev,
-          locales: updated.locales.map((l) => ({
-            id: l.id,
-            locale_id: l.locale_id,
-            name: l.name,
-            description: l.description ?? "",
-            sort_order: l.sort_order,
-          })),
-        };
-      });
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -132,35 +115,29 @@ export default function CountryDetailPage() {
   }, [countryId]);
 
   // Initial cities load
-  useEffect(() => {
-    if (!countryId) return;
-    refreshCities();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Locales for dialog
-  useEffect(() => {
-    localesService.list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableLocales(res.data))
-      .catch(() => {});
-  }, []);
+  useEffect(() => { refreshCities(); }, [countryId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced search
+  const lastSearchKey = useRef(`${searchField}:${search}`);
   useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    const key = `${searchField}:${search}`;
+    if (lastSearchKey.current === key) return;
+    lastSearchKey.current = key;
     setPage(0);
     const timer = setTimeout(
-      () => refreshCities({ page: 0, code: search.trim() || undefined }),
+      () => refreshCities({ page: 0, [searchField]: search.trim() || undefined }),
       350,
     );
     return () => clearTimeout(timer);
-  }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [search, searchField]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cityNames = useMemo(
-    () => Object.fromEntries(cities.map((c) => [c.id, c.locales[0]?.name ?? ""])),
+    () => Object.fromEntries(cities.map((c) => [c.id, c.locale?.name ?? ""])),
     [cities],
   );
 
-  const countryName = pickTranslation(country?.locales, availableLocales)?.name ?? country?.code ?? "";
+  const countryName = country?.locale?.name ?? country?.code ?? "";
+  const countryLabel = country ? `${countryName} (${country.code})` : undefined;
 
   function openCreate() {
     setMode("create");
@@ -169,28 +146,31 @@ export default function CountryDetailPage() {
     setDialogOpen(true);
   }
 
-  function openDialog(city: City) {
-    setMode("view");
-    setActiveId(city.id);
-    setForm({
-      country_id: "",
-      code: city.code ?? "",
-      sort_order: city.sort_order,
-      locales: city.locales.map((l) => ({
-        id: l.id,
-        locale_id: l.locale_id,
-        name: l.name,
-        description: l.description ?? "",
-        sort_order: l.sort_order,
-      })),
-    });
-    setDialogOpen(true);
+  async function openDialog(c: City) {
+    try {
+      const res = await citiesService.get(c.id);
+      const full = res.data;
+      setMode("view");
+      setActiveId(full.id);
+      setForm({
+        country_id: full.country.id,
+        code: full.code,
+        sort_order: full.sort_order,
+        locale: emptyCityForm.locale,
+        // Populated by CityLocaleTranslations itself via GET /cities/{id}/locales.
+        locales: [],
+      });
+      setDialogOpen(true);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
   }
 
   function handleSortByChange(value: string) {
-    setSortBy(value);
+    const field = value as NonNullable<ListParams["sort_by"]>;
+    setSortBy(field);
     setPage(0);
-    refreshCities({ sort_by: value, page: 0 });
+    refreshCities({ sort_by: field, page: 0 });
   }
 
   function handleSortDirChange(dir: "ASC" | "DESC") {
@@ -254,8 +234,8 @@ export default function CountryDetailPage() {
         />
         <PageActions
           fields={searchFields}
-          searchField="code"
-          onSearchFieldChange={() => {}}
+          searchField={searchField}
+          onSearchFieldChange={(v) => setSearchField(v as "code" | "name")}
           search={search}
           onSearchChange={setSearch}
           sort={{
@@ -306,10 +286,10 @@ export default function CountryDetailPage() {
         onOpenChange={setDialogOpen}
         mode={mode}
         cityId={activeId}
-        countryId={countryId}
+        fixedCountryId={countryId}
+        countryLabel={countryLabel}
         form={form}
         onFormChange={setForm}
-        availableLocales={availableLocales}
         onSaved={() => refreshCities()}
       />
 

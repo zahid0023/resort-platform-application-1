@@ -9,56 +9,30 @@ export interface CountryLocale {
   sort_order: number;
 }
 
-export interface CountryCityLocale {
-  id: number;
-  locale: Locale;
-  name: string;
-  description?: string;
-  sort_order: number;
-}
-
-export interface CountryCity {
-  id: number;
-  code: string;
-  sort_order: number;
-  locales: CountryCityLocale[];
-}
-
-export interface CountryCurrencyLocale {
-  id: number;
-  locale: Locale;
-  name: string;
-  short_name?: string;
-  sort_order: number;
-}
-
-export interface CountryCurrency {
-  id: number;
-  code: string;
-  numeric_code: string;
-  symbol: string;
-  decimal_places: number;
-  is_default: boolean;
-  sort_order: number;
-  locales: CountryCurrencyLocale[];
-}
-
 export interface Country {
   id: number;
   code: string;
   iso3_code: string;
   phone_code: string;
   sort_order: number;
-  /** Every translation on GET /{id}; exactly one (Accept-Language-matched, en fallback) everywhere else */
-  locales: CountryLocale[];
-  /** [] except on GET /{id} */
-  cities: CountryCity[];
-  /** [] except on GET /{id} */
-  currencies: CountryCurrency[];
+  /** The single translation matching Accept-Language (falls back to en, then null) — on GET /{id} and list alike. */
+  locale: CountryLocale | null;
 }
 
 export interface CountryListResponse {
   data: Country[];
+  current_page: number;
+  total_pages: number;
+  total_elements: number;
+  page_size: number;
+  has_next: boolean;
+  has_previous: boolean;
+  searchable_fields?: string[];
+  sortable_fields?: string[];
+}
+
+export interface CountryLocaleListResponse {
+  data: CountryLocale[];
   current_page: number;
   total_pages: number;
   total_elements: number;
@@ -119,6 +93,12 @@ export interface ListParams {
   name?: string;
 }
 
+export interface ListLocalesParams {
+  page?: number;
+  size?: number;
+  localeCode?: string;
+}
+
 export const countriesService = {
   async list(params: ListParams = {}): Promise<CountryListResponse> {
     const { page = 0, size = 10, sort_by, sort_dir = "ASC", iso3Code, phoneCode, name } = params;
@@ -136,6 +116,13 @@ export const countriesService = {
 
   async get(id: number): Promise<{ data: Country }> {
     return api.get<{ data: Country }>(`/countries/${id}`);
+  },
+
+  async listLocales(countryId: number, params: ListLocalesParams = {}): Promise<CountryLocaleListResponse> {
+    const { page = 0, size = 10, localeCode } = params;
+    const query = new URLSearchParams({ page: String(page), size: String(size) });
+    if (localeCode) query.set("localeCode", localeCode);
+    return api.get<CountryLocaleListResponse>(`/countries/${countryId}/locales?${query}`);
   },
 
   async create(body: CreateCountryRequest): Promise<MutationResponse> {

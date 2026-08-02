@@ -1,18 +1,32 @@
 import { api } from "./api";
+import type { Locale } from "./locales";
+import type { CountryLocale } from "./countries";
 
 export interface CityLocale {
   id: number;
-  locale_id: number;
+  locale: Locale;
   name: string;
   description?: string;
   sort_order: number;
 }
 
+// Minimal embedded parent summary — the country's own single Accept-Language-matched translation.
+export interface CityCountry {
+  id: number;
+  code: string;
+  iso3_code: string;
+  phone_code: string;
+  sort_order: number;
+  locale: CountryLocale | null;
+}
+
 export interface City {
   id: number;
-  code?: string;
+  country: CityCountry;
+  code: string;
   sort_order: number;
-  locales: CityLocale[];
+  /** The single translation matching Accept-Language (falls back to en, then null) — on GET /{id} and list alike. */
+  locale: CityLocale | null;
 }
 
 export interface CityListResponse {
@@ -23,6 +37,20 @@ export interface CityListResponse {
   page_size: number;
   has_next: boolean;
   has_previous: boolean;
+  searchable_fields?: string[];
+  sortable_fields?: string[];
+}
+
+export interface CityLocaleListResponse {
+  data: CityLocale[];
+  current_page: number;
+  total_pages: number;
+  total_elements: number;
+  page_size: number;
+  has_next: boolean;
+  has_previous: boolean;
+  searchable_fields?: string[];
+  sortable_fields?: string[];
 }
 
 export interface CreateCityLocaleRequest {
@@ -32,11 +60,17 @@ export interface CreateCityLocaleRequest {
   sort_order: number;
 }
 
+// The initial translation is always resolved to the "en" locale server-side —
+// there's no locale_id here, and only a single locale entry is accepted at creation.
 export interface CreateCityRequest {
+  code: string;
   country_id: number;
-  code?: string;
   sort_order: number;
-  locales?: CreateCityLocaleRequest[];
+  locale: {
+    name: string;
+    description: string;
+    sort_order: number;
+  };
 }
 
 export interface UpdateCityRequest {
@@ -54,48 +88,47 @@ export interface MutationResponse {
   id: number;
 }
 
-export interface ListCitiesParams {
+export interface ListParams {
   page?: number;
   size?: number;
-  sort_by?: string;
-  sort_dir?: "ASC" | "DESC";
-  code?: string;
-}
-
-export interface ListCitiesFlatParams {
-  page?: number;
-  size?: number;
-  sort_by?: string;
+  // sortBy=id throws 400 — it's only valid as the implicit default when sortBy is omitted entirely.
+  sort_by?: "createdAt" | "sortOrder" | "code" | "name";
   sort_dir?: "ASC" | "DESC";
   code?: string;
   countryId?: number;
+  name?: string;
+}
+
+export interface ListLocalesParams {
+  page?: number;
+  size?: number;
+  localeCode?: string;
 }
 
 export const citiesService = {
-  // Flat list across all countries (used on /cities page)
-  async listFlat(params: ListCitiesFlatParams = {}): Promise<CityListResponse> {
-    const { page = 0, size = 20, sort_by = "sortOrder", sort_dir = "ASC", code, countryId } = params;
-    const query = new URLSearchParams({ page: String(page), size: String(size), sort_by, sort_dir });
-    if (code) query.set("code", code);
-    if (countryId) query.set("countryId", String(countryId));
-    return api.get<CityListResponse>(`/cities?${query}`);
-  },
-
-  // List cities scoped to a country (used on country detail page)
-  async list(countryId: number, params: ListCitiesParams = {}): Promise<CityListResponse> {
-    const { page = 0, size = 20, sort_by = "sortOrder", sort_dir = "ASC", code } = params;
+  async list(params: ListParams = {}): Promise<CityListResponse> {
+    const { page = 0, size = 10, sort_by, sort_dir = "ASC", code, countryId, name } = params;
     const query = new URLSearchParams({
       page: String(page),
       size: String(size),
-      sort_by,
-      sort_dir,
+      sortDir: sort_dir,
     });
+    if (sort_by) query.set("sortBy", sort_by);
     if (code) query.set("code", code);
-    return api.get<CityListResponse>(`/countries/${countryId}/cities?${query}`);
+    if (countryId != null) query.set("countryId", String(countryId));
+    if (name) query.set("name", name);
+    return api.get<CityListResponse>(`/cities?${query}`);
   },
 
-  async get(id: number): Promise<{ city: City }> {
-    return api.get<{ city: City }>(`/cities/${id}`);
+  async get(id: number): Promise<{ data: City }> {
+    return api.get<{ data: City }>(`/cities/${id}`);
+  },
+
+  async listLocales(cityId: number, params: ListLocalesParams = {}): Promise<CityLocaleListResponse> {
+    const { page = 0, size = 10, localeCode } = params;
+    const query = new URLSearchParams({ page: String(page), size: String(size) });
+    if (localeCode) query.set("localeCode", localeCode);
+    return api.get<CityLocaleListResponse>(`/cities/${cityId}/locales?${query}`);
   },
 
   async create(body: CreateCityRequest): Promise<MutationResponse> {

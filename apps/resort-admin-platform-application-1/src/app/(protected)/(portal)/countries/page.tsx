@@ -62,12 +62,6 @@ export default function CountriesPage() {
 	const [form, setForm] = useState<CountryFormState>(emptyCountryForm);
 	const [deleteTarget, setDeleteTarget] = useState<Country | null>(null);
 
-	// Refs to avoid stale closures in refresh
-	const dialogOpenRef = useRef(dialogOpen);
-	const activeIdRef = useRef(activeId);
-	useEffect(() => { dialogOpenRef.current = dialogOpen; }, [dialogOpen]);
-	useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
-
 
 	function toFieldOption(key: string) {
 		return { value: key, label: t(`apiFields.${key}`) };
@@ -101,23 +95,6 @@ export default function CountriesPage() {
 			setTotalElements(res.total_elements);
 			setHasNext(res.has_next);
 			setHasPrevious(res.has_previous);
-
-			// Sync open dialog form with refreshed data
-			setForm((prev) => {
-				if (!dialogOpenRef.current || activeIdRef.current == null) return prev;
-				const updated = res.data.find((c) => c.id === activeIdRef.current);
-				if (!updated) return prev;
-				return {
-					...prev,
-					locales: updated.locales.map((l) => ({
-						id: l.id,
-						locale: l.locale,
-						name: l.name,
-						description: l.description ?? "",
-						sort_order: l.sort_order,
-					})),
-				};
-			});
 		} catch (err) {
 			toast.error((err as Error).message);
 		} finally {
@@ -147,7 +124,7 @@ export default function CountriesPage() {
 	}, [search, searchField]); // eslint-disable-line react-hooks/exhaustive-deps
 
 	const countryNames = useMemo(
-		() => Object.fromEntries(countries.map((c) => [c.id, c.locales[0]?.name ?? ""])),
+		() => Object.fromEntries(countries.map((c) => [c.id, c.locale?.name ?? ""])),
 		[countries],
 	);
 
@@ -183,13 +160,8 @@ export default function CountriesPage() {
 				phone_code: full.phone_code ?? "",
 				sort_order: full.sort_order,
 				locale: emptyCountryForm.locale,
-				locales: full.locales.map((l) => ({
-					id: l.id,
-					locale: l.locale,
-					name: l.name,
-					description: l.description ?? "",
-					sort_order: l.sort_order,
-				})),
+				// Lazily populated by CountryDialog the first time the Translations tab is selected.
+				locales: [],
 			});
 			setDialogOpen(true);
 		} catch (err) {

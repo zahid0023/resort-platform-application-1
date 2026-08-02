@@ -2,6 +2,8 @@
 
 import {
   BlocksIcon,
+  CloudIcon,
+  CoinsIcon,
   CreditCardIcon,
   FileTextIcon,
   FolderIcon,
@@ -11,6 +13,7 @@ import {
   LayoutDashboard,
   LayoutTemplateIcon,
   LogOut,
+  MapPinIcon,
   PhoneCallIcon,
   RadioIcon,
   SettingsIcon,
@@ -78,9 +81,20 @@ const contactNavItems = [
   { title: "Communication Channels", url: "/communication-channels", icon: RadioIcon },
 ];
 
+const addressNavItems = [
+  { title: "Country", url: "/countries", icon: GlobeIcon },
+  { title: "City", url: "/cities", icon: MapPinIcon },
+];
+
+const currencyNavItems = [
+  { title: "Currency", url: "/currencies", icon: CoinsIcon },
+];
+
+const hostingNavItems = [
+  { title: "Image Hosting Providers", url: "/image-hosting-providers", icon: CloudIcon },
+];
+
 const commonNavItems = [
-  { title: "Countries", url: "/countries", icon: GlobeIcon },
-  { title: "Cities", url: "/cities", icon: GlobeIcon },
   { title: "Facility Groups", url: "/facility-groups", icon: FolderIcon },
   { title: "Facilities", url: "/facilities", icon: BlocksIcon },
   { title: "Facility Scopes", url: "/facility-scopes", icon: SettingsIcon },
@@ -163,6 +177,57 @@ export function PortalSidebar() {
             <SidebarGroupLabel>Contact</SidebarGroupLabel>
             <SidebarMenu className="gap-2">
               {contactNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButtonActive
+                    icon={<item.icon />}
+                    title={item.title}
+                    url={item.url}
+                  />
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarGroupLabel>Address</SidebarGroupLabel>
+            <SidebarMenu className="gap-2">
+              {addressNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButtonActive
+                    icon={<item.icon />}
+                    title={item.title}
+                    url={item.url}
+                  />
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarGroupLabel>Currency</SidebarGroupLabel>
+            <SidebarMenu className="gap-2">
+              {currencyNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButtonActive
+                    icon={<item.icon />}
+                    title={item.title}
+                    url={item.url}
+                  />
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarGroupLabel>Hosting</SidebarGroupLabel>
+            <SidebarMenu className="gap-2">
+              {hostingNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButtonActive
                     icon={<item.icon />}

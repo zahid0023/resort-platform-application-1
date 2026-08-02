@@ -1,42 +1,37 @@
-import { Eye, MapPin, Trash2 } from "lucide-react";
+import { CloudIcon, Eye, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardAction, CardContent } from "@resort/shadcn-ui";
 import { Button } from "@resort/shadcn-ui";
-import type { City } from "@/services/cities";
+import type { ImageHostingProvider } from "@/services/image-hosting-providers";
 
-export interface CityCardProps {
-  city: City;
-  defaultName?: string;
-  onView?: (city: City) => void;
-  onDelete?: (city: City) => void;
+export interface ImageHostingProviderCardProps {
+  provider: ImageHostingProvider;
+  onView?: (provider: ImageHostingProvider) => void;
+  onDelete?: (provider: ImageHostingProvider) => void;
 }
 
-export function CityCard({ city, defaultName, onView, onDelete }: CityCardProps) {
-  const title = defaultName?.trim() || city.code;
-  const subtitle = defaultName?.trim() ? city.code : undefined;
-  const countryName = city.country.locale?.name ?? city.country.code;
-
+export function ImageHostingProviderCard({ provider, onView, onDelete }: ImageHostingProviderCardProps) {
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    onDelete?.(city);
+    onDelete?.(provider);
   };
 
   return (
     <Card
       role="button"
       tabIndex={0}
-      onClick={() => onView?.(city)}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onView?.(city); } }}
+      onClick={() => onView?.(provider)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onView?.(provider); } }}
       className="group hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <CardHeader>
         <div className="flex items-center gap-3 min-w-0">
           <div className="h-11 w-11 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-            <MapPin className="h-5 w-5" />
+            <CloudIcon className="h-5 w-5" />
           </div>
           <div className="min-w-0">
-            <h3 className="font-semibold truncate">{title}</h3>
-            {subtitle && <p className="text-xs text-muted-foreground truncate font-mono">{subtitle}</p>}
+            <h3 className="font-semibold truncate">{provider.name}</h3>
+            <p className="text-xs text-muted-foreground truncate font-mono">{provider.code}</p>
           </div>
         </div>
         {(onView || onDelete) && (
@@ -47,7 +42,7 @@ export function CityCard({ city, defaultName, onView, onDelete }: CityCardProps)
           >
             {onView && (
               <Button size="icon" variant="ghost" className="h-8 w-8"
-                onClick={(e) => { e.stopPropagation(); onView(city); }}
+                onClick={(e) => { e.stopPropagation(); onView(provider); }}
                 title="View details"
               >
                 <Eye className="h-3.5 w-3.5" />
@@ -63,10 +58,9 @@ export function CityCard({ city, defaultName, onView, onDelete }: CityCardProps)
       </CardHeader>
 
       <CardContent>
-        <div className="text-sm">
-          <p className="text-xs text-muted-foreground">Country</p>
-          <p className="font-medium truncate">{countryName} ({city.country.code})</p>
-        </div>
+        <p className="text-sm text-muted-foreground line-clamp-2">
+          {provider.description || "No description"}
+        </p>
       </CardContent>
     </Card>
   );

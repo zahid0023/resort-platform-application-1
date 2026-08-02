@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, Globe, RefreshCw, Save, X } from "lucide-react";
 import { Button, Sheet, SheetContent } from "@resort/shadcn-ui";
@@ -85,6 +85,14 @@ export function CountryDialog({
   const [translationsEditing, setTranslationsEditing] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [activeTab, setActiveTab] = useState<"general" | "locales">("general");
+  const [refreshing, setRefreshing] = useState(false);
+  const [localesLoaded, setLocalesLoaded] = useState(false);
+  // Owned here (not inside CountryLocaleTranslations) so it survives that component unmounting
+  // when the user switches away from the tab and back — otherwise the search text resets to
+  // empty on remount while `form.locales` stays whatever the last search had filtered it to,
+  // showing a filtered list next to an empty, out-of-sync search box.
+  const [localeSearch, setLocaleSearch] = useState("");
+  const lastLocaleSearchKey = useRef("");
   const [draftPrompt, setDraftPrompt] = useState<CountryFormState | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const [draftSyncing, setDraftSyncing] = useState(false);
@@ -98,6 +106,9 @@ export function CountryDialog({
       setDraftPrompt(null);
       setDraftSavedAt(null);
       setDraftSyncing(false);
+      setLocalesLoaded(false);
+      setLocaleSearch("");
+      lastLocaleSearchKey.current = "";
     }
   }, [open]);
 
@@ -191,6 +202,82 @@ export function CountryDialog({
     setActiveTab("locales");
   }
 
+  // Shared by the lazy first-load, the search box, and the manual refresh button. The sub-resource
+  // is paginated and this dialog only ever holds one page of it, so search re-hits the server with
+  // localeCode rather than filtering whatever page happens to already be loaded.
+  async function fetchLocales(localeCode?: string): Promise<void> {
+    if (countryId == null) return;
+    const res = await countriesService.listLocales(countryId, { size: 50, localeCode: localeCode || undefined });
+    onFormChange({
+      ...form,
+      locales: res.data.map((l) => ({
+        id: l.id,
+        locale: l.locale,
+        name: l.name,
+        description: l.description ?? "",
+        sort_order: l.sort_order,
+      })),
+    });
+  }
+
+  // Translations are only fetched once the tab is actually selected — not when the country card
+  // is opened — and only the first time per dialog session; re-selecting the tab afterward reuses
+  // what's already loaded. Use the Refresh button for an explicit re-fetch.
+  useEffect(() => {
+    if (!open || mode === "create" || activeTab !== "locales" || localesLoaded) return;
+    setLocalesLoaded(true);
+    fetchLocales().catch((err) => toast.error((err as Error).message));
+  }, [open, mode, activeTab, localesLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced server-side search, view mode only — edit mode always needs the complete,
+  // unfiltered list (see CountryLocaleTranslations' duplicate-locale checks).
+  useEffect(() => {
+    if (!open || mode === "create" || translationsEditing) return;
+    if (lastLocaleSearchKey.current === localeSearch) return;
+    lastLocaleSearchKey.current = localeSearch;
+    const timer = setTimeout(() => {
+      fetchLocales(localeSearch.trim()).catch((err) => toast.error((err as Error).message));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [localeSearch, open, mode, translationsEditing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Entering edit mode always needs the complete list — clear any active search and re-pull
+  // everything first, so duplicate-locale checks never operate on a filtered subset.
+  function startEditingLocales() {
+    setLocaleSearch("");
+    lastLocaleSearchKey.current = "";
+    fetchLocales().catch((err) => toast.error((err as Error).message));
+    setTranslationsEditing(true);
+  }
+
+  // Manual refresh only — switching tabs never re-fetches on its own otherwise. Pulls whichever the
+  // active tab needs: general info re-hits GET /countries/{id}, translations re-hits the locales
+  // sub-resource (honoring whatever search filter is currently applied).
+  async function handleRefresh() {
+    if (countryId == null) return;
+    setRefreshing(true);
+    try {
+      if (activeTab === "general") {
+        const res = await countriesService.get(countryId);
+        const full = res.data;
+        onFormChange({
+          ...form,
+          iso3_code: full.iso3_code ?? "",
+          phone_code: full.phone_code ?? "",
+          sort_order: full.sort_order,
+        });
+      } else {
+        await fetchLocales(localeSearch.trim());
+        setLocalesLoaded(true);
+      }
+      toast.success(t("common.refreshed"));
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   // Silent check — drives the Create button's disabled state without firing toasts on every render.
   function isLocaleValid(): boolean {
     return form.locale.name.trim() !== "" && form.locale.description.trim() !== ""
@@ -254,12 +341,27 @@ export function CountryDialog({
               onValueChange={(v) => setActiveTab(v as "general" | "locales")}
               className="flex-1 min-h-0 flex-col"
             >
-              <TabsList className="mx-6 mt-4 w-fit shrink-0">
-                <TabsTrigger value="general">{t("common.generalInfo")}</TabsTrigger>
-                <TabsTrigger value="locales" disabled={mode === "create" && !isGeneralInfoValid()}>
-                  {t("locale.translations")}
-                </TabsTrigger>
-              </TabsList>
+              <div className="flex items-center justify-between mx-6 mt-4 gap-2">
+                <TabsList className="w-fit shrink-0">
+                  <TabsTrigger value="general">{t("common.generalInfo")}</TabsTrigger>
+                  <TabsTrigger value="locales" disabled={mode === "create" && !isGeneralInfoValid()}>
+                    {t("locale.translations")}
+                  </TabsTrigger>
+                </TabsList>
+                {mode !== "create" && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 shrink-0"
+                    onClick={handleRefresh}
+                    disabled={refreshing || (activeTab === "general" ? generalEditing : translationsEditing)}
+                    title={t("common.refresh")}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                  </Button>
+                )}
+              </div>
 
               <TabsContent value="general" className="min-h-0 overflow-y-auto px-6 py-5">
                 <CountryGeneralInfo
@@ -283,6 +385,9 @@ export function CountryDialog({
                   onSaved={onSaved}
                   editing={translationsEditing}
                   onEditingChange={setTranslationsEditing}
+                  onStartEditing={startEditingLocales}
+                  search={localeSearch}
+                  onSearchChange={setLocaleSearch}
                   open={open}
                 />
               </TabsContent>

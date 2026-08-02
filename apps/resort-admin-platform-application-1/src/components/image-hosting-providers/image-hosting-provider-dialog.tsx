@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, MapPin, RefreshCw, Save, X } from "lucide-react";
+import { ArrowRight, CloudIcon, RefreshCw, Save, X } from "lucide-react";
 import { Button, Sheet, SheetContent } from "@resort/shadcn-ui";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@resort/shadcn-ui";
 import {
@@ -15,38 +15,34 @@ import {
 } from "@resort/shadcn-ui";
 import { DialogEntityHeader } from "@/components/shared/dialog-entity-header";
 import { DialogCreateFooter } from "@/components/shared/dialog-create-footer";
-import { citiesService } from "@/services/cities";
+import { imageHostingProvidersService } from "@/services/image-hosting-providers";
 import { toast } from "sonner";
-import type { CityDialogMode, CityFormState } from "./types";
-import { CityGeneralInfo } from "./city-general-info";
-import { CityLocaleTranslations } from "./city-locale-translations";
+import type { ImageHostingProviderDialogMode, ImageHostingProviderFormState } from "./types";
+import { ImageHostingProviderGeneralInfo } from "./image-hosting-provider-general-info";
+import { ImageHostingProviderConfigFields } from "./image-hosting-provider-config-fields";
 
-export const emptyCityForm: CityFormState = {
-  country_id: "",
+export const emptyImageHostingProviderForm: ImageHostingProviderFormState = {
   code: "",
+  name: "",
+  description: "",
   sort_order: 0,
-  locale: { name: "", description: "", sort_order: 0 },
-  locales: [],
+  config_fields: [{ key: "", label: "", field_type: "TEXT", placeholder: "", default_value: "", is_required: true, sort_order: 1, _new: true }],
 };
 
-const CODE_PATTERN = /^[A-Z]{3}$/;
-// Create only ever submits the "en" translation — keep it English/ASCII.
-const ENGLISH_TEXT_PATTERN = /^[\x00-\x7F]*$/;
-
 // Local autosave for the create form — never sent to the backend, just a browser-local checkpoint.
-const DRAFT_STORAGE_KEY = "city-dialog-draft";
+const DRAFT_STORAGE_KEY = "image-hosting-provider-dialog-draft";
 const DRAFT_SAVE_DEBOUNCE_MS = 500;
 
-function hasDraftContent(f: CityFormState): boolean {
-  return f.country_id !== "" || f.code.trim() !== ""
-    || f.locale.name.trim() !== "" || f.locale.description.trim() !== "";
+function hasDraftContent(f: ImageHostingProviderFormState): boolean {
+  return f.code.trim() !== "" || f.name.trim() !== "" || f.description.trim() !== ""
+    || f.config_fields.some((r) => r.key.trim() !== "" || r.label.trim() !== "");
 }
 
-function readDraft(): CityFormState | null {
+function readDraft(): ImageHostingProviderFormState | null {
   try {
     const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as CityFormState;
+    const parsed = JSON.parse(raw) as ImageHostingProviderFormState;
     return hasDraftContent(parsed) ? parsed : null;
   } catch {
     return null;
@@ -57,45 +53,39 @@ function clearDraft() {
   localStorage.removeItem(DRAFT_STORAGE_KEY);
 }
 
-export interface CityDialogProps {
+export interface ImageHostingProviderDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: CityDialogMode;
-  cityId?: number;
-  /** Pre-set country (opened from a country's own detail page) — hides the country picker in create mode */
-  fixedCountryId?: number;
-  /** Display label for the resolved country, used in view/edit and alongside fixedCountryId */
-  countryLabel?: string;
-  form: CityFormState;
-  onFormChange: (form: CityFormState) => void;
+  mode: ImageHostingProviderDialogMode;
+  providerId?: number;
+  form: ImageHostingProviderFormState;
+  onFormChange: (form: ImageHostingProviderFormState) => void;
   onSaved?: () => void | Promise<void>;
 }
 
-export function CityDialog({
+export function ImageHostingProviderDialog({
   open,
   onOpenChange,
   mode,
-  cityId,
-  fixedCountryId,
-  countryLabel,
+  providerId,
   form,
   onFormChange,
   onSaved,
-}: CityDialogProps) {
+}: ImageHostingProviderDialogProps) {
   const { t } = useTranslation();
   const [submitting, setSubmitting] = useState(false);
   const [generalEditing, setGeneralEditing] = useState(false);
-  const [translationsEditing, setTranslationsEditing] = useState(false);
+  const [configFieldsEditing, setConfigFieldsEditing] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
-  const [activeTab, setActiveTab] = useState<"general" | "locales">("general");
-  const [draftPrompt, setDraftPrompt] = useState<CityFormState | null>(null);
+  const [activeTab, setActiveTab] = useState<"general" | "configFields">("general");
+  const [draftPrompt, setDraftPrompt] = useState<ImageHostingProviderFormState | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const [draftSyncing, setDraftSyncing] = useState(false);
 
   useEffect(() => {
     if (!open) {
       setGeneralEditing(false);
-      setTranslationsEditing(false);
+      setConfigFieldsEditing(false);
       setConfirmClose(false);
       setActiveTab("general");
       setDraftPrompt(null);
@@ -111,8 +101,6 @@ export function CityDialog({
     }
   }, [open, mode]);
 
-  // Debounced local autosave of the create form — skipped while the restore prompt is pending,
-  // otherwise the still-empty parent form would immediately overwrite the draft we're offering.
   useEffect(() => {
     if (!open || mode !== "create" || draftPrompt) return;
     if (hasDraftContent(form)) setDraftSyncing(true);
@@ -159,10 +147,8 @@ export function CityDialog({
     </span>
   ) : undefined;
 
-  // Edit/view only — in-progress section edits still warn before discarding, since those aren't
-  // autosaved. Create is covered by the local draft (see draftIndicator above), so closing it
-  // never needs a confirm: the in-progress data is already safely persisted to resume later.
-  const isDirty = generalEditing || translationsEditing;
+  // Edit/view only — create is covered by the local draft, so closing it never needs a confirm.
+  const isDirty = generalEditing || configFieldsEditing;
 
   function requestClose() {
     if (mode === "create") { onOpenChange(false); return; }
@@ -170,56 +156,73 @@ export function CityDialog({
     else onOpenChange(false);
   }
 
-  // Silent check — drives the "locales" tab's disabled state without firing toasts on every render.
+  // Silent check — drives the "config fields" tab's disabled state without firing toasts on every render.
   function isGeneralInfoValid(): boolean {
-    const code = form.code.trim().toUpperCase();
-    const hasCountry = fixedCountryId != null || form.country_id !== "";
-    return CODE_PATTERN.test(code) && hasCountry;
+    return form.code.trim() !== "" && form.name.trim() !== "";
   }
 
-  // Same checks, but reports which field is missing/invalid — used by both the Next button and submit.
+  // Same checks, but reports which field is missing — used by both the Next button and submit.
   function validateGeneralInfo(): boolean {
-    const code = form.code.trim().toUpperCase();
-    if (fixedCountryId == null && form.country_id === "") { toast.error(t("toast.countryRequired")); return false; }
-    if (!CODE_PATTERN.test(code)) { toast.error(t("toast.cityCodeInvalid")); return false; }
+    if (!form.code.trim()) { toast.error(t("toast.codeRequired")); return false; }
+    if (!form.name.trim()) { toast.error(t("toast.nameRequired")); return false; }
     return true;
   }
 
   function handleNext() {
     if (!validateGeneralInfo()) return;
-    setActiveTab("locales");
+    setActiveTab("configFields");
   }
 
   // Silent check — drives the Create button's disabled state without firing toasts on every render.
-  function isLocaleValid(): boolean {
-    return form.locale.name.trim() !== "" && form.locale.description.trim() !== ""
-      && ENGLISH_TEXT_PATTERN.test(form.locale.name) && ENGLISH_TEXT_PATTERN.test(form.locale.description);
+  function isConfigFieldsValid(): boolean {
+    if (form.config_fields.length === 0) return false;
+    const keys = new Set<string>();
+    for (const row of form.config_fields) {
+      const key = row.key.trim();
+      if (!key || !row.label.trim() || !row.field_type.trim()) return false;
+      if (keys.has(key)) return false;
+      keys.add(key);
+    }
+    return true;
+  }
+
+  function validateConfigFields(): boolean {
+    if (form.config_fields.length === 0) { toast.error(t("toast.configFieldsRequired")); return false; }
+    const keys = new Set<string>();
+    for (const [i, row] of form.config_fields.entries()) {
+      if (!row.key.trim()) { toast.error(t("toast.configFieldKeyRequiredRow", { n: i + 1 })); return false; }
+      if (!row.label.trim()) { toast.error(t("toast.configFieldLabelRequiredRow", { n: i + 1 })); return false; }
+      if (!row.field_type.trim()) { toast.error(t("toast.configFieldTypeRequiredRow", { n: i + 1 })); return false; }
+      if (keys.has(row.key.trim())) { toast.error(t("toast.configFieldKeyDuplicate", { key: row.key.trim() })); return false; }
+      keys.add(row.key.trim());
+    }
+    return true;
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (mode !== "create") return;
     if (!validateGeneralInfo()) { setActiveTab("general"); return; }
-    const resolvedCountryId = fixedCountryId ?? Number(form.country_id);
-    if (!form.locale.name.trim()) { toast.error(t("toast.localeNameRequired", { n: 1 })); return; }
-    if (!ENGLISH_TEXT_PATTERN.test(form.locale.name)) { toast.error(t("toast.localeNameEnglishOnly")); return; }
-    if (!form.locale.description.trim()) { toast.error(t("toast.localeDescriptionRequired", { n: 1 })); return; }
-    if (!ENGLISH_TEXT_PATTERN.test(form.locale.description)) { toast.error(t("toast.localeDescriptionEnglishOnly")); return; }
+    if (!validateConfigFields()) return;
     setSubmitting(true);
     try {
-      const code = form.code.trim().toUpperCase();
-      await citiesService.create({
-        code,
-        country_id: resolvedCountryId,
+      await imageHostingProvidersService.create({
+        code: form.code.trim(),
+        name: form.name.trim(),
+        description: form.description.trim(),
         sort_order: Number(form.sort_order) || 0,
-        locale: {
-          name: form.locale.name.trim(),
-          description: form.locale.description.trim(),
-          sort_order: Number(form.locale.sort_order) || 0,
-        },
+        config_fields: form.config_fields.map((row) => ({
+          key: row.key.trim(),
+          label: row.label.trim(),
+          field_type: row.field_type.trim(),
+          placeholder: row.placeholder.trim(),
+          default_value: row.default_value.trim(),
+          is_required: row.is_required,
+          sort_order: Number(row.sort_order) || 0,
+        })),
       });
       clearDraft();
-      toast.success(t("cities.createdToast"));
+      toast.success(t("imageHostingProvider.createdToast"));
       onOpenChange(false);
       await onSaved?.();
     } catch (err) {
@@ -229,9 +232,9 @@ export function CityDialog({
     }
   }
 
-  const isEditing = generalEditing || translationsEditing;
-  const headerTitle = mode === "create" ? t("dialog.city.new") : (isEditing ? t("dialog.city.edit") : t("dialog.city.view"));
-  const headerDesc = mode === "create" ? t("dialog.city.desc.create") : (isEditing ? t("dialog.city.desc.edit") : t("dialog.city.desc.view"));
+  const isEditing = generalEditing || configFieldsEditing;
+  const headerTitle = mode === "create" ? t("dialog.imageHostingProvider.new") : (isEditing ? t("dialog.imageHostingProvider.edit") : t("dialog.imageHostingProvider.view"));
+  const headerDesc = mode === "create" ? t("dialog.imageHostingProvider.desc.create") : (isEditing ? t("dialog.imageHostingProvider.desc.edit") : t("dialog.imageHostingProvider.desc.view"));
 
   return (
     <>
@@ -244,28 +247,26 @@ export function CityDialog({
         >
           <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
 
-            <DialogEntityHeader icon={<MapPin className="h-4 w-4" />} title={headerTitle} description={headerDesc} />
+            <DialogEntityHeader icon={<CloudIcon className="h-4 w-4" />} title={headerTitle} description={headerDesc} />
 
             <Tabs
               value={activeTab}
-              onValueChange={(v) => setActiveTab(v as "general" | "locales")}
+              onValueChange={(v) => setActiveTab(v as "general" | "configFields")}
               className="flex-1 min-h-0 flex-col"
             >
               <TabsList className="mx-6 mt-4 w-fit shrink-0">
                 <TabsTrigger value="general">{t("common.generalInfo")}</TabsTrigger>
-                <TabsTrigger value="locales" disabled={mode === "create" && !isGeneralInfoValid()}>
-                  {t("locale.translations")}
+                <TabsTrigger value="configFields" disabled={mode === "create" && !isGeneralInfoValid()}>
+                  {t("imageHostingProvider.configFields")}
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="general" className="min-h-0 overflow-y-auto px-6 py-5">
-                <CityGeneralInfo
+                <ImageHostingProviderGeneralInfo
                   mode={mode}
                   form={form}
                   onFormChange={(patch) => onFormChange({ ...form, ...patch })}
-                  cityId={cityId}
-                  fixedCountryId={fixedCountryId}
-                  countryLabel={countryLabel}
+                  providerId={providerId}
                   onSaved={onSaved}
                   editing={generalEditing}
                   onEditingChange={setGeneralEditing}
@@ -273,15 +274,15 @@ export function CityDialog({
                 />
               </TabsContent>
 
-              <TabsContent value="locales" className="min-h-0 overflow-y-auto px-6 py-5">
-                <CityLocaleTranslations
+              <TabsContent value="configFields" className="min-h-0 overflow-y-auto px-6 py-5">
+                <ImageHostingProviderConfigFields
                   mode={mode}
                   form={form}
                   onFormChange={onFormChange}
-                  cityId={cityId}
+                  providerId={providerId}
                   onSaved={onSaved}
-                  editing={translationsEditing}
-                  onEditingChange={setTranslationsEditing}
+                  editing={configFieldsEditing}
+                  onEditingChange={setConfigFieldsEditing}
                   open={open}
                 />
               </TabsContent>
@@ -301,8 +302,8 @@ export function CityDialog({
               </div>
             )}
 
-            {mode === "create" && activeTab === "locales" && (
-              <DialogCreateFooter submitting={submitting} onCancel={requestClose} disabled={!isLocaleValid()} indicator={draftIndicator} />
+            {mode === "create" && activeTab === "configFields" && (
+              <DialogCreateFooter submitting={submitting} onCancel={requestClose} disabled={!isConfigFieldsValid()} indicator={draftIndicator} />
             )}
 
           </form>
@@ -328,7 +329,7 @@ export function CityDialog({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("dialog.restoreDraft.title")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("dialog.restoreDraft.descCity")}</AlertDialogDescription>
+            <AlertDialogDescription>{t("dialog.restoreDraft.descImageHostingProvider")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={discardDraft}>{t("dialog.restoreDraft.discard")}</AlertDialogCancel>

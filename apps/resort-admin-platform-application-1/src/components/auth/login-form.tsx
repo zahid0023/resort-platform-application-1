@@ -21,6 +21,7 @@ import {
 import { Input } from "@resort/shadcn-ui"
 import Link from "next/link"
 import { login } from "@/services/auth"
+import { ApiError } from "@/services/api"
 
 export function LoginForm({
   className,
@@ -43,7 +44,11 @@ export function LoginForm({
       toast.success(t("auth.login.successToast"))
       router.push("/dashboard")
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("auth.login.failToast"))
+      if (err instanceof ApiError && err.code === "INVALID_CREDENTIALS") {
+        toast.error(t("auth.login.invalidCredentialsToast"))
+      } else {
+        toast.error(t("auth.login.failToast"))
+      }
     } finally {
       setLoading(false)
     }

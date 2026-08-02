@@ -16,10 +16,10 @@ import {
 import { PageActions } from "@/components/shared/page-actions";
 import { PageHeader } from "@/components/shared/page-header";
 import { Pagination } from "@/components/shared/pagination";
-import { CityCard } from "@/components/cities/city-card";
-import { CityDialog, emptyCityForm } from "@/components/cities/city-dialog";
-import type { CityDialogMode, CityFormState } from "@/components/cities/types";
-import { citiesService, type City, type ListParams } from "@/services/cities";
+import { ImageHostingProviderCard } from "@/components/image-hosting-providers/image-hosting-provider-card";
+import { ImageHostingProviderDialog, emptyImageHostingProviderForm } from "@/components/image-hosting-providers/image-hosting-provider-dialog";
+import type { ImageHostingProviderDialogMode, ImageHostingProviderFormState } from "@/components/image-hosting-providers/types";
+import { imageHostingProvidersService, type ImageHostingProvider, type ListParams } from "@/services/image-hosting-providers";
 
 const PAGE_SIZE = 20;
 
@@ -31,11 +31,11 @@ function buildApiFilters(field: string, q: string): Pick<ListParams, "code" | "n
   return { [field]: q } as Pick<ListParams, "code" | "name">;
 }
 
-export default function CitiesPage() {
+export default function ImageHostingProvidersPage() {
   const { t } = useTranslation();
 
   // List data
-  const [cities, setCities] = useState<City[]>([]);
+  const [providers, setProviders] = useState<ImageHostingProvider[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Pagination
@@ -49,17 +49,21 @@ export default function CitiesPage() {
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState(ALL_FIELD);
 
-  // Sort — "id" is only valid as the implicit default when sortBy is omitted; never send it explicitly.
-  const [sortBy, setSortBy] = useState<NonNullable<ListParams["sort_by"]>>("sortOrder");
+  // Sort — only code/name are sortable here; "id" is implicit-default only.
+  const [sortBy, setSortBy] = useState<NonNullable<ListParams["sort_by"]>>("code");
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC");
 
   // Dialog
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [mode, setMode] = useState<CityDialogMode>("create");
+  const [mode, setMode] = useState<ImageHostingProviderDialogMode>("create");
   const [activeId, setActiveId] = useState<number | undefined>(undefined);
-  const [countryLabel, setCountryLabel] = useState<string | undefined>(undefined);
-  const [form, setForm] = useState<CityFormState>(emptyCityForm);
-  const [deleteTarget, setDeleteTarget] = useState<City | null>(null);
+  const [form, setForm] = useState<ImageHostingProviderFormState>(emptyImageHostingProviderForm);
+  const [deleteTarget, setDeleteTarget] = useState<ImageHostingProvider | null>(null);
+
+  const dialogOpenRef = useRef(dialogOpen);
+  const activeIdRef = useRef(activeId);
+  useEffect(() => { dialogOpenRef.current = dialogOpen; }, [dialogOpen]);
+  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
 
   function toFieldOption(key: string) {
     return { value: key, label: t(`apiFields.${key}`) };
@@ -70,15 +74,14 @@ export default function CitiesPage() {
     ...["code", "name"].map(toFieldOption),
   ], [t]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // "id" is deliberately excluded — passing sortBy=id throws 400 (it's implicit-default only).
   const sortFields = useMemo(() => [
-    ...["sortOrder", "code", "name", "createdAt"].map(toFieldOption),
+    ...["code", "name"].map(toFieldOption),
   ], [t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function refresh(overrides: Partial<ListParams> = {}) {
     setLoading(true);
     try {
-      const res = await citiesService.list({
+      const res = await imageHostingProvidersService.list({
         page,
         size: PAGE_SIZE,
         sort_by: sortBy,
@@ -87,11 +90,19 @@ export default function CitiesPage() {
         ...overrides,
       });
 
-      setCities(res.data);
+      setProviders(res.data);
       setTotalPages(res.total_pages);
       setTotalElements(res.total_elements);
       setHasNext(res.has_next);
       setHasPrevious(res.has_previous);
+
+      // Sync open dialog form with refreshed data
+      setForm((prev) => {
+        if (!dialogOpenRef.current || activeIdRef.current == null) return prev;
+        const updated = res.data.find((p) => p.id === activeIdRef.current);
+        if (!updated) return prev;
+        return { ...prev, name: updated.name, description: updated.description, sort_order: updated.sort_order };
+      });
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -116,44 +127,41 @@ export default function CitiesPage() {
     return () => clearTimeout(timer);
   }, [search, searchField]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const cityNames = useMemo(
-    () => Object.fromEntries(cities.map((c) => [c.id, c.locale?.name ?? ""])),
-    [cities],
-  );
-
   // Client-side OR filter only for "all" field (API has no OR-across-fields support)
-  const displayCities = useMemo(() => {
-    if (searchField !== ALL_FIELD || !search.trim()) return cities;
+  const displayProviders = useMemo(() => {
+    if (searchField !== ALL_FIELD || !search.trim()) return providers;
     const q = search.trim().toLowerCase();
-    return cities.filter((c) => {
-      const code = c.code.toLowerCase();
-      const name = (cityNames[c.id] ?? "").toLowerCase();
-      return code.includes(q) || name.includes(q);
-    });
-  }, [cities, cityNames, search, searchField]);
+    return providers.filter((p) => p.code.toLowerCase().includes(q) || p.name.toLowerCase().includes(q));
+  }, [providers, search, searchField]);
 
   function openCreate() {
     setMode("create");
     setActiveId(undefined);
-    setCountryLabel(undefined);
-    setForm(emptyCityForm);
+    setForm(emptyImageHostingProviderForm);
     setDialogOpen(true);
   }
 
-  async function openDialog(c: City) {
+  async function openDialog(p: ImageHostingProvider) {
     try {
-      const res = await citiesService.get(c.id);
+      const res = await imageHostingProvidersService.get(p.id);
       const full = res.data;
       setMode("view");
       setActiveId(full.id);
-      setCountryLabel(`${full.country.locale?.name ?? full.country.code} (${full.country.code})`);
       setForm({
-        country_id: full.country.id,
         code: full.code,
+        name: full.name,
+        description: full.description,
         sort_order: full.sort_order,
-        locale: emptyCityForm.locale,
-        // Populated by CityLocaleTranslations itself via GET /cities/{id}/locales.
-        locales: [],
+        config_fields: full.config_fields.map((f) => ({
+          id: f.id,
+          key: f.key,
+          label: f.label,
+          field_type: f.field_type,
+          placeholder: f.placeholder,
+          default_value: f.default_value,
+          is_required: f.is_required,
+          sort_order: f.sort_order,
+        })),
       });
       setDialogOpen(true);
     } catch (err) {
@@ -182,8 +190,8 @@ export default function CitiesPage() {
   async function confirmDelete() {
     if (!deleteTarget) return;
     try {
-      await citiesService.remove(deleteTarget.id);
-      toast.success(`${t("delete.city.title")}: ${deleteTarget.code}`);
+      await imageHostingProvidersService.remove(deleteTarget.id);
+      toast.success(`${t("delete.imageHostingProvider.title")}: ${deleteTarget.code}`);
       setDeleteTarget(null);
       await refresh({ page: 0 });
       setPage(0);
@@ -198,8 +206,8 @@ export default function CitiesPage() {
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 w-full">
         <PageHeader
           eyebrow={t("common.admin")}
-          title={t("cities.title")}
-          subtitle={t("cities.subtitle")}
+          title={t("imageHostingProvider.title")}
+          subtitle={t("imageHostingProvider.subtitle")}
         />
         <PageActions
           fields={searchFields}
@@ -214,25 +222,24 @@ export default function CitiesPage() {
             sortDir,
             onSortDirChange: handleSortDirChange,
           }}
-          newLabel={t("cities.new")}
+          newLabel={t("imageHostingProvider.new")}
           onNew={openCreate}
         />
       </header>
 
       <main className="flex flex-col gap-4">
         {loading ? (
-          <div className="text-center py-16 text-muted-foreground">{t("cities.loading")}</div>
-        ) : displayCities.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">{t("imageHostingProvider.loading")}</div>
+        ) : displayProviders.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground border rounded-xl border-dashed">
-            {t("cities.empty")}
+            {t("imageHostingProvider.empty")}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {displayCities.map((city) => (
-              <CityCard
-                key={city.id}
-                city={city}
-                defaultName={cityNames[city.id]}
+            {displayProviders.map((p) => (
+              <ImageHostingProviderCard
+                key={p.id}
+                provider={p}
                 onView={openDialog}
                 onDelete={setDeleteTarget}
               />
@@ -250,12 +257,11 @@ export default function CitiesPage() {
         />
       </main>
 
-      <CityDialog
+      <ImageHostingProviderDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         mode={mode}
-        cityId={activeId}
-        countryLabel={countryLabel}
+        providerId={activeId}
         form={form}
         onFormChange={setForm}
         onSaved={() => refresh()}
@@ -264,9 +270,9 @@ export default function CitiesPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("delete.city.title")}</AlertDialogTitle>
+            <AlertDialogTitle>{t("delete.imageHostingProvider.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("delete.city.desc", { code: deleteTarget?.code ?? `#${deleteTarget?.id}` })}
+              {t("delete.imageHostingProvider.desc", { code: deleteTarget?.code ?? `#${deleteTarget?.id}` })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

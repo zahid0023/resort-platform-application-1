@@ -24,18 +24,21 @@ import {
   AlertDialogTitle,
 } from "@resort/shadcn-ui";
 import { citiesService } from "@/services/cities";
-import type { Locale } from "@/services/locales";
+import { localesService, type Locale } from "@/services/locales";
 import { toast } from "sonner";
-import type { CityDialogMode, CityFormState, CityLocaleRow } from "./types";
+import type { CityDialogMode, CityFormState, LocaleRow } from "./types";
 
-type NewLocaleRow = CityLocaleRow & { _rkey: string };
+type NewLocaleRow = LocaleRow & { _rkey: string };
+
+// Create only ever submits the "en" translation — keep what's typed limited to English/ASCII text
+// so it can't silently end up holding another script's name/description.
+const NON_ASCII = /[^\x00-\x7F]/g;
 
 export interface CityLocaleTranslationsProps {
   mode: CityDialogMode;
   form: CityFormState;
   onFormChange: (form: CityFormState) => void;
   cityId?: number;
-  availableLocales: Locale[];
   onSaved?: () => void | Promise<void>;
   editing: boolean;
   onEditingChange: (v: boolean) => void;
@@ -47,7 +50,6 @@ export function CityLocaleTranslations({
   form,
   onFormChange,
   cityId,
-  availableLocales,
   onSaved,
   editing,
   onEditingChange,
@@ -55,10 +57,59 @@ export function CityLocaleTranslations({
 }: CityLocaleTranslationsProps) {
   const { t } = useTranslation();
   const [newLocaleRows, setNewLocaleRows] = useState<NewLocaleRow[]>([]);
-  const [rowEditData, setRowEditData] = useState<Record<string, CityLocaleRow>>({});
+  const [rowEditData, setRowEditData] = useState<Record<string, LocaleRow>>({});
   const [busyRowKeys, setBusyRowKeys] = useState<Set<string>>(new Set());
-  const [pendingDeleteRow, setPendingDeleteRow] = useState<CityLocaleRow | null>(null);
+  const [pendingDeleteRow, setPendingDeleteRow] = useState<LocaleRow | null>(null);
   const rKeyCounter = useRef(0);
+
+  // Only needed once the user actually wants to add a language.
+  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
+  const [localesLoaded, setLocalesLoaded] = useState(false);
+
+  useEffect(() => {
+    if (!editing || localesLoaded) return;
+    localesService
+      .list({ size: 50, sort_by: "sortOrder", sort_dir: "ASC" })
+      .then((res) => {
+        setAvailableLocales(res.data);
+        setLocalesLoaded(true);
+      })
+      .catch(() => {});
+  }, [editing, localesLoaded]);
+
+  // GET /cities/{id} and the list endpoint only ever carry the single Accept-Language-matched
+  // translation — the full set is only available via this dedicated sub-resource, so this tab
+  // fetches its own data rather than relying on whatever the parent list/get call populated.
+  function refreshLocales() {
+    if (cityId == null) return;
+    citiesService.listLocales(cityId, { size: 50 })
+      .then((res) => {
+        onFormChange({
+          ...form,
+          locales: res.data.map((l) => ({
+            id: l.id,
+            locale: l.locale,
+            name: l.name,
+            description: l.description ?? "",
+            sort_order: l.sort_order,
+          })),
+        });
+      })
+      .catch((err) => toast.error((err as Error).message));
+  }
+
+  // Guarded by comparing against the last-fetched key rather than a one-shot "have I run" flag:
+  // a ref flip doesn't survive React Strict Mode's dev-only effect replay (mount → cleanup →
+  // mount again on the same ref), so a boolean guard fires a spurious extra fetch on the replay.
+  // Comparing actual values is replay-safe since the key is identical across both passes.
+  const lastFetchKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open || mode === "create" || cityId == null) { lastFetchKey.current = null; return; }
+    const key = String(cityId);
+    if (lastFetchKey.current === key) return;
+    lastFetchKey.current = key;
+    refreshLocales();
+  }, [open, cityId, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) {
@@ -68,14 +119,14 @@ export function CityLocaleTranslations({
     }
   }, [open]);
 
-  function rowKey(row: CityLocaleRow): string {
+  function rowKey(row: LocaleRow): string {
     return row.id != null ? `e_${row.id}` : (row as NewLocaleRow)._rkey ?? "";
   }
 
   function isRowEditing(key: string) { return key in rowEditData; }
   function isRowBusy(key: string) { return busyRowKeys.has(key); }
 
-  function startEditRow(key: string, row: CityLocaleRow) {
+  function startEditRow(key: string, row: LocaleRow) {
     setRowEditData((prev) => ({ ...prev, [key]: { ...row } }));
   }
 
@@ -84,7 +135,7 @@ export function CityLocaleTranslations({
     if (isNew) setNewLocaleRows((prev) => prev.filter((r) => r._rkey !== key));
   }
 
-  function patchRowEdit(key: string, patch: Partial<CityLocaleRow>) {
+  function patchRowEdit(key: string, patch: Partial<LocaleRow>) {
     setRowEditData((prev) => prev[key] ? { ...prev, [key]: { ...prev[key], ...patch } } : prev);
   }
 
@@ -96,11 +147,11 @@ export function CityLocaleTranslations({
     });
   }
 
-  async function saveRow(key: string, row: CityLocaleRow, isNew: boolean) {
+  async function saveRow(key: string, row: LocaleRow, isNew: boolean) {
     if (cityId == null) return;
     const data = rowEditData[key];
     if (!data) return;
-    if (!data.locale_id) { toast.error(t("toast.localeSelectLang", { n: 1 })); return; }
+    if (isNew && !data.locale_id) { toast.error(t("toast.localeSelectLang", { n: 1 })); return; }
     if (!data.name.trim()) { toast.error(t("toast.localeNameRequired", { n: 1 })); return; }
     setBusy(key, true);
     try {
@@ -121,6 +172,7 @@ export function CityLocaleTranslations({
       }
       setRowEditData((prev) => { const n = { ...prev }; delete n[key]; return n; });
       toast.success(t("common.saved"));
+      refreshLocales();
       await onSaved?.();
     } catch (err) {
       toast.error((err as Error).message);
@@ -136,8 +188,9 @@ export function CityLocaleTranslations({
     setPendingDeleteRow(null);
     setBusy(key, true);
     try {
-      await citiesService.removeLocale(cityId, row.id);
+      await citiesService.removeLocale(cityId, row.id!);
       toast.success(t("locale.removedToast"));
+      refreshLocales();
       await onSaved?.();
     } catch (err) {
       toast.error((err as Error).message);
@@ -152,11 +205,18 @@ export function CityLocaleTranslations({
     onEditingChange(false);
   }
 
+  function usedLocaleIds(excludeKey?: string): Set<number> {
+    const existing = form.locales
+      .filter((r) => rowKey(r) !== excludeKey)
+      .map((r) => r.locale?.id);
+    const added = newLocaleRows
+      .filter((r) => r._rkey !== excludeKey)
+      .map((r) => r.locale_id);
+    return new Set([...existing, ...added].filter((v): v is number => typeof v === "number"));
+  }
+
   function addNewLocaleRow() {
-    const usedIds = new Set([
-      ...form.locales.map((r) => r.locale_id),
-      ...newLocaleRows.map((r) => r.locale_id),
-    ].filter((v): v is number => typeof v === "number"));
+    const usedIds = usedLocaleIds();
     const nextLocale = availableLocales.find((l) => !usedIds.has(l.id));
     const _rkey = `n_${rKeyCounter.current++}`;
     const newRow: NewLocaleRow = {
@@ -171,29 +231,7 @@ export function CityLocaleTranslations({
     setRowEditData((prev) => ({ ...prev, [_rkey]: { ...newRow } }));
   }
 
-  function addLocaleRow() {
-    const usedIds = new Set(
-      form.locales.map((r) => r.locale_id).filter((v): v is number => typeof v === "number"),
-    );
-    const nextLocale = availableLocales.find((l) => !usedIds.has(l.id));
-    onFormChange({
-      ...form,
-      locales: [
-        ...form.locales,
-        { locale_id: nextLocale ? nextLocale.id : "", name: "", description: "", sort_order: form.locales.length + 1, _new: true },
-      ],
-    });
-  }
-
-  function updateLocaleRow(idx: number, patch: Partial<CityLocaleRow>) {
-    onFormChange({ ...form, locales: form.locales.map((row, i) => (i === idx ? { ...row, ...patch } : row)) });
-  }
-
-  function removeLocaleRow(idx: number) {
-    onFormChange({ ...form, locales: form.locales.filter((_, i) => i !== idx) });
-  }
-
-  const allLocaleRows: Array<CityLocaleRow & { _rkey: string }> = [
+  const allLocaleRows: Array<LocaleRow & { _rkey: string }> = [
     ...form.locales.map((l) => ({ ...l, _rkey: `e_${l.id}` })),
     ...newLocaleRows,
   ];
@@ -225,14 +263,6 @@ export function CityLocaleTranslations({
             </Button>
           </div>
         )}
-        {mode === "create" && (
-          <Button type="button" size="sm" variant="outline" onClick={addLocaleRow}
-            disabled={form.locales.length >= availableLocales.length}
-            className="h-7 text-xs px-2.5"
-          >
-            <Plus className="h-3.5 w-3.5 mr-1" /> {t("locale.add")}
-          </Button>
-        )}
       </div>
 
       <Card className="gap-0 py-0 overflow-hidden">
@@ -245,123 +275,62 @@ export function CityLocaleTranslations({
             </div>
           ) : (
             <div className="divide-y">
-              {form.locales.map((row, idx) => {
-                const localeMeta = availableLocales.find((l) => l.id === row.locale_id);
-                return (
-                  <div key={`e_${row.id}`} className="p-4 space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <Languages className="h-3.5 w-3.5 text-muted-foreground" />
-                      {localeMeta ? `${localeMeta.name} (${localeMeta.code})` : t("locale.row.label", { n: idx + 1 })}
-                    </div>
-                    <div className="space-y-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">{t("field.language")}</Label>
-                        <Select value={row.locale_id ? String(row.locale_id) : ""} disabled>
-                          <SelectTrigger className="h-9 text-sm w-full">
-                            <SelectValue placeholder={t("placeholder.selectLanguage")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableLocales.map((l) => (
-                              <SelectItem key={l.id} value={String(l.id)}>{l.name} ({l.code})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">{t("field.sort")}</Label>
-                        <Input type="number" value={row.sort_order} disabled className="h-9 text-sm" onChange={() => {}} />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">{t("common.name")}</Label>
-                      <Input value={row.name} disabled placeholder={t("placeholder.cityName")} className="h-9 text-sm" onChange={() => {}} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">{t("common.description")}</Label>
-                      <Textarea value={row.description} disabled placeholder={t("placeholder.cityDescription")} rows={2} className="text-sm resize-none" onChange={() => {}} />
-                    </div>
+              {form.locales.map((row) => (
+                <div key={`e_${row.id}`} className="p-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Languages className="h-3.5 w-3.5 text-muted-foreground" />
+                    {row.locale ? `${row.locale.name} (${row.locale.code})` : t("locale.row.label", { n: row.id ?? 0 })}
                   </div>
-                );
-              })}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">{t("common.name")}</Label>
+                    <Input value={row.name} disabled placeholder={t("placeholder.cityName")} className="h-9 text-sm" onChange={() => {}} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">{t("common.description")}</Label>
+                    <Textarea value={row.description} disabled placeholder={t("placeholder.cityDescription")} rows={2} className="text-sm resize-none" onChange={() => {}} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground">{t("field.sort")}</Label>
+                    <Input type="number" value={row.sort_order} disabled className="h-9 text-sm" onChange={() => {}} />
+                  </div>
+                </div>
+              ))}
             </div>
           )
         )}
 
-        {/* CREATE mode */}
+        {/* CREATE mode — always a single "en" translation, resolved server-side */}
         {mode === "create" && (
-          form.locales.length === 0 ? (
-            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-              <Languages className="h-4 w-4 mr-2 opacity-40" />
-              {t("locale.empty.create")}
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Languages className="h-3.5 w-3.5 text-muted-foreground" />
+              {t("locale.row.english")}
             </div>
-          ) : (
-            <div className="divide-y">
-              {form.locales.map((row, idx) => {
-                const usedIds = form.locales.map((r, i) => i !== idx ? r.locale_id : null).filter((v): v is number => typeof v === "number");
-                return (
-                  <div key={idx} className="p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <Languages className="h-3.5 w-3.5 text-muted-foreground" />
-                        {t("locale.row.label", { n: idx + 1 })}
-                        <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-medium">{t("locale.row.new")}</span>
-                      </div>
-                      <Button type="button" size="icon" variant="ghost"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        onClick={() => removeLocaleRow(idx)}
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">{t("field.language")} *</Label>
-                        <Select
-                          value={row.locale_id ? String(row.locale_id) : ""}
-                          onValueChange={(v) => updateLocaleRow(idx, { locale_id: Number(v) })}
-                        >
-                          <SelectTrigger className="h-9 text-sm w-full">
-                            <SelectValue placeholder={t("placeholder.selectLanguage")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableLocales.map((l) => (
-                              <SelectItem key={l.id} value={String(l.id)} disabled={usedIds.includes(l.id)}>
-                                {l.name} ({l.code})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">{t("field.sort")} *</Label>
-                        <Input type="number" value={row.sort_order}
-                          onChange={(e) => updateLocaleRow(idx, { sort_order: Number(e.target.value) })}
-                          className="h-9 text-sm"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">{t("common.name")} *</Label>
-                      <Input value={row.name}
-                        onChange={(e) => updateLocaleRow(idx, { name: e.target.value })}
-                        placeholder={t("placeholder.cityName")}
-                        className="h-9 text-sm"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">{t("common.description")}</Label>
-                      <Textarea value={row.description}
-                        onChange={(e) => updateLocaleRow(idx, { description: e.target.value })}
-                        placeholder={t("placeholder.cityDescription")}
-                        rows={2}
-                        className="text-sm resize-none"
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">{t("common.name")} *</Label>
+              <Input value={form.locale.name}
+                onChange={(e) => onFormChange({ ...form, locale: { ...form.locale, name: e.target.value.replace(NON_ASCII, "") } })}
+                placeholder={t("placeholder.cityName")}
+                className="h-9 text-sm"
+              />
             </div>
-          )
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">{t("common.description")} *</Label>
+              <Textarea value={form.locale.description}
+                onChange={(e) => onFormChange({ ...form, locale: { ...form.locale, description: e.target.value.replace(NON_ASCII, "") } })}
+                placeholder={t("placeholder.cityDescription")}
+                rows={2}
+                className="text-sm resize-none"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">{t("field.sort")}</Label>
+              <Input type="number" value={form.locale.sort_order}
+                onChange={(e) => onFormChange({ ...form, locale: { ...form.locale, sort_order: Number(e.target.value) } })}
+                className="h-9 text-sm"
+              />
+            </div>
+          </div>
         )}
 
         {/* EDIT mode */}
@@ -379,20 +348,16 @@ export function CityLocaleTranslations({
                 const rowEditing = isRowEditing(key);
                 const busy = isRowBusy(key);
                 const editData = rowEditData[key] ?? row;
-                const localeMeta = availableLocales.find((l) => l.id === row.locale_id);
-                const usedIds = allLocaleRows
-                  .filter((r) => r._rkey !== key)
-                  .map((r) => r.locale_id)
-                  .filter((v): v is number => typeof v === "number");
+                const usedIds = usedLocaleIds(key);
 
                 return (
                   <div key={key} className="p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-sm font-medium">
                         <Languages className="h-3.5 w-3.5 text-muted-foreground" />
-                        {!rowEditing && localeMeta
-                          ? `${localeMeta.name} (${localeMeta.code})`
-                          : t("locale.row.label", { n: allLocaleRows.indexOf(row) + 1 })}
+                        {!isNew && row.locale
+                          ? `${row.locale.name} (${row.locale.code})`
+                          : t("locale.row.new")}
                         {isNew && (
                           <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-medium">
                             {t("locale.row.new")}
@@ -441,36 +406,27 @@ export function CityLocaleTranslations({
                       </div>
                     </div>
 
-                    <div className="space-y-3">
+                    {isNew && (
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground">{t("field.language")} *</Label>
                         <Select
                           value={editData.locale_id ? String(editData.locale_id) : ""}
                           onValueChange={(v) => patchRowEdit(key, { locale_id: Number(v) })}
-                          disabled={!rowEditing || !isNew}
+                          disabled={!rowEditing}
                         >
                           <SelectTrigger className="h-9 text-sm w-full">
                             <SelectValue placeholder={t("placeholder.selectLanguage")} />
                           </SelectTrigger>
                           <SelectContent>
                             {availableLocales.map((l) => (
-                              <SelectItem key={l.id} value={String(l.id)} disabled={usedIds.includes(l.id)}>
+                              <SelectItem key={l.id} value={String(l.id)} disabled={usedIds.has(l.id)}>
                                 {l.name} ({l.code})
                               </SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">{t("field.sort")} *</Label>
-                        <Input type="number"
-                          value={editData.sort_order}
-                          onChange={(e) => patchRowEdit(key, { sort_order: Number(e.target.value) })}
-                          disabled={!rowEditing}
-                          className="h-9 text-sm"
-                        />
-                      </div>
-                    </div>
+                    )}
 
                     <div className="space-y-1.5">
                       <Label className="text-xs text-muted-foreground">{t("common.name")} *</Label>
@@ -492,6 +448,16 @@ export function CityLocaleTranslations({
                         disabled={!rowEditing}
                         rows={2}
                         className="text-sm resize-none"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">{t("field.sort")} *</Label>
+                      <Input type="number"
+                        value={editData.sort_order}
+                        onChange={(e) => patchRowEdit(key, { sort_order: Number(e.target.value) })}
+                        disabled={!rowEditing}
+                        className="h-9 text-sm"
                       />
                     </div>
                   </div>

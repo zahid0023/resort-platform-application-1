@@ -24,6 +24,18 @@ function getAcceptLanguage(): string {
     return i18n.resolvedLanguage ?? i18n.language ?? "en";
 }
 
+export class ApiError extends Error {
+    status: number;
+    code?: string;
+
+    constructor(message: string, status: number, code?: string) {
+        super(message);
+        this.name = "ApiError";
+        this.status = status;
+        this.code = code;
+    }
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = getToken();
 
@@ -40,13 +52,15 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     if (!res.ok) {
         const text = await res.text().catch(() => "");
         let message = res.statusText;
+        let code: string | undefined;
         try {
             const json = JSON.parse(text);
             message = json.message || json.error || text || res.statusText;
+            code = json.error;
         } catch {
             message = text || res.statusText;
         }
-        throw new Error(message || `Request failed: ${res.status}`);
+        throw new ApiError(message || `Request failed: ${res.status}`, res.status, code);
     }
 
     if (res.status === 204) return undefined as T;

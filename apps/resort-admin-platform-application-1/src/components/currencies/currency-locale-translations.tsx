@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Languages, Pencil, Plus, Search, Trash2, X } from "lucide-react";
+import { Check, Languages, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Button } from "@resort/shadcn-ui";
 import { Card } from "@resort/shadcn-ui";
 import { Input } from "@resort/shadcn-ui";
 import { Label } from "@resort/shadcn-ui";
-import { Textarea } from "@resort/shadcn-ui";
 import {
   Select,
   SelectContent,
@@ -23,46 +22,38 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@resort/shadcn-ui";
-import { countriesService } from "@/services/countries";
+import { currenciesService } from "@/services/currencies";
 import { localesService, type Locale } from "@/services/locales";
 import { toast } from "sonner";
-import type { CountryDialogMode, CountryFormState, LocaleRow } from "./types";
+import type { CurrencyDialogMode, CurrencyFormState, LocaleRow } from "./types";
 
 type NewLocaleRow = LocaleRow & { _rkey: string };
 
 // Create only ever submits the "en" translation — keep what's typed limited to English/ASCII text
-// so it can't silently end up holding another script's name/description.
+// so it can't silently end up holding another script's name/short name.
 const NON_ASCII = /[^\x00-\x7F]/g;
 
-export interface CountryLocaleTranslationsProps {
-  mode: CountryDialogMode;
-  form: CountryFormState;
-  onFormChange: (form: CountryFormState) => void;
-  countryId?: number;
+export interface CurrencyLocaleTranslationsProps {
+  mode: CurrencyDialogMode;
+  form: CurrencyFormState;
+  onFormChange: (form: CurrencyFormState) => void;
+  currencyId?: number;
   onSaved?: () => void | Promise<void>;
   editing: boolean;
   onEditingChange: (v: boolean) => void;
-  /** Clears search, re-pulls the complete unfiltered list, then flips editing on. */
-  onStartEditing: () => void;
-  /** Owned by the parent dialog — survives this component unmounting on tab switch. */
-  search: string;
-  onSearchChange: (v: string) => void;
   open: boolean;
 }
 
-export function CountryLocaleTranslations({
+export function CurrencyLocaleTranslations({
   mode,
   form,
   onFormChange,
-  countryId,
+  currencyId,
   onSaved,
   editing,
   onEditingChange,
-  onStartEditing,
-  search,
-  onSearchChange,
   open,
-}: CountryLocaleTranslationsProps) {
+}: CurrencyLocaleTranslationsProps) {
   const { t } = useTranslation();
   const [newLocaleRows, setNewLocaleRows] = useState<NewLocaleRow[]>([]);
   const [rowEditData, setRowEditData] = useState<Record<string, LocaleRow>>({});
@@ -70,9 +61,7 @@ export function CountryLocaleTranslations({
   const [pendingDeleteRow, setPendingDeleteRow] = useState<LocaleRow | null>(null);
   const rKeyCounter = useRef(0);
 
-  // Only needed once the user actually wants to add a language — the full catalog can't be
-  // derived from the country's own translations, but there's no reason to fetch it before this
-  // section is even opened for editing.
+  // Only needed once the user actually wants to add a language.
   const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
   const [localesLoaded, setLocalesLoaded] = useState(false);
 
@@ -87,12 +76,12 @@ export function CountryLocaleTranslations({
       .catch(() => {});
   }, [editing, localesLoaded]);
 
-  // GET /countries/{id} and the list endpoint only ever carry the single Accept-Language-matched
+  // GET /currencies/{id} and the list endpoint only ever carry the single Accept-Language-matched
   // translation — the full set is only available via this dedicated sub-resource, so this tab
   // fetches its own data rather than relying on whatever the parent list/get call populated.
-  function refreshLocales(localeCode?: string) {
-    if (countryId == null) return;
-    countriesService.listLocales(countryId, { size: 50, localeCode: localeCode || undefined })
+  function refreshLocales() {
+    if (currencyId == null) return;
+    currenciesService.listLocales(currencyId, { size: 50 })
       .then((res) => {
         onFormChange({
           ...form,
@@ -100,13 +89,26 @@ export function CountryLocaleTranslations({
             id: l.id,
             locale: l.locale,
             name: l.name,
-            description: l.description ?? "",
+            short_name: l.short_name ?? "",
             sort_order: l.sort_order,
           })),
         });
       })
       .catch((err) => toast.error((err as Error).message));
   }
+
+  // Guarded by comparing against the last-fetched key rather than a one-shot "have I run" flag:
+  // a ref flip doesn't survive React Strict Mode's dev-only effect replay (mount → cleanup →
+  // mount again on the same ref), so a boolean guard fires a spurious extra fetch on the replay.
+  // Comparing actual values is replay-safe since the key is identical across both passes.
+  const lastFetchKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (!open || mode === "create" || currencyId == null) { lastFetchKey.current = null; return; }
+    const key = String(currencyId);
+    if (lastFetchKey.current === key) return;
+    lastFetchKey.current = key;
+    refreshLocales();
+  }, [open, currencyId, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) {
@@ -145,7 +147,7 @@ export function CountryLocaleTranslations({
   }
 
   async function saveRow(key: string, row: LocaleRow, isNew: boolean) {
-    if (countryId == null) return;
+    if (currencyId == null) return;
     const data = rowEditData[key];
     if (!data) return;
     if (isNew && !data.locale_id) { toast.error(t("toast.localeSelectLang", { n: 1 })); return; }
@@ -153,17 +155,17 @@ export function CountryLocaleTranslations({
     setBusy(key, true);
     try {
       if (isNew) {
-        await countriesService.addLocale(countryId, {
+        await currenciesService.addLocale(currencyId, {
           locale_id: Number(data.locale_id),
           name: data.name.trim(),
-          description: data.description?.trim() || undefined,
+          short_name: data.short_name?.trim() || undefined,
           sort_order: Number(data.sort_order) || 0,
         });
         setNewLocaleRows((prev) => prev.filter((r) => r._rkey !== key));
       } else {
-        await countriesService.updateLocale(countryId, row.id!, {
+        await currenciesService.updateLocale(currencyId, row.id!, {
           name: data.name.trim(),
-          description: data.description?.trim() || undefined,
+          short_name: data.short_name?.trim() || undefined,
           sort_order: Number(data.sort_order) || 0,
         });
       }
@@ -179,13 +181,13 @@ export function CountryLocaleTranslations({
   }
 
   async function confirmDelete() {
-    if (!pendingDeleteRow || countryId == null || !pendingDeleteRow.id) return;
+    if (!pendingDeleteRow || currencyId == null || !pendingDeleteRow.id) return;
     const row = pendingDeleteRow;
     const key = rowKey(row);
     setPendingDeleteRow(null);
     setBusy(key, true);
     try {
-      await countriesService.removeLocale(countryId, row.id!);
+      await currenciesService.removeLocale(currencyId, row.id!);
       toast.success(t("locale.removedToast"));
       refreshLocales();
       await onSaved?.();
@@ -220,7 +222,7 @@ export function CountryLocaleTranslations({
       _rkey,
       locale_id: nextLocale?.id ?? "",
       name: "",
-      description: "",
+      short_name: "",
       sort_order: form.locales.length + newLocaleRows.length + 1,
       _new: true,
     };
@@ -243,7 +245,7 @@ export function CountryLocaleTranslations({
           </h3>
         </div>
         {mode !== "create" && !editing && (
-          <Button type="button" size="sm" variant="outline" onClick={onStartEditing} className="h-7 text-xs px-2.5 gap-1.5">
+          <Button type="button" size="sm" variant="outline" onClick={() => onEditingChange(true)} className="h-7 text-xs px-2.5 gap-1.5">
             <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
           </Button>
         )}
@@ -262,35 +264,13 @@ export function CountryLocaleTranslations({
         )}
       </div>
 
-      {/* Search is view mode only — edit mode always needs the complete, unfiltered list. */}
-      {mode !== "create" && !editing && (form.locales.length > 0 || search.trim() !== "") && (
-        <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-          <Input
-            value={search}
-            onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={t("locale.searchByCode")}
-            className="pl-8 h-8 text-sm"
-          />
-        </div>
-      )}
-
       <Card className="gap-0 py-0 overflow-hidden">
         {/* VIEW mode */}
         {!editing && mode !== "create" && (
           form.locales.length === 0 ? (
             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-              {search.trim() !== "" ? (
-                <>
-                  <Search className="h-4 w-4 mr-2 opacity-40" />
-                  {t("locale.noSearchMatch")}
-                </>
-              ) : (
-                <>
-                  <Languages className="h-4 w-4 mr-2 opacity-40" />
-                  {t("locale.empty.country")}
-                </>
-              )}
+              <Languages className="h-4 w-4 mr-2 opacity-40" />
+              {t("locale.empty.currency")}
             </div>
           ) : (
             <div className="divide-y">
@@ -302,11 +282,11 @@ export function CountryLocaleTranslations({
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground">{t("common.name")}</Label>
-                    <Input value={row.name} disabled placeholder={t("placeholder.countryName")} className="h-9 text-sm" onChange={() => {}} />
+                    <Input value={row.name} disabled placeholder={t("placeholder.currencyName")} className="h-9 text-sm" onChange={() => {}} />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">{t("common.description")}</Label>
-                    <Textarea value={row.description} disabled placeholder={t("placeholder.countryDescription")} rows={2} className="text-sm resize-none" onChange={() => {}} />
+                    <Label className="text-xs text-muted-foreground">{t("field.shortName")}</Label>
+                    <Input value={row.short_name} disabled placeholder={t("placeholder.currencyShortName")} className="h-9 text-sm" onChange={() => {}} />
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-xs text-muted-foreground">{t("field.sort")}</Label>
@@ -329,17 +309,16 @@ export function CountryLocaleTranslations({
               <Label className="text-xs text-muted-foreground">{t("common.name")} *</Label>
               <Input value={form.locale.name}
                 onChange={(e) => onFormChange({ ...form, locale: { ...form.locale, name: e.target.value.replace(NON_ASCII, "") } })}
-                placeholder={t("placeholder.countryName")}
+                placeholder={t("placeholder.currencyName")}
                 className="h-9 text-sm"
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">{t("common.description")} *</Label>
-              <Textarea value={form.locale.description}
-                onChange={(e) => onFormChange({ ...form, locale: { ...form.locale, description: e.target.value.replace(NON_ASCII, "") } })}
-                placeholder={t("placeholder.countryDescription")}
-                rows={2}
-                className="text-sm resize-none"
+              <Label className="text-xs text-muted-foreground">{t("field.shortName")}</Label>
+              <Input value={form.locale.short_name}
+                onChange={(e) => onFormChange({ ...form, locale: { ...form.locale, short_name: e.target.value.replace(NON_ASCII, "") } })}
+                placeholder={t("placeholder.currencyShortName")}
+                className="h-9 text-sm"
               />
             </div>
             <div className="space-y-1.5">
@@ -357,7 +336,7 @@ export function CountryLocaleTranslations({
           allLocaleRows.length === 0 ? (
             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
               <Languages className="h-4 w-4 mr-2 opacity-40" />
-              {t("locale.empty.country")}
+              {t("locale.empty.currency")}
             </div>
           ) : (
             <div className="divide-y">
@@ -452,21 +431,20 @@ export function CountryLocaleTranslations({
                       <Input
                         value={editData.name}
                         onChange={(e) => patchRowEdit(key, { name: e.target.value })}
-                        placeholder={t("placeholder.countryName")}
+                        placeholder={t("placeholder.currencyName")}
                         disabled={!rowEditing}
                         className="h-9 text-sm"
                       />
                     </div>
 
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">{t("common.description")}</Label>
-                      <Textarea
-                        value={editData.description}
-                        onChange={(e) => patchRowEdit(key, { description: e.target.value })}
-                        placeholder={t("placeholder.countryDescription")}
+                      <Label className="text-xs text-muted-foreground">{t("field.shortName")}</Label>
+                      <Input
+                        value={editData.short_name}
+                        onChange={(e) => patchRowEdit(key, { short_name: e.target.value })}
+                        placeholder={t("placeholder.currencyShortName")}
                         disabled={!rowEditing}
-                        rows={2}
-                        className="text-sm resize-none"
+                        className="h-9 text-sm"
                       />
                     </div>
 

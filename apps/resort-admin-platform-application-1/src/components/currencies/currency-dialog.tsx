@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, MapPin, RefreshCw, Save, X } from "lucide-react";
+import { ArrowRight, Coins, RefreshCw, Save, X } from "lucide-react";
 import { Button, Sheet, SheetContent } from "@resort/shadcn-ui";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@resort/shadcn-ui";
 import {
@@ -15,38 +15,43 @@ import {
 } from "@resort/shadcn-ui";
 import { DialogEntityHeader } from "@/components/shared/dialog-entity-header";
 import { DialogCreateFooter } from "@/components/shared/dialog-create-footer";
-import { citiesService } from "@/services/cities";
+import { currenciesService } from "@/services/currencies";
 import { toast } from "sonner";
-import type { CityDialogMode, CityFormState } from "./types";
-import { CityGeneralInfo } from "./city-general-info";
-import { CityLocaleTranslations } from "./city-locale-translations";
+import type { CurrencyDialogMode, CurrencyFormState } from "./types";
+import { CurrencyGeneralInfo } from "./currency-general-info";
+import { CurrencyLocaleTranslations } from "./currency-locale-translations";
 
-export const emptyCityForm: CityFormState = {
+export const emptyCurrencyForm: CurrencyFormState = {
   country_id: "",
   code: "",
+  numeric_code: "",
+  symbol: "",
+  decimal_places: 2,
+  is_default: false,
   sort_order: 0,
-  locale: { name: "", description: "", sort_order: 0 },
+  locale: { name: "", short_name: "", sort_order: 0 },
   locales: [],
 };
 
 const CODE_PATTERN = /^[A-Z]{3}$/;
+const NUMERIC_CODE_PATTERN = /^[0-9]{3}$/;
 // Create only ever submits the "en" translation — keep it English/ASCII.
 const ENGLISH_TEXT_PATTERN = /^[\x00-\x7F]*$/;
 
 // Local autosave for the create form — never sent to the backend, just a browser-local checkpoint.
-const DRAFT_STORAGE_KEY = "city-dialog-draft";
+const DRAFT_STORAGE_KEY = "currency-dialog-draft";
 const DRAFT_SAVE_DEBOUNCE_MS = 500;
 
-function hasDraftContent(f: CityFormState): boolean {
-  return f.country_id !== "" || f.code.trim() !== ""
-    || f.locale.name.trim() !== "" || f.locale.description.trim() !== "";
+function hasDraftContent(f: CurrencyFormState): boolean {
+  return f.country_id !== "" || f.code.trim() !== "" || f.numeric_code.trim() !== "" || f.symbol.trim() !== ""
+    || f.locale.name.trim() !== "" || f.locale.short_name.trim() !== "";
 }
 
-function readDraft(): CityFormState | null {
+function readDraft(): CurrencyFormState | null {
   try {
     const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as CityFormState;
+    const parsed = JSON.parse(raw) as CurrencyFormState;
     return hasDraftContent(parsed) ? parsed : null;
   } catch {
     return null;
@@ -57,38 +62,38 @@ function clearDraft() {
   localStorage.removeItem(DRAFT_STORAGE_KEY);
 }
 
-export interface CityDialogProps {
+export interface CurrencyDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: CityDialogMode;
-  cityId?: number;
+  mode: CurrencyDialogMode;
+  currencyId?: number;
   /** Pre-set country (opened from a country's own detail page) — hides the country picker in create mode */
   fixedCountryId?: number;
   /** Display label for the resolved country, used in view/edit and alongside fixedCountryId */
   countryLabel?: string;
-  form: CityFormState;
-  onFormChange: (form: CityFormState) => void;
+  form: CurrencyFormState;
+  onFormChange: (form: CurrencyFormState) => void;
   onSaved?: () => void | Promise<void>;
 }
 
-export function CityDialog({
+export function CurrencyDialog({
   open,
   onOpenChange,
   mode,
-  cityId,
+  currencyId,
   fixedCountryId,
   countryLabel,
   form,
   onFormChange,
   onSaved,
-}: CityDialogProps) {
+}: CurrencyDialogProps) {
   const { t } = useTranslation();
   const [submitting, setSubmitting] = useState(false);
   const [generalEditing, setGeneralEditing] = useState(false);
   const [translationsEditing, setTranslationsEditing] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [activeTab, setActiveTab] = useState<"general" | "locales">("general");
-  const [draftPrompt, setDraftPrompt] = useState<CityFormState | null>(null);
+  const [draftPrompt, setDraftPrompt] = useState<CurrencyFormState | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const [draftSyncing, setDraftSyncing] = useState(false);
 
@@ -111,8 +116,7 @@ export function CityDialog({
     }
   }, [open, mode]);
 
-  // Debounced local autosave of the create form — skipped while the restore prompt is pending,
-  // otherwise the still-empty parent form would immediately overwrite the draft we're offering.
+  // Debounced local autosave of the create form.
   useEffect(() => {
     if (!open || mode !== "create" || draftPrompt) return;
     if (hasDraftContent(form)) setDraftSyncing(true);
@@ -159,9 +163,7 @@ export function CityDialog({
     </span>
   ) : undefined;
 
-  // Edit/view only — in-progress section edits still warn before discarding, since those aren't
-  // autosaved. Create is covered by the local draft (see draftIndicator above), so closing it
-  // never needs a confirm: the in-progress data is already safely persisted to resume later.
+  // Edit/view only — create is covered by the local draft, so closing it never needs a confirm.
   const isDirty = generalEditing || translationsEditing;
 
   function requestClose() {
@@ -173,15 +175,19 @@ export function CityDialog({
   // Silent check — drives the "locales" tab's disabled state without firing toasts on every render.
   function isGeneralInfoValid(): boolean {
     const code = form.code.trim().toUpperCase();
+    const numericCode = form.numeric_code.trim();
     const hasCountry = fixedCountryId != null || form.country_id !== "";
-    return CODE_PATTERN.test(code) && hasCountry;
+    return CODE_PATTERN.test(code) && NUMERIC_CODE_PATTERN.test(numericCode) && form.symbol.trim() !== "" && hasCountry;
   }
 
   // Same checks, but reports which field is missing/invalid — used by both the Next button and submit.
   function validateGeneralInfo(): boolean {
     const code = form.code.trim().toUpperCase();
+    const numericCode = form.numeric_code.trim();
     if (fixedCountryId == null && form.country_id === "") { toast.error(t("toast.countryRequired")); return false; }
-    if (!CODE_PATTERN.test(code)) { toast.error(t("toast.cityCodeInvalid")); return false; }
+    if (!CODE_PATTERN.test(code)) { toast.error(t("toast.currencyCodeInvalid")); return false; }
+    if (!NUMERIC_CODE_PATTERN.test(numericCode)) { toast.error(t("toast.numericCodeInvalid")); return false; }
+    if (!form.symbol.trim()) { toast.error(t("toast.symbolRequired")); return false; }
     return true;
   }
 
@@ -192,8 +198,7 @@ export function CityDialog({
 
   // Silent check — drives the Create button's disabled state without firing toasts on every render.
   function isLocaleValid(): boolean {
-    return form.locale.name.trim() !== "" && form.locale.description.trim() !== ""
-      && ENGLISH_TEXT_PATTERN.test(form.locale.name) && ENGLISH_TEXT_PATTERN.test(form.locale.description);
+    return form.locale.name.trim() !== "" && ENGLISH_TEXT_PATTERN.test(form.locale.name) && ENGLISH_TEXT_PATTERN.test(form.locale.short_name);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -203,23 +208,27 @@ export function CityDialog({
     const resolvedCountryId = fixedCountryId ?? Number(form.country_id);
     if (!form.locale.name.trim()) { toast.error(t("toast.localeNameRequired", { n: 1 })); return; }
     if (!ENGLISH_TEXT_PATTERN.test(form.locale.name)) { toast.error(t("toast.localeNameEnglishOnly")); return; }
-    if (!form.locale.description.trim()) { toast.error(t("toast.localeDescriptionRequired", { n: 1 })); return; }
-    if (!ENGLISH_TEXT_PATTERN.test(form.locale.description)) { toast.error(t("toast.localeDescriptionEnglishOnly")); return; }
+    if (!ENGLISH_TEXT_PATTERN.test(form.locale.short_name)) { toast.error(t("toast.localeNameEnglishOnly")); return; }
     setSubmitting(true);
     try {
       const code = form.code.trim().toUpperCase();
-      await citiesService.create({
+      const numericCode = form.numeric_code.trim();
+      await currenciesService.create({
         code,
+        numeric_code: numericCode,
         country_id: resolvedCountryId,
+        symbol: form.symbol.trim(),
+        decimal_places: Number(form.decimal_places) || 0,
+        is_default: form.is_default,
         sort_order: Number(form.sort_order) || 0,
         locale: {
           name: form.locale.name.trim(),
-          description: form.locale.description.trim(),
+          short_name: form.locale.short_name.trim() || undefined,
           sort_order: Number(form.locale.sort_order) || 0,
         },
       });
       clearDraft();
-      toast.success(t("cities.createdToast"));
+      toast.success(t("currencies.createdToast"));
       onOpenChange(false);
       await onSaved?.();
     } catch (err) {
@@ -230,8 +239,8 @@ export function CityDialog({
   }
 
   const isEditing = generalEditing || translationsEditing;
-  const headerTitle = mode === "create" ? t("dialog.city.new") : (isEditing ? t("dialog.city.edit") : t("dialog.city.view"));
-  const headerDesc = mode === "create" ? t("dialog.city.desc.create") : (isEditing ? t("dialog.city.desc.edit") : t("dialog.city.desc.view"));
+  const headerTitle = mode === "create" ? t("dialog.currency.new") : (isEditing ? t("dialog.currency.edit") : t("dialog.currency.view"));
+  const headerDesc = mode === "create" ? t("dialog.currency.desc.create") : (isEditing ? t("dialog.currency.desc.edit") : t("dialog.currency.desc.view"));
 
   return (
     <>
@@ -244,7 +253,7 @@ export function CityDialog({
         >
           <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
 
-            <DialogEntityHeader icon={<MapPin className="h-4 w-4" />} title={headerTitle} description={headerDesc} />
+            <DialogEntityHeader icon={<Coins className="h-4 w-4" />} title={headerTitle} description={headerDesc} />
 
             <Tabs
               value={activeTab}
@@ -259,11 +268,11 @@ export function CityDialog({
               </TabsList>
 
               <TabsContent value="general" className="min-h-0 overflow-y-auto px-6 py-5">
-                <CityGeneralInfo
+                <CurrencyGeneralInfo
                   mode={mode}
                   form={form}
                   onFormChange={(patch) => onFormChange({ ...form, ...patch })}
-                  cityId={cityId}
+                  currencyId={currencyId}
                   fixedCountryId={fixedCountryId}
                   countryLabel={countryLabel}
                   onSaved={onSaved}
@@ -274,11 +283,11 @@ export function CityDialog({
               </TabsContent>
 
               <TabsContent value="locales" className="min-h-0 overflow-y-auto px-6 py-5">
-                <CityLocaleTranslations
+                <CurrencyLocaleTranslations
                   mode={mode}
                   form={form}
                   onFormChange={onFormChange}
-                  cityId={cityId}
+                  currencyId={currencyId}
                   onSaved={onSaved}
                   editing={translationsEditing}
                   onEditingChange={setTranslationsEditing}
@@ -328,7 +337,7 @@ export function CityDialog({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("dialog.restoreDraft.title")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("dialog.restoreDraft.descCity")}</AlertDialogDescription>
+            <AlertDialogDescription>{t("dialog.restoreDraft.descCurrency")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={discardDraft}>{t("dialog.restoreDraft.discard")}</AlertDialogCancel>
