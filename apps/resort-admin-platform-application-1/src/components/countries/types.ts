@@ -18,6 +18,8 @@ export interface CountryFormState {
   code: string;
   iso3_code: string;
   phone_code: string;
+  /** View/edit-only — populated from GET /countries/:id; "" means no flag has been uploaded yet. */
+  flag_url: string;
   sort_order: number;
   /** Create mode only — the single "en" translation created alongside the country */
   locale: { name: string; description: string; sort_order: number };

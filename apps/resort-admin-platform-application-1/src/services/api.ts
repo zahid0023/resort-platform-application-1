@@ -95,4 +95,36 @@ export const api = {
 
     delete: <T>(path: string, options?: RequestInit) =>
         apiFetch<T>(path, { ...options, method: "DELETE" }),
+
+    // Multipart form uploads never set Content-Type manually — the browser must set it (with the
+    // boundary) itself, so this bypasses apiFetch's JSON-only header defaults entirely.
+    postForm: async <T>(path: string, body: FormData): Promise<T> => {
+        const token = getToken();
+        const res = await fetch(`${BASE_URL}${path}`, {
+            method: "POST",
+            body,
+            headers: {
+                "Accept-Language": getAcceptLanguage(),
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+        });
+
+        if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            let message = res.statusText;
+            let code: string | undefined;
+            try {
+                const json = JSON.parse(text);
+                message = json.message || json.error || text || res.statusText;
+                code = json.error;
+            } catch {
+                message = text || res.statusText;
+            }
+            throw new ApiError(message || `Request failed: ${res.status}`, res.status, code);
+        }
+
+        if (res.status === 204) return undefined as T;
+
+        return res.json();
+    },
 };

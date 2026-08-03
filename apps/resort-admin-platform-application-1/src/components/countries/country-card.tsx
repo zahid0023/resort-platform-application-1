@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, Eye, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardAction, CardContent, CardFooter } from "@resort/shadcn-ui";
@@ -14,8 +15,10 @@ export interface CountryCardProps {
 
 export function CountryCard({ country, defaultName, onNavigate, onView, onDelete }: CountryCardProps) {
   const { t } = useTranslation();
+  const [flagFailed, setFlagFailed] = useState(false);
   const title = defaultName?.trim() || country.iso3_code || country.code;
-  const subtitle = defaultName?.trim() ? (country.iso3_code ?? country.code) : undefined;
+  const subtitle = country.code;
+  const showFlag = !!country.flag_url && !flagFailed;
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -33,8 +36,17 @@ export function CountryCard({ country, defaultName, onNavigate, onView, onDelete
     >
       <CardHeader>
         <div className="flex items-center gap-3 min-w-0">
-          <div className="h-11 w-11 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-semibold shrink-0">
-            {country.code}
+          <div className="h-11 w-11 text-primary flex items-center justify-center font-semibold shrink-0 overflow-hidden">
+            {showFlag ? (
+              <img
+                src={country.flag_url}
+                alt={country.code}
+                className="w-full h-full object-cover"
+                onError={() => setFlagFailed(true)}
+              />
+            ) : (
+              country.code
+            )}
           </div>
           <div className="min-w-0">
             <h3 className="font-semibold truncate">{title}</h3>

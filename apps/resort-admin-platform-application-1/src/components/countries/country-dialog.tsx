@@ -16,6 +16,7 @@ import {
 import { DialogEntityHeader } from "@/components/shared/dialog-entity-header";
 import { DialogCreateFooter } from "@/components/shared/dialog-create-footer";
 import { countriesService } from "@/services/countries";
+import { localesService, type Locale } from "@/services/locales";
 import { toast } from "sonner";
 import type { CountryDialogMode, CountryFormState } from "./types";
 import { CountryGeneralInfo } from "./country-general-info";
@@ -25,6 +26,7 @@ export const emptyCountryForm: CountryFormState = {
   code: "",
   iso3_code: "",
   phone_code: "",
+  flag_url: "",
   sort_order: 0,
   locale: { name: "", description: "", sort_order: 0 },
   locales: [],
@@ -87,6 +89,14 @@ export function CountryDialog({
   const [activeTab, setActiveTab] = useState<"general" | "locales">("general");
   const [refreshing, setRefreshing] = useState(false);
   const [localesLoaded, setLocalesLoaded] = useState(false);
+  // Owned here (not inside CountryLocaleTranslations) for the same reason `localesLoaded` above is —
+  // Radix unmounts inactive TabsContent panels, so any "have I fetched this" flag kept inside that
+  // child resets to false every time the user switches back to the Translations tab, causing a
+  // pointless refetch of the language catalog on every tab reselect. Fetched lazily on first "Add
+  // Translation" click (see prepareAddLocale) rather than as soon as the tab is viewed, so simply
+  // opening the Translations tab only ever issues the one locales-list request, not two.
+  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
+  const [languagesLoaded, setLanguagesLoaded] = useState(false);
   // Owned here (not inside CountryLocaleTranslations) so it survives that component unmounting
   // when the user switches away from the tab and back — otherwise the search text resets to
   // empty on remount while `form.locales` stays whatever the last search had filtered it to,
@@ -107,6 +117,7 @@ export function CountryDialog({
       setDraftSavedAt(null);
       setDraftSyncing(false);
       setLocalesLoaded(false);
+      setLanguagesLoaded(false);
       setLocaleSearch("");
       lastLocaleSearchKey.current = "";
     }
@@ -207,7 +218,7 @@ export function CountryDialog({
   // localeCode rather than filtering whatever page happens to already be loaded.
   async function fetchLocales(localeCode?: string): Promise<void> {
     if (countryId == null) return;
-    const res = await countriesService.listLocales(countryId, { size: 50, localeCode: localeCode || undefined });
+    const res = await countriesService.listLocales(countryId, { size: 10, localeCode: localeCode || undefined });
     onFormChange({
       ...form,
       locales: res.data.map((l) => ({
@@ -218,6 +229,17 @@ export function CountryDialog({
         sort_order: l.sort_order,
       })),
     });
+  }
+
+  // The language catalog (for the "add translation" dropdown and the Add button's disabled state)
+  // is only ever needed once the user actually starts adding a translation — see prepareAddLocale
+  // below — not just because the Translations tab is open. Fetched at most once per dialog session,
+  // gated by `languagesLoaded` here rather than inside CountryLocaleTranslations, since that
+  // component unmounts on every tab switch and a flag kept there would reset each time.
+  async function fetchAvailableLocales(): Promise<Locale[]> {
+    const res = await localesService.list({ size: 50, sort_by: "sortOrder", sort_dir: "ASC" });
+    setAvailableLocales(res.data);
+    return res.data;
   }
 
   // Translations are only fetched once the tab is actually selected — not when the country card
@@ -244,11 +266,26 @@ export function CountryDialog({
   // Adding a translation always needs the complete list — clear any active search and re-pull
   // everything first, so duplicate-locale checks never operate on a filtered subset. Editing an
   // existing translation doesn't need this: CountryLocaleTranslations drives `translationsEditing`
-  // itself based on whether any row has an open draft.
-  function prepareAddLocale() {
+  // itself based on whether any row has an open draft. This is also the first point the language
+  // catalog is actually needed (for the new row's language dropdown), so it's fetched here too —
+  // once per dialog session — rather than eagerly whenever the Translations tab is merely viewed.
+  //
+  // Returns the up-to-date catalog (not just fires the fetch) so the caller can reliably check
+  // "are all locales already used" right after awaiting this — reading the `availableLocales` state
+  // variable here wouldn't work, since a `setState` call doesn't update the value already captured
+  // in this closure; only the returned array reflects what was just fetched.
+  function prepareAddLocale(): Promise<Locale[]> {
     setLocaleSearch("");
     lastLocaleSearchKey.current = "";
     fetchLocales().catch((err) => toast.error((err as Error).message));
+    if (!languagesLoaded) {
+      setLanguagesLoaded(true);
+      return fetchAvailableLocales().catch((err) => {
+        toast.error((err as Error).message);
+        return availableLocales;
+      });
+    }
+    return Promise.resolve(availableLocales);
   }
 
   // Manual refresh only — switching tabs never re-fetches on its own otherwise. Pulls whichever the
@@ -265,11 +302,13 @@ export function CountryDialog({
           ...form,
           iso3_code: full.iso3_code ?? "",
           phone_code: full.phone_code ?? "",
+          flag_url: full.flag_url ?? "",
           sort_order: full.sort_order,
         });
       } else {
-        await fetchLocales(localeSearch.trim());
+        await Promise.all([fetchLocales(localeSearch.trim()), fetchAvailableLocales()]);
         setLocalesLoaded(true);
+        setLanguagesLoaded(true);
       }
       toast.success(t("common.refreshed"));
     } catch (err) {
@@ -390,6 +429,7 @@ export function CountryDialog({
                   search={localeSearch}
                   onSearchChange={setLocaleSearch}
                   open={open}
+                  availableLocales={availableLocales}
                 />
               </TabsContent>
             </Tabs>

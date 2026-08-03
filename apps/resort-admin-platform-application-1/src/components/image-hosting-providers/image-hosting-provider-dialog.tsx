@@ -92,6 +92,16 @@ export function ImageHostingProviderDialog({
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const [draftSyncing, setDraftSyncing] = useState(false);
 
+  // `fetchConfigFields` and `fetchConfigs` both patch different fields of the same `form` object,
+  // and both of their lazy-load effects can fire in the same commit when the Configs tab is opened
+  // first (see the third effect below). If each spread the `form` closed over in its own render,
+  // whichever async call resolves last would overwrite the other's just-applied update with the
+  // stale value it captured before either fetch started — the resolved data silently disappears
+  // even though the API returned it correctly. Reading `formRef.current` instead of `form` at the
+  // point each response arrives always reflects whatever the other fetch already committed.
+  const formRef = useRef(form);
+  useEffect(() => { formRef.current = form; }, [form]);
+
   useEffect(() => {
     if (!open) {
       setGeneralEditing(false);
@@ -172,38 +182,44 @@ export function ImageHostingProviderDialog({
   }
 
   // Config fields are never embedded on the provider DTO — this sub-resource is the only way to
-  // read them, fetched once the first time the tab is selected (see effect below).
-  async function fetchConfigFields(): Promise<void> {
-    if (providerId == null) return;
+  // read them. Split into a pure data-fetcher plus a thin `onFormChange` wrapper so the merged
+  // "landing on Configs" effect below can fetch this data WITHOUT it racing its own write against
+  // `fetchConfigs`'s — see that effect for why.
+  async function fetchConfigFieldsData() {
+    if (providerId == null) return [];
     const rows = await imageHostingProvidersService.listConfigFields(providerId);
-    onFormChange({
-      ...form,
-      config_fields: rows.map((f) => ({
-        id: f.id,
-        key: f.key,
-        label: f.label,
-        field_type: f.field_type,
-        placeholder: f.placeholder,
-        default_value: f.default_value,
-        is_required: f.is_required,
-        sort_order: f.sort_order,
-      })),
-    });
+    return rows.map((f) => ({
+      id: f.id,
+      key: f.key,
+      label: f.label,
+      field_type: f.field_type,
+      placeholder: f.placeholder,
+      default_value: f.default_value,
+      is_required: f.is_required,
+      sort_order: f.sort_order,
+    }));
+  }
+
+  async function fetchConfigFields(): Promise<void> {
+    const config_fields = await fetchConfigFieldsData();
+    onFormChange({ ...formRef.current, config_fields });
   }
 
   // Shared by the lazy first-load, the search box, and the manual refresh button. Configs are a
   // genuinely paginated sub-resource; this dialog only ever holds one page (size 50), same
   // simplification the Country pattern uses for locale translations.
-  async function fetchConfigs(name?: string): Promise<void> {
-    if (providerId == null) return;
+  async function fetchConfigsData(name?: string) {
+    if (providerId == null) return [];
     const res = await imageHostingProvidersService.listConfigs(providerId, { size: 50, name: name || undefined });
-    onFormChange({
-      ...form,
-      configs: res.data.map((c) => ({ id: c.id, name: c.name, config: c.config })),
-    });
+    return res.data.map((c) => ({ id: c.id, name: c.name, config: c.config }));
   }
 
-  // Config fields and configs are only fetched once the tab is actually selected — not when the
+  async function fetchConfigs(name?: string): Promise<void> {
+    const configs = await fetchConfigsData(name);
+    onFormChange({ ...formRef.current, configs });
+  }
+
+  // Config fields are fetched once the "Config Fields" tab is actually selected — not when the
   // provider card is opened — and only the first time per dialog session; re-selecting the tab
   // afterward reuses what's already loaded. Use the Refresh button for an explicit re-fetch.
   useEffect(() => {
@@ -212,21 +228,38 @@ export function ImageHostingProviderDialog({
     fetchConfigFields().catch((err) => toast.error((err as Error).message));
   }, [open, mode, activeTab, configFieldsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The Configs tab needs both its own list AND the field schema (to render each config's per-field
+  // inputs — see ImageHostingProviderConfigs). Landing on Configs directly (without ever visiting
+  // Config Fields first) means both are still unloaded, so both fetches must fire together. Doing
+  // that as two separate effects each calling `onFormChange({ ...form, ownField })` raced: both
+  // closed over the same pre-fetch `form`, so whichever async call resolved last overwrote the
+  // other's just-committed field back to its stale value — even a `formRef` doesn't fully close this
+  // gap if both promises happen to resolve within the same batch. Fetching both (only the ones not
+  // already loaded) and merging into a *single* `onFormChange` call removes the race entirely: there
+  // is only ever one write, so there is nothing for it to race against.
   useEffect(() => {
-    if (!open || mode === "create" || activeTab !== "configs" || configsLoaded) return;
-    setConfigsLoaded(true);
-    fetchConfigs().catch((err) => toast.error((err as Error).message));
-  }, [open, mode, activeTab, configsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // The Configs tab renders one input per config field (see ImageHostingProviderConfigs), so it
-  // needs the schema too — load it here if the user lands on Configs before ever visiting Config
-  // Fields. Shares `configFieldsLoaded` with that tab's own effect, so whichever tab is visited
-  // first is the one that actually fetches.
-  useEffect(() => {
-    if (!open || mode === "create" || activeTab !== "configs" || configFieldsLoaded) return;
-    setConfigFieldsLoaded(true);
-    fetchConfigFields().catch((err) => toast.error((err as Error).message));
-  }, [open, mode, activeTab, configFieldsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!open || mode === "create" || activeTab !== "configs") return;
+    if (configsLoaded && configFieldsLoaded) return;
+    const needConfigs = !configsLoaded;
+    const needFields = !configFieldsLoaded;
+    if (needConfigs) setConfigsLoaded(true);
+    if (needFields) setConfigFieldsLoaded(true);
+    (async () => {
+      try {
+        const [configs, config_fields] = await Promise.all([
+          needConfigs ? fetchConfigsData() : Promise.resolve(null),
+          needFields ? fetchConfigFieldsData() : Promise.resolve(null),
+        ]);
+        onFormChange({
+          ...formRef.current,
+          ...(configs != null ? { configs } : {}),
+          ...(config_fields != null ? { config_fields } : {}),
+        });
+      } catch (err) {
+        toast.error((err as Error).message);
+      }
+    })();
+  }, [open, mode, activeTab, configsLoaded, configFieldsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced server-side search — skipped while any config row has an open draft (a row being
   // edited, or a new one being added), since replacing `form.configs` mid-edit would pull the rug

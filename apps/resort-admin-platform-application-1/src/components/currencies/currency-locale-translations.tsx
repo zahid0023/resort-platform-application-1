@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Languages, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Check, Languages, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { Button } from "@resort/shadcn-ui";
 import { Card } from "@resort/shadcn-ui";
 import { Input } from "@resort/shadcn-ui";
@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from "@resort/shadcn-ui";
 import { currenciesService } from "@/services/currencies";
-import { localesService, type Locale } from "@/services/locales";
+import type { Locale } from "@/services/locales";
 import { toast } from "sonner";
 import type { CurrencyDialogMode, CurrencyFormState, LocaleRow } from "./types";
 
@@ -39,9 +39,20 @@ export interface CurrencyLocaleTranslationsProps {
   onFormChange: (form: CurrencyFormState) => void;
   currencyId?: number;
   onSaved?: () => void | Promise<void>;
-  /** Reported upward automatically based on whether any row has an open edit draft. */
+  /** True while any single translation row has an in-progress edit (existing or newly added). */
+  editing: boolean;
   onEditingChange: (v: boolean) => void;
+  /** Clears search and re-pulls the complete unfiltered list before adding a new translation row.
+   * Returns the up-to-date language catalog so the caller can check "any locales left to add" right
+   * after awaiting it, instead of racing the `availableLocales` prop's next render. */
+  onPrepareAdd: () => Promise<Locale[]>;
+  /** Owned by the parent dialog — survives this component unmounting on tab switch. */
+  search: string;
+  onSearchChange: (v: string) => void;
   open: boolean;
+  /** Owned by the parent dialog (see [[feedback_tab_content_state]]) — fetched once per dialog
+   * session there, not here, so it isn't lost every time this component unmounts on tab switch. */
+  availableLocales: Locale[];
 }
 
 export function CurrencyLocaleTranslations({
@@ -50,8 +61,13 @@ export function CurrencyLocaleTranslations({
   onFormChange,
   currencyId,
   onSaved,
+  editing,
   onEditingChange,
+  onPrepareAdd,
+  search,
+  onSearchChange,
   open,
+  availableLocales,
 }: CurrencyLocaleTranslationsProps) {
   const { t } = useTranslation();
   const [newLocaleRows, setNewLocaleRows] = useState<NewLocaleRow[]>([]);
@@ -60,30 +76,12 @@ export function CurrencyLocaleTranslations({
   const [pendingDeleteRow, setPendingDeleteRow] = useState<LocaleRow | null>(null);
   const rKeyCounter = useRef(0);
 
-  // The full catalog can't be derived from the currency's own translations — needed for the language
-  // dropdown on a new row and to compute the Add button's disabled state.
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
-  const [localesLoaded, setLocalesLoaded] = useState(false);
-
-  // Fetched once as soon as this tab is shown, not gated behind any edit action — the Add button
-  // itself is no longer gated behind one either.
-  useEffect(() => {
-    if (mode === "create" || localesLoaded) return;
-    localesService
-      .list({ size: 50, sort_by: "sortOrder", sort_dir: "ASC" })
-      .then((res) => {
-        setAvailableLocales(res.data);
-        setLocalesLoaded(true);
-      })
-      .catch(() => {});
-  }, [mode, localesLoaded]);
-
   // GET /currencies/{id} and the list endpoint only ever carry the single Accept-Language-matched
   // translation — the full set is only available via this dedicated sub-resource, so this tab
   // fetches its own data rather than relying on whatever the parent list/get call populated.
-  function refreshLocales() {
+  function refreshLocales(localeCode?: string) {
     if (currencyId == null) return;
-    currenciesService.listLocales(currencyId, { size: 50 })
+    currenciesService.listLocales(currencyId, { size: 10, localeCode: localeCode || undefined })
       .then((res) => {
         onFormChange({
           ...form,
@@ -98,19 +96,6 @@ export function CurrencyLocaleTranslations({
       })
       .catch((err) => toast.error((err as Error).message));
   }
-
-  // Guarded by comparing against the last-fetched key rather than a one-shot "have I run" flag:
-  // a ref flip doesn't survive React Strict Mode's dev-only effect replay (mount → cleanup →
-  // mount again on the same ref), so a boolean guard fires a spurious extra fetch on the replay.
-  // Comparing actual values is replay-safe since the key is identical across both passes.
-  const lastFetchKey = useRef<string | null>(null);
-  useEffect(() => {
-    if (!open || mode === "create" || currencyId == null) { lastFetchKey.current = null; return; }
-    const key = String(currencyId);
-    if (lastFetchKey.current === key) return;
-    lastFetchKey.current = key;
-    refreshLocales();
-  }, [open, currencyId, mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) {
@@ -216,9 +201,11 @@ export function CurrencyLocaleTranslations({
     return new Set([...existing, ...added].filter((v): v is number => typeof v === "number"));
   }
 
-  function addNewLocaleRow() {
+  // `catalog` is passed explicitly (rather than read off the `availableLocales` prop) because the
+  // caller just awaited a fresh fetch of it — the prop won't reflect that until the next render.
+  function addNewLocaleRow(catalog: Locale[]) {
     const usedIds = usedLocaleIds();
-    const nextLocale = availableLocales.find((l) => !usedIds.has(l.id));
+    const nextLocale = catalog.find((l) => !usedIds.has(l.id));
     const _rkey = `n_${rKeyCounter.current++}`;
     const newRow: NewLocaleRow = {
       _rkey,
@@ -230,6 +217,20 @@ export function CurrencyLocaleTranslations({
     };
     setNewLocaleRows((prev) => [...prev, newRow]);
     setRowEditData((prev) => ({ ...prev, [_rkey]: { ...newRow } }));
+  }
+
+  // Adding a translation always needs the complete list — clear any active search and re-pull
+  // everything first, so duplicate-locale checks never operate on a filtered subset. Also guards
+  // against the language catalog only being known lazily (fetched on first Add click, not eagerly on
+  // tab view — see [[feedback_dialog_lazy_tab_load]]): re-check against the freshly-awaited catalog
+  // before actually opening a new row, rather than opening an unusable one with no language left.
+  async function handleAddLocale() {
+    const catalog = await onPrepareAdd();
+    if (catalog.length > 0 && usedLocaleIds().size >= catalog.length) {
+      toast.error(t("locale.allLanguagesAdded"));
+      return;
+    }
+    addNewLocaleRow(catalog);
   }
 
   // New rows render first, so adding one never requires scrolling down to see it.
@@ -248,14 +249,30 @@ export function CurrencyLocaleTranslations({
           </h3>
         </div>
         {mode !== "create" && (
-          <Button type="button" size="sm" variant="outline" onClick={addNewLocaleRow}
-            disabled={newLocaleRows.length > 0 || (form.locales.length + newLocaleRows.length) >= availableLocales.length}
+          <Button type="button" size="sm" variant="outline" onClick={handleAddLocale}
+            // The language catalog is only fetched lazily on first use (see prepareAddLocale in
+            // CurrencyDialog), so `availableLocales` starts empty — don't let that read as "no
+            // languages left" and disable Add before the catalog has ever been loaded.
+            disabled={newLocaleRows.length > 0 || (availableLocales.length > 0 && (form.locales.length + newLocaleRows.length) >= availableLocales.length)}
             className="h-7 text-xs px-2.5"
           >
             <Plus className="h-3.5 w-3.5 mr-1" /> {t("locale.add")}
           </Button>
         )}
       </div>
+
+      {/* Search is view mode only — edit mode always needs the complete, unfiltered list. */}
+      {mode !== "create" && !editing && (form.locales.length > 0 || search.trim() !== "") && (
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={t("locale.searchByCode")}
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
+      )}
 
       <Card className="gap-0 py-0 overflow-hidden">
         {/* CREATE mode — always a single "en" translation, resolved server-side */}
@@ -296,8 +313,17 @@ export function CurrencyLocaleTranslations({
         {mode !== "create" && (
           allLocaleRows.length === 0 ? (
             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-              <Languages className="h-4 w-4 mr-2 opacity-40" />
-              {t("locale.empty.currency")}
+              {search.trim() !== "" ? (
+                <>
+                  <Search className="h-4 w-4 mr-2 opacity-40" />
+                  {t("locale.noSearchMatch")}
+                </>
+              ) : (
+                <>
+                  <Languages className="h-4 w-4 mr-2 opacity-40" />
+                  {t("locale.empty.currency")}
+                </>
+              )}
             </div>
           ) : (
             <div className="divide-y">

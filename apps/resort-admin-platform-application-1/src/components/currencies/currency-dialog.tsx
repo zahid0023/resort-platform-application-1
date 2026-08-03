@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, Coins, RefreshCw, Save, X } from "lucide-react";
 import { Button, Sheet, SheetContent } from "@resort/shadcn-ui";
@@ -16,6 +16,7 @@ import {
 import { DialogEntityHeader } from "@/components/shared/dialog-entity-header";
 import { DialogCreateFooter } from "@/components/shared/dialog-create-footer";
 import { currenciesService } from "@/services/currencies";
+import { localesService, type Locale } from "@/services/locales";
 import { toast } from "sonner";
 import type { CurrencyDialogMode, CurrencyFormState } from "./types";
 import { CurrencyGeneralInfo } from "./currency-general-info";
@@ -93,6 +94,18 @@ export function CurrencyDialog({
   const [translationsEditing, setTranslationsEditing] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
   const [activeTab, setActiveTab] = useState<"general" | "locales">("general");
+  const [refreshing, setRefreshing] = useState(false);
+  const [localesLoaded, setLocalesLoaded] = useState(false);
+  // Owned here (not inside CurrencyLocaleTranslations) so it survives that component unmounting when
+  // the user switches away from the tab and back — see [[feedback_tab_content_state]] and
+  // [[feedback_dialog_lazy_tab_load]] (same fix already applied to Country and City).
+  const [localeSearch, setLocaleSearch] = useState("");
+  const lastLocaleSearchKey = useRef("");
+  // The language catalog is only needed once the user actually starts adding a translation (see
+  // prepareAddLocale below), not just because the Translations tab is open — and, like localesLoaded
+  // above, must live here rather than in the child so it isn't refetched on every tab reselect.
+  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
+  const [languagesLoaded, setLanguagesLoaded] = useState(false);
   const [draftPrompt, setDraftPrompt] = useState<CurrencyFormState | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const [draftSyncing, setDraftSyncing] = useState(false);
@@ -103,6 +116,10 @@ export function CurrencyDialog({
       setTranslationsEditing(false);
       setConfirmClose(false);
       setActiveTab("general");
+      setLocalesLoaded(false);
+      setLanguagesLoaded(false);
+      setLocaleSearch("");
+      lastLocaleSearchKey.current = "";
       setDraftPrompt(null);
       setDraftSavedAt(null);
       setDraftSyncing(false);
@@ -196,6 +213,109 @@ export function CurrencyDialog({
     setActiveTab("locales");
   }
 
+  // Shared by the lazy first-load, the search box, and the manual refresh button. The sub-resource
+  // is paginated and this dialog only ever holds one page of it, so search re-hits the server with
+  // localeCode rather than filtering whatever page happens to already be loaded.
+  async function fetchLocales(localeCode?: string): Promise<void> {
+    if (currencyId == null) return;
+    const res = await currenciesService.listLocales(currencyId, { size: 10, localeCode: localeCode || undefined });
+    onFormChange({
+      ...form,
+      locales: res.data.map((l) => ({
+        id: l.id,
+        locale: l.locale,
+        name: l.name,
+        short_name: l.short_name ?? "",
+        sort_order: l.sort_order,
+      })),
+    });
+  }
+
+  // The language catalog (for the "add translation" dropdown and the Add button's disabled state)
+  // is only ever needed once the user actually starts adding a translation — see prepareAddLocale
+  // below — not just because the Translations tab is open. Fetched at most once per dialog session.
+  async function fetchAvailableLocales(): Promise<Locale[]> {
+    const res = await localesService.list({ size: 50, sort_by: "sortOrder", sort_dir: "ASC" });
+    setAvailableLocales(res.data);
+    return res.data;
+  }
+
+  // Translations are only fetched once the tab is actually selected — not when the currency card
+  // is opened — and only the first time per dialog session; re-selecting the tab afterward reuses
+  // what's already loaded. Use the Refresh button for an explicit re-fetch.
+  useEffect(() => {
+    if (!open || mode === "create" || activeTab !== "locales" || localesLoaded) return;
+    setLocalesLoaded(true);
+    fetchLocales().catch((err) => toast.error((err as Error).message));
+  }, [open, mode, activeTab, localesLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced server-side search, view mode only — edit mode always needs the complete,
+  // unfiltered list (see CurrencyLocaleTranslations' duplicate-locale checks).
+  useEffect(() => {
+    if (!open || mode === "create" || translationsEditing) return;
+    if (lastLocaleSearchKey.current === localeSearch) return;
+    lastLocaleSearchKey.current = localeSearch;
+    const timer = setTimeout(() => {
+      fetchLocales(localeSearch.trim()).catch((err) => toast.error((err as Error).message));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [localeSearch, open, mode, translationsEditing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Adding a translation always needs the complete list — clear any active search and re-pull
+  // everything first, so duplicate-locale checks never operate on a filtered subset. Editing an
+  // existing translation doesn't need this: CurrencyLocaleTranslations drives `translationsEditing`
+  // itself based on whether any row has an open draft. This is also the first point the language
+  // catalog is actually needed (for the new row's language dropdown), so it's fetched here too —
+  // once per dialog session — rather than eagerly whenever the Translations tab is merely viewed.
+  //
+  // Returns the up-to-date catalog (not just fires the fetch) so the caller can reliably check
+  // "are all locales already used" right after awaiting this — reading the `availableLocales` state
+  // variable here wouldn't work, since a `setState` call doesn't update the value already captured
+  // in this closure; only the returned array reflects what was just fetched.
+  function prepareAddLocale(): Promise<Locale[]> {
+    setLocaleSearch("");
+    lastLocaleSearchKey.current = "";
+    fetchLocales().catch((err) => toast.error((err as Error).message));
+    if (!languagesLoaded) {
+      setLanguagesLoaded(true);
+      return fetchAvailableLocales().catch((err) => {
+        toast.error((err as Error).message);
+        return availableLocales;
+      });
+    }
+    return Promise.resolve(availableLocales);
+  }
+
+  // Manual refresh only — switching tabs never re-fetches on its own otherwise. Pulls whichever the
+  // active tab needs: general info re-hits GET /currencies/{id}, translations re-hits the locales
+  // sub-resource (honoring whatever search filter is currently applied).
+  async function handleRefresh() {
+    if (currencyId == null) return;
+    setRefreshing(true);
+    try {
+      if (activeTab === "general") {
+        const res = await currenciesService.get(currencyId);
+        const full = res.data;
+        onFormChange({
+          ...form,
+          symbol: full.symbol,
+          decimal_places: full.decimal_places,
+          is_default: full.is_default,
+          sort_order: full.sort_order,
+        });
+      } else {
+        await Promise.all([fetchLocales(localeSearch.trim()), fetchAvailableLocales()]);
+        setLocalesLoaded(true);
+        setLanguagesLoaded(true);
+      }
+      toast.success(t("common.refreshed"));
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   // Silent check — drives the Create button's disabled state without firing toasts on every render.
   function isLocaleValid(): boolean {
     return form.locale.name.trim() !== "" && ENGLISH_TEXT_PATTERN.test(form.locale.name) && ENGLISH_TEXT_PATTERN.test(form.locale.short_name);
@@ -260,12 +380,27 @@ export function CurrencyDialog({
               onValueChange={(v) => setActiveTab(v as "general" | "locales")}
               className="flex-1 min-h-0 flex-col"
             >
-              <TabsList className="mx-6 mt-4 w-fit shrink-0">
-                <TabsTrigger value="general">{t("common.generalInfo")}</TabsTrigger>
-                <TabsTrigger value="locales" disabled={mode === "create" && !isGeneralInfoValid()}>
-                  {t("locale.translations")}
-                </TabsTrigger>
-              </TabsList>
+              <div className="flex items-center justify-between mx-6 mt-4 gap-2">
+                <TabsList className="w-fit shrink-0">
+                  <TabsTrigger value="general">{t("common.generalInfo")}</TabsTrigger>
+                  <TabsTrigger value="locales" disabled={mode === "create" && !isGeneralInfoValid()}>
+                    {t("locale.translations")}
+                  </TabsTrigger>
+                </TabsList>
+                {mode !== "create" && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 shrink-0"
+                    onClick={handleRefresh}
+                    disabled={refreshing || (activeTab === "general" ? generalEditing : translationsEditing)}
+                    title={t("common.refresh")}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                  </Button>
+                )}
+              </div>
 
               <TabsContent value="general" className="min-h-0 overflow-y-auto px-6 py-5">
                 <CurrencyGeneralInfo
@@ -289,8 +424,13 @@ export function CurrencyDialog({
                   onFormChange={onFormChange}
                   currencyId={currencyId}
                   onSaved={onSaved}
+                  editing={translationsEditing}
                   onEditingChange={setTranslationsEditing}
+                  onPrepareAdd={prepareAddLocale}
+                  search={localeSearch}
+                  onSearchChange={setLocaleSearch}
                   open={open}
+                  availableLocales={availableLocales}
                 />
               </TabsContent>
             </Tabs>

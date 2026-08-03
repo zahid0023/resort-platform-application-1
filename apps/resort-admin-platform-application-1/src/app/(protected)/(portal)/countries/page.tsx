@@ -158,6 +158,7 @@ export default function CountriesPage() {
 				code: full.code,
 				iso3_code: full.iso3_code ?? "",
 				phone_code: full.phone_code ?? "",
+				flag_url: full.flag_url ?? "",
 				sort_order: full.sort_order,
 				locale: emptyCountryForm.locale,
 				// Lazily populated by CountryDialog the first time the Translations tab is selected.

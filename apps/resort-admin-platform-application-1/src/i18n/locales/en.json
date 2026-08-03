@@ -26,7 +26,8 @@
     "hide": "Hide",
     "loadMore": "Load more",
     "refresh": "Refresh",
-    "refreshed": "Refreshed"
+    "refreshed": "Refreshed",
+    "remove": "Remove"
   },
   "auth": {
     "login": {
@@ -120,6 +121,38 @@
     "change": "Change",
     "loadFailed": "Failed to load countries."
   },
+  "imageHostingProviderConfigPicker": {
+    "title": "Select Storage Config",
+    "titleProvider": "Select Provider",
+    "titleConfig": "Select Config — {{provider}}",
+    "countProviders": "{{n}} providers",
+    "countConfigs": "{{n}} configs",
+    "searchProviders": "Search providers by name…",
+    "searchConfigs": "Search configs by name…",
+    "emptyProviders": "No image hosting providers found.",
+    "emptyConfigs": "No configs for this provider.",
+    "loadProvidersFailed": "Failed to load providers.",
+    "loadConfigsFailed": "Failed to load configs.",
+    "createConfigPrompt": "No storage configs yet for {{provider}} — create one below to continue.",
+    "createConfigFailed": "Failed to create config.",
+    "change": "Change"
+  },
+  "countryFlag": {
+    "section": "Flag Image",
+    "availableAfterCreate": "Flag image can be uploaded once the country has been created.",
+    "promptUpload": "This country doesn't have a flag image yet — upload one below.",
+    "noImage": "No image on record",
+    "alt": "Country flag",
+    "clickToUpload": "Click to upload",
+    "fileRequired": "Choose an image file to upload.",
+    "svgOnly": "Flag images must be an SVG file.",
+    "svgHint": "SVG only.",
+    "upload": "Upload",
+    "replace": "Replace",
+    "uploading": "Uploading…",
+    "uploadedToast": "Flag image uploaded successfully.",
+    "viaConfig": "Using {{config}}"
+  },
   "facilityScope": {
     "title": "Facility Scopes",
     "subtitle": "Pre-seeded scopes that define where a facility can be applied (e.g. Resort, Room Category, Room).",
@@ -138,6 +171,7 @@
     "add": "Add",
     "searchByCode": "Search by locale code (e.g. en, bn)…",
     "noSearchMatch": "No translations match that locale code.",
+    "allLanguagesAdded": "A translation already exists for every available language.",
     "help": {
       "create": "Optionally add locale-specific names.",
       "edit": "Add, update, or remove locale translations.",

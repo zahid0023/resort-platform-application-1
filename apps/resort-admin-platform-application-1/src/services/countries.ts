@@ -14,6 +14,8 @@ export interface Country {
   code: string;
   iso3_code: string;
   phone_code: string;
+  /** URL of the uploaded flag image, or "" if none has been uploaded — see country-images.ts. */
+  flag_url: string;
   sort_order: number;
   /** The single translation matching Accept-Language (falls back to en, then null) — on GET /{id} and list alike. */
   locale: CountryLocale | null;

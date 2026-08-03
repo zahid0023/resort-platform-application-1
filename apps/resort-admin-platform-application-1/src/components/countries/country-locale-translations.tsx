@@ -24,7 +24,7 @@ import {
   AlertDialogTitle,
 } from "@resort/shadcn-ui";
 import { countriesService } from "@/services/countries";
-import { localesService, type Locale } from "@/services/locales";
+import type { Locale } from "@/services/locales";
 import { toast } from "sonner";
 import type { CountryDialogMode, CountryFormState, LocaleRow } from "./types";
 
@@ -43,12 +43,17 @@ export interface CountryLocaleTranslationsProps {
   /** True while any single translation row has an in-progress edit (existing or newly added). */
   editing: boolean;
   onEditingChange: (v: boolean) => void;
-  /** Clears search and re-pulls the complete unfiltered list before adding a new translation row. */
-  onPrepareAdd: () => void;
+  /** Clears search and re-pulls the complete unfiltered list before adding a new translation row.
+   * Returns the up-to-date language catalog so the caller can check "any locales left to add" right
+   * after awaiting it, instead of racing the `availableLocales` prop's next render. */
+  onPrepareAdd: () => Promise<Locale[]>;
   /** Owned by the parent dialog — survives this component unmounting on tab switch. */
   search: string;
   onSearchChange: (v: string) => void;
   open: boolean;
+  /** Owned by the parent dialog (see [[feedback_tab_content_state]]) — fetched once per dialog
+   * session there, not here, so it isn't lost every time this component unmounts on tab switch. */
+  availableLocales: Locale[];
 }
 
 export function CountryLocaleTranslations({
@@ -63,6 +68,7 @@ export function CountryLocaleTranslations({
   search,
   onSearchChange,
   open,
+  availableLocales,
 }: CountryLocaleTranslationsProps) {
   const { t } = useTranslation();
   const [newLocaleRows, setNewLocaleRows] = useState<NewLocaleRow[]>([]);
@@ -71,30 +77,12 @@ export function CountryLocaleTranslations({
   const [pendingDeleteRow, setPendingDeleteRow] = useState<LocaleRow | null>(null);
   const rKeyCounter = useRef(0);
 
-  // The full catalog can't be derived from the country's own translations — needed for the
-  // language dropdown on a new row and to compute the Add button's disabled state.
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
-  const [localesLoaded, setLocalesLoaded] = useState(false);
-
-  // Needed to compute the Add button's disabled state and populate the language dropdown for a
-  // new row — fetched once as soon as this tab is shown, not gated behind any edit action.
-  useEffect(() => {
-    if (mode === "create" || localesLoaded) return;
-    localesService
-      .list({ size: 50, sort_by: "sortOrder", sort_dir: "ASC" })
-      .then((res) => {
-        setAvailableLocales(res.data);
-        setLocalesLoaded(true);
-      })
-      .catch(() => {});
-  }, [mode, localesLoaded]);
-
   // GET /countries/{id} and the list endpoint only ever carry the single Accept-Language-matched
   // translation — the full set is only available via this dedicated sub-resource, so this tab
   // fetches its own data rather than relying on whatever the parent list/get call populated.
   function refreshLocales(localeCode?: string) {
     if (countryId == null) return;
-    countriesService.listLocales(countryId, { size: 50, localeCode: localeCode || undefined })
+    countriesService.listLocales(countryId, { size: 10, localeCode: localeCode || undefined })
       .then((res) => {
         onFormChange({
           ...form,
@@ -214,9 +202,11 @@ export function CountryLocaleTranslations({
     return new Set([...existing, ...added].filter((v): v is number => typeof v === "number"));
   }
 
-  function addNewLocaleRow() {
+  // `catalog` is passed explicitly (rather than read off the `availableLocales` prop) because the
+  // caller just awaited a fresh fetch of it — the prop won't reflect that until the next render.
+  function addNewLocaleRow(catalog: Locale[]) {
     const usedIds = usedLocaleIds();
-    const nextLocale = availableLocales.find((l) => !usedIds.has(l.id));
+    const nextLocale = catalog.find((l) => !usedIds.has(l.id));
     const _rkey = `n_${rKeyCounter.current++}`;
     const newRow: NewLocaleRow = {
       _rkey,
@@ -231,10 +221,19 @@ export function CountryLocaleTranslations({
   }
 
   // Adding a translation always needs the complete list — clear any active search and re-pull
-  // everything first, so duplicate-locale checks never operate on a filtered subset.
-  function handleAddLocale() {
-    onPrepareAdd();
-    addNewLocaleRow();
+  // everything first, so duplicate-locale checks never operate on a filtered subset. Also guards
+  // against the language catalog only being known lazily (fetched on first Add click, not eagerly on
+  // tab view — see [[feedback_dialog_lazy_tab_load]]): the Add button's disabled state can't tell
+  // "all locales already used" before the catalog has ever loaded, so this re-checks against the
+  // freshly-awaited catalog before actually opening a new row, rather than opening an unusable one
+  // with no language left to select.
+  async function handleAddLocale() {
+    const catalog = await onPrepareAdd();
+    if (catalog.length > 0 && usedLocaleIds().size >= catalog.length) {
+      toast.error(t("locale.allLanguagesAdded"));
+      return;
+    }
+    addNewLocaleRow(catalog);
   }
 
   // New rows render first, so adding one never requires scrolling down to see it.
@@ -254,7 +253,10 @@ export function CountryLocaleTranslations({
         </div>
         {mode !== "create" && (
           <Button type="button" size="sm" variant="outline" onClick={handleAddLocale}
-            disabled={newLocaleRows.length > 0 || (form.locales.length + newLocaleRows.length) >= availableLocales.length}
+            // The language catalog is only fetched lazily on first use (see prepareAddLocale in
+            // CountryDialog), so `availableLocales` starts empty — don't let that read as "no
+            // languages left" and disable Add before the catalog has ever been loaded.
+            disabled={newLocaleRows.length > 0 || (availableLocales.length > 0 && (form.locales.length + newLocaleRows.length) >= availableLocales.length)}
             className="h-7 text-xs px-2.5"
           >
             <Plus className="h-3.5 w-3.5 mr-1" /> {t("locale.add")}

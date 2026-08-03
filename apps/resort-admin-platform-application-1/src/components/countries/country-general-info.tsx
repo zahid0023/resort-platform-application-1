@@ -8,6 +8,7 @@ import { Label } from "@resort/shadcn-ui";
 import { countriesService } from "@/services/countries";
 import { toast } from "sonner";
 import type { CountryDialogMode, CountryFormState } from "./types";
+import { CountryFlagImage } from "./country-flag-image";
 
 const ISO3_PATTERN = /^[A-Z]{3}$/;
 const PHONE_PATTERN = /^[0-9]{1,3}$/;
@@ -155,6 +156,15 @@ export function CountryGeneralInfo({
           </div>
         </CardContent>
       </Card>
+
+      <CountryFlagImage
+        mode={mode}
+        countryId={countryId}
+        flagUrl={form.flag_url}
+        onFlagUrlChange={(url) => onFormChange({ flag_url: url })}
+        onSaved={onSaved}
+        open={open}
+      />
     </div>
   );
 }
