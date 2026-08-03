@@ -102,6 +102,8 @@
     "configFieldLabelRequiredRow": "Config field {{n}}: label is required.",
     "configFieldTypeRequiredRow": "Config field {{n}}: field type is required.",
     "configFieldKeyDuplicate": "Config field key \"{{key}}\" is used more than once.",
+    "configNameRequired": "Name is required.",
+    "configValueRequired": "\"{{field}}\" is required.",
     "currencyCodeInvalid": "Currency code must be exactly 3 letters (e.g. BDT).",
     "currencyCodeMaxLength": "Currency code can only be 3 letters.",
     "numericCodeInvalid": "Numeric code must be exactly 3 digits (e.g. 050).",
@@ -190,6 +192,8 @@
     "providerDescription": "Optional description...",
     "configFieldKey": "bucket",
     "configFieldLabel": "Bucket Name",
+    "configName": "Cloudinary Marketing",
+    "configNameForProvider": "{{provider}} Marketing",
     "currencyCode": "BDT",
     "numericCode": "050",
     "currencySymbol": "৳",
@@ -318,6 +322,22 @@
       "delete": {
         "title": "Delete Config Field",
         "desc": "Are you sure you want to remove this config field? This action cannot be undone."
+      }
+    },
+    "configs": "Configs",
+    "config": {
+      "add": "Add",
+      "addFirst": "Create Config",
+      "name": "Name",
+      "searchByName": "Search by name…",
+      "noSearchMatch": "No configs match that search.",
+      "empty": {
+        "view": "No configs for this provider."
+      },
+      "removedToast": "Config removed.",
+      "delete": {
+        "title": "Delete Config",
+        "desc": "Are you sure you want to remove this config? This action cannot be undone."
       }
     }
   },

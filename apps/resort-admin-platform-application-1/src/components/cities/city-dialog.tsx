@@ -280,7 +280,6 @@ export function CityDialog({
                   onFormChange={onFormChange}
                   cityId={cityId}
                   onSaved={onSaved}
-                  editing={translationsEditing}
                   onEditingChange={setTranslationsEditing}
                   open={open}
                 />

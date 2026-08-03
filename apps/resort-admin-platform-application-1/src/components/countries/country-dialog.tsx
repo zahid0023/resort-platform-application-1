@@ -241,13 +241,14 @@ export function CountryDialog({
     return () => clearTimeout(timer);
   }, [localeSearch, open, mode, translationsEditing]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Entering edit mode always needs the complete list — clear any active search and re-pull
-  // everything first, so duplicate-locale checks never operate on a filtered subset.
-  function startEditingLocales() {
+  // Adding a translation always needs the complete list — clear any active search and re-pull
+  // everything first, so duplicate-locale checks never operate on a filtered subset. Editing an
+  // existing translation doesn't need this: CountryLocaleTranslations drives `translationsEditing`
+  // itself based on whether any row has an open draft.
+  function prepareAddLocale() {
     setLocaleSearch("");
     lastLocaleSearchKey.current = "";
     fetchLocales().catch((err) => toast.error((err as Error).message));
-    setTranslationsEditing(true);
   }
 
   // Manual refresh only — switching tabs never re-fetches on its own otherwise. Pulls whichever the
@@ -385,7 +386,7 @@ export function CountryDialog({
                   onSaved={onSaved}
                   editing={translationsEditing}
                   onEditingChange={setTranslationsEditing}
-                  onStartEditing={startEditingLocales}
+                  onPrepareAdd={prepareAddLocale}
                   search={localeSearch}
                   onSearchChange={setLocaleSearch}
                   open={open}

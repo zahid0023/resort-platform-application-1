@@ -289,7 +289,6 @@ export function CurrencyDialog({
                   onFormChange={onFormChange}
                   currencyId={currencyId}
                   onSaved={onSaved}
-                  editing={translationsEditing}
                   onEditingChange={setTranslationsEditing}
                   open={open}
                 />

@@ -39,7 +39,7 @@ export interface CurrencyLocaleTranslationsProps {
   onFormChange: (form: CurrencyFormState) => void;
   currencyId?: number;
   onSaved?: () => void | Promise<void>;
-  editing: boolean;
+  /** Reported upward automatically based on whether any row has an open edit draft. */
   onEditingChange: (v: boolean) => void;
   open: boolean;
 }
@@ -50,7 +50,6 @@ export function CurrencyLocaleTranslations({
   onFormChange,
   currencyId,
   onSaved,
-  editing,
   onEditingChange,
   open,
 }: CurrencyLocaleTranslationsProps) {
@@ -61,12 +60,15 @@ export function CurrencyLocaleTranslations({
   const [pendingDeleteRow, setPendingDeleteRow] = useState<LocaleRow | null>(null);
   const rKeyCounter = useRef(0);
 
-  // Only needed once the user actually wants to add a language.
+  // The full catalog can't be derived from the currency's own translations — needed for the language
+  // dropdown on a new row and to compute the Add button's disabled state.
   const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
   const [localesLoaded, setLocalesLoaded] = useState(false);
 
+  // Fetched once as soon as this tab is shown, not gated behind any edit action — the Add button
+  // itself is no longer gated behind one either.
   useEffect(() => {
-    if (!editing || localesLoaded) return;
+    if (mode === "create" || localesLoaded) return;
     localesService
       .list({ size: 50, sort_by: "sortOrder", sort_dir: "ASC" })
       .then((res) => {
@@ -74,7 +76,7 @@ export function CurrencyLocaleTranslations({
         setLocalesLoaded(true);
       })
       .catch(() => {});
-  }, [editing, localesLoaded]);
+  }, [mode, localesLoaded]);
 
   // GET /currencies/{id} and the list endpoint only ever carry the single Accept-Language-matched
   // translation — the full set is only available via this dedicated sub-resource, so this tab
@@ -117,6 +119,12 @@ export function CurrencyLocaleTranslations({
       setBusyRowKeys(new Set());
     }
   }, [open]);
+
+  // A translation is "being edited" whenever any row (existing or newly added) has an open draft —
+  // there's no section-wide edit toggle anymore, so this is what drives isDirty upstream.
+  useEffect(() => {
+    onEditingChange(Object.keys(rowEditData).length > 0);
+  }, [rowEditData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function rowKey(row: LocaleRow): string {
     return row.id != null ? `e_${row.id}` : (row as NewLocaleRow)._rkey ?? "";
@@ -198,12 +206,6 @@ export function CurrencyLocaleTranslations({
     }
   }
 
-  function cancelEditing() {
-    setNewLocaleRows([]);
-    setRowEditData({});
-    onEditingChange(false);
-  }
-
   function usedLocaleIds(excludeKey?: string): Set<number> {
     const existing = form.locales
       .filter((r) => rowKey(r) !== excludeKey)
@@ -230,9 +232,10 @@ export function CurrencyLocaleTranslations({
     setRowEditData((prev) => ({ ...prev, [_rkey]: { ...newRow } }));
   }
 
+  // New rows render first, so adding one never requires scrolling down to see it.
   const allLocaleRows: Array<LocaleRow & { _rkey: string }> = [
-    ...form.locales.map((l) => ({ ...l, _rkey: `e_${l.id}` })),
     ...newLocaleRows,
+    ...form.locales.map((l) => ({ ...l, _rkey: `e_${l.id}` })),
   ];
 
   return (
@@ -244,60 +247,17 @@ export function CurrencyLocaleTranslations({
             {t("locale.translations")}
           </h3>
         </div>
-        {mode !== "create" && !editing && (
-          <Button type="button" size="sm" variant="outline" onClick={() => onEditingChange(true)} className="h-7 text-xs px-2.5 gap-1.5">
-            <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+        {mode !== "create" && (
+          <Button type="button" size="sm" variant="outline" onClick={addNewLocaleRow}
+            disabled={newLocaleRows.length > 0 || (form.locales.length + newLocaleRows.length) >= availableLocales.length}
+            className="h-7 text-xs px-2.5"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" /> {t("locale.add")}
           </Button>
-        )}
-        {editing && (
-          <div className="flex items-center gap-1.5">
-            <Button type="button" size="sm" variant="outline" onClick={cancelEditing} className="h-7 text-xs px-2.5 gap-1.5">
-              <X className="h-3.5 w-3.5" /> {t("common.cancel")}
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={addNewLocaleRow}
-              disabled={(form.locales.length + newLocaleRows.length) >= availableLocales.length}
-              className="h-7 text-xs px-2.5"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" /> {t("locale.add")}
-            </Button>
-          </div>
         )}
       </div>
 
       <Card className="gap-0 py-0 overflow-hidden">
-        {/* VIEW mode */}
-        {!editing && mode !== "create" && (
-          form.locales.length === 0 ? (
-            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-              <Languages className="h-4 w-4 mr-2 opacity-40" />
-              {t("locale.empty.currency")}
-            </div>
-          ) : (
-            <div className="divide-y">
-              {form.locales.map((row) => (
-                <div key={`e_${row.id}`} className="p-4 space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Languages className="h-3.5 w-3.5 text-muted-foreground" />
-                    {row.locale ? `${row.locale.name} (${row.locale.code})` : t("locale.row.label", { n: row.id ?? 0 })}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">{t("common.name")}</Label>
-                    <Input value={row.name} disabled placeholder={t("placeholder.currencyName")} className="h-9 text-sm" onChange={() => {}} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">{t("field.shortName")}</Label>
-                    <Input value={row.short_name} disabled placeholder={t("placeholder.currencyShortName")} className="h-9 text-sm" onChange={() => {}} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground">{t("field.sort")}</Label>
-                    <Input type="number" value={row.sort_order} disabled className="h-9 text-sm" onChange={() => {}} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          )
-        )}
-
         {/* CREATE mode — always a single "en" translation, resolved server-side */}
         {mode === "create" && (
           <div className="p-4 space-y-3">
@@ -331,8 +291,9 @@ export function CurrencyLocaleTranslations({
           </div>
         )}
 
-        {/* EDIT mode */}
-        {editing && (
+        {/* View/Edit — each translation is edited independently via its own pencil icon, no
+            section-wide edit toggle required first */}
+        {mode !== "create" && (
           allLocaleRows.length === 0 ? (
             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
               <Languages className="h-4 w-4 mr-2 opacity-40" />

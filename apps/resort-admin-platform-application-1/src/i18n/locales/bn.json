@@ -102,6 +102,8 @@
     "configFieldLabelRequiredRow": "কনফিগ ফিল্ড {{n}}: লেবেল প্রয়োজন।",
     "configFieldTypeRequiredRow": "কনফিগ ফিল্ড {{n}}: ফিল্ড টাইপ প্রয়োজন।",
     "configFieldKeyDuplicate": "কনফিগ ফিল্ড কী \"{{key}}\" একাধিকবার ব্যবহৃত হয়েছে।",
+    "configNameRequired": "নাম প্রয়োজন।",
+    "configValueRequired": "\"{{field}}\" প্রয়োজন।",
     "currencyCodeInvalid": "মুদ্রার কোড অবশ্যই ঠিক ৩টি অক্ষরের হতে হবে (যেমন BDT)।",
     "currencyCodeMaxLength": "মুদ্রার কোড কেবল ৩টি অক্ষরের হতে পারে।",
     "numericCodeInvalid": "নিউমেরিক কোড অবশ্যই ঠিক ৩টি সংখ্যার হতে হবে (যেমন 050)।",
@@ -174,6 +176,8 @@
     "providerDescription": "ঐচ্ছিক বিবরণ...",
     "configFieldKey": "bucket",
     "configFieldLabel": "Bucket Name",
+    "configName": "Cloudinary Marketing",
+    "configNameForProvider": "{{provider}} মার্কেটিং",
     "currencyCode": "BDT",
     "numericCode": "050",
     "currencySymbol": "৳",
@@ -302,6 +306,22 @@
       "delete": {
         "title": "কনফিগ ফিল্ড মুছুন",
         "desc": "আপনি কি এই কনফিগ ফিল্ডটি সরাতে নিশ্চিত? এই পদক্ষেপটি পূর্বাবস্থায় ফেরানো যাবে না।"
+      }
+    },
+    "configs": "কনফিগসমূহ",
+    "config": {
+      "add": "যোগ করুন",
+      "addFirst": "কনফিগ তৈরি করুন",
+      "name": "নাম",
+      "searchByName": "নাম দিয়ে খুঁজুন…",
+      "noSearchMatch": "এই অনুসন্ধানের সাথে মিলে এমন কোনো কনফিগ নেই।",
+      "empty": {
+        "view": "এই প্রোভাইডারের কোনো কনফিগ নেই।"
+      },
+      "removedToast": "কনফিগ সরানো হয়েছে।",
+      "delete": {
+        "title": "কনফিগ মুছুন",
+        "desc": "আপনি কি এই কনফিগটি সরাতে নিশ্চিত? এই পদক্ষেপটি পূর্বাবস্থায় ফেরানো যাবে না।"
       }
     }
   },

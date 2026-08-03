@@ -30,7 +30,7 @@ export interface ImageHostingProviderConfigFieldsProps {
   onFormChange: (form: ImageHostingProviderFormState) => void;
   providerId?: number;
   onSaved?: () => void | Promise<void>;
-  editing: boolean;
+  /** Reported upward automatically based on whether any row has an open edit draft. */
   onEditingChange: (v: boolean) => void;
   open: boolean;
 }
@@ -41,7 +41,6 @@ export function ImageHostingProviderConfigFields({
   onFormChange,
   providerId,
   onSaved,
-  editing,
   onEditingChange,
   open,
 }: ImageHostingProviderConfigFieldsProps) {
@@ -59,6 +58,12 @@ export function ImageHostingProviderConfigFields({
       setBusyRowKeys(new Set());
     }
   }, [open]);
+
+  // A config field is "being edited" whenever any row (existing or newly added) has an open draft —
+  // there's no section-wide edit toggle anymore, so this is what drives isDirty upstream.
+  useEffect(() => {
+    onEditingChange(Object.keys(rowEditData).length > 0);
+  }, [rowEditData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function rowKey(row: ConfigFieldRow): string {
     return row.id != null ? `e_${row.id}` : (row as NewConfigFieldRow)._rkey ?? "";
@@ -145,12 +150,6 @@ export function ImageHostingProviderConfigFields({
     }
   }
 
-  function cancelEditing() {
-    setNewRows([]);
-    setRowEditData({});
-    onEditingChange(false);
-  }
-
   function addNewRow() {
     const _rkey = `n_${rKeyCounter.current++}`;
     const newRow: NewConfigFieldRow = {
@@ -169,11 +168,11 @@ export function ImageHostingProviderConfigFields({
   }
 
   // CREATE mode — rows live only in `form.config_fields` until the whole provider is submitted.
+  // New rows are prepended so adding one never requires scrolling down to see it.
   function addCreateRow() {
     onFormChange({
       ...form,
       config_fields: [
-        ...form.config_fields,
         {
           key: "",
           label: "",
@@ -184,6 +183,7 @@ export function ImageHostingProviderConfigFields({
           sort_order: form.config_fields.length + 1,
           _new: true,
         },
+        ...form.config_fields,
       ],
     });
   }
@@ -196,9 +196,10 @@ export function ImageHostingProviderConfigFields({
     onFormChange({ ...form, config_fields: form.config_fields.filter((_, i) => i !== idx) });
   }
 
+  // New rows render first, so adding one never requires scrolling down to see it.
   const allRows: Array<ConfigFieldRow & { _rkey: string }> = [
-    ...form.config_fields.map((f) => ({ ...f, _rkey: `e_${f.id}` })),
     ...newRows,
+    ...form.config_fields.map((f) => ({ ...f, _rkey: `e_${f.id}` })),
   ];
 
   return (
@@ -210,20 +211,10 @@ export function ImageHostingProviderConfigFields({
             {t("imageHostingProvider.configFields")}
           </h3>
         </div>
-        {mode !== "create" && !editing && (
-          <Button type="button" size="sm" variant="outline" onClick={() => onEditingChange(true)} className="h-7 text-xs px-2.5 gap-1.5">
-            <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
+        {mode !== "create" && (
+          <Button type="button" size="sm" variant="outline" onClick={addNewRow} disabled={newRows.length > 0} className="h-7 text-xs px-2.5">
+            <Plus className="h-3.5 w-3.5 mr-1" /> {t("imageHostingProvider.configField.add")}
           </Button>
-        )}
-        {editing && (
-          <div className="flex items-center gap-1.5">
-            <Button type="button" size="sm" variant="outline" onClick={cancelEditing} className="h-7 text-xs px-2.5 gap-1.5">
-              <X className="h-3.5 w-3.5" /> {t("common.cancel")}
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={addNewRow} className="h-7 text-xs px-2.5">
-              <Plus className="h-3.5 w-3.5 mr-1" /> {t("imageHostingProvider.configField.add")}
-            </Button>
-          </div>
         )}
         {mode === "create" && (
           <Button type="button" size="sm" variant="outline" onClick={addCreateRow} className="h-7 text-xs px-2.5">
@@ -233,25 +224,6 @@ export function ImageHostingProviderConfigFields({
       </div>
 
       <Card className="gap-0 py-0 overflow-hidden">
-        {/* VIEW mode */}
-        {!editing && mode !== "create" && (
-          form.config_fields.length === 0 ? (
-            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-              <KeyRound className="h-4 w-4 mr-2 opacity-40" />
-              {t("imageHostingProvider.configField.empty.view")}
-            </div>
-          ) : (
-            <div className="divide-y">
-              {form.config_fields.map((row) => (
-                <div key={`e_${row.id}`} className="p-4 space-y-3">
-                  <ConfigFieldHeader row={row} isNew={false} keyEditable={false} />
-                  <ConfigFieldFields row={row} disabled keyEditable={false} onChange={() => {}} listId={`cft-e_${row.id}`} />
-                </div>
-              ))}
-            </div>
-          )
-        )}
-
         {/* CREATE mode — bundled directly into the create request, no API calls until submit */}
         {mode === "create" && (
           form.config_fields.length === 0 ? (
@@ -279,8 +251,9 @@ export function ImageHostingProviderConfigFields({
           )
         )}
 
-        {/* EDIT mode */}
-        {editing && (
+        {/* View/Edit — each config field is edited independently via its own pencil icon, no
+            section-wide edit toggle required first */}
+        {mode !== "create" && (
           allRows.length === 0 ? (
             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
               <KeyRound className="h-4 w-4 mr-2 opacity-40" />

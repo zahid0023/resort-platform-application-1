@@ -152,16 +152,10 @@ export default function ImageHostingProvidersPage() {
         name: full.name,
         description: full.description,
         sort_order: full.sort_order,
-        config_fields: full.config_fields.map((f) => ({
-          id: f.id,
-          key: f.key,
-          label: f.label,
-          field_type: f.field_type,
-          placeholder: f.placeholder,
-          default_value: f.default_value,
-          is_required: f.is_required,
-          sort_order: f.sort_order,
-        })),
+        // Config fields and configs are never embedded on this DTO — both are lazily populated
+        // by ImageHostingProviderDialog the first time their respective tab is selected.
+        config_fields: [],
+        configs: [],
       });
       setDialogOpen(true);
     } catch (err) {

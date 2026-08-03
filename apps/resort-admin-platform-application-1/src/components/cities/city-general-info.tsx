@@ -6,7 +6,7 @@ import { Card, CardContent } from "@resort/shadcn-ui";
 import { Input } from "@resort/shadcn-ui";
 import { Label } from "@resort/shadcn-ui";
 import { citiesService } from "@/services/cities";
-import type { Country } from "@/services/countries";
+import { countriesService, type Country } from "@/services/countries";
 import { toast } from "sonner";
 import type { CityDialogMode, CityFormState } from "./types";
 import { CountryPickerDialog } from "./country-picker-dialog";
@@ -53,6 +53,19 @@ export function CityGeneralInfo({
       setSelectedCountry(null);
     }
   }, [open]);
+
+  // Restoring a local draft (or any other path that lands a country_id in the form without going
+  // through handleCountrySelect) only brings back the id, not the country to display — resolve it
+  // here so the picker shows the already-set country instead of the empty "select a country" state.
+  useEffect(() => {
+    if (!open || !showCountryPicker || form.country_id === "") return;
+    if (selectedCountry?.id === Number(form.country_id)) return;
+    let cancelled = false;
+    countriesService.get(Number(form.country_id))
+      .then((res) => { if (!cancelled) setSelectedCountry(res.data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [open, showCountryPicker, form.country_id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function startEdit() {
     setLocalSortOrder(form.sort_order);

@@ -17,8 +17,12 @@ export interface ImageHostingProvider {
   name: string;
   description: string;
   sort_order: number;
-  /** [] except on GET /{id} */
-  config_fields: ImageHostingProviderConfigField[];
+}
+
+export interface ImageHostingProviderConfig {
+  id: number;
+  name: string;
+  config: Record<string, unknown>;
 }
 
 export interface ImageHostingProviderListResponse {
@@ -85,6 +89,37 @@ export interface ListParams {
   name?: string;
 }
 
+export interface ImageHostingProviderConfigListResponse {
+  data: ImageHostingProviderConfig[];
+  current_page: number;
+  total_pages: number;
+  total_elements: number;
+  page_size: number;
+  has_next: boolean;
+  has_previous: boolean;
+  searchable_fields?: string[];
+  sortable_fields?: string[];
+}
+
+export interface CreateConfigRequest {
+  name: string;
+  config: Record<string, unknown>;
+}
+
+export interface UpdateConfigRequest {
+  name: string;
+  config: Record<string, unknown>;
+}
+
+export interface ListConfigsParams {
+  page?: number;
+  size?: number;
+  // sortBy=id throws 400 — implicit-default only. Only "name" is a selectable sort field.
+  sort_by?: "name";
+  sort_dir?: "ASC" | "DESC";
+  name?: string;
+}
+
 export const imageHostingProvidersService = {
   async list(params: ListParams = {}): Promise<ImageHostingProviderListResponse> {
     const { page = 0, size = 10, sort_by, sort_dir = "ASC", code, name } = params;
@@ -130,5 +165,31 @@ export const imageHostingProvidersService = {
 
   async removeConfigField(providerId: number, id: number): Promise<MutationResponse> {
     return api.delete<MutationResponse>(`/image-hosting-providers/${providerId}/config-fields/${id}`);
+  },
+
+  // Configs — actual configured instances of a provider (e.g. "Cloudinary Marketing"), distinct
+  // from config fields (which describe the schema). Paginated, unlike config-fields.
+  async listConfigs(providerId: number, params: ListConfigsParams = {}): Promise<ImageHostingProviderConfigListResponse> {
+    const { page = 0, size = 10, sort_by, sort_dir = "ASC", name } = params;
+    const query = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+      sortDir: sort_dir,
+    });
+    if (sort_by) query.set("sortBy", sort_by);
+    if (name) query.set("name", name);
+    return api.get<ImageHostingProviderConfigListResponse>(`/image-hosting-providers/${providerId}/configs?${query}`);
+  },
+
+  async createConfig(providerId: number, body: CreateConfigRequest): Promise<MutationResponse> {
+    return api.post<MutationResponse>(`/image-hosting-providers/${providerId}/configs`, body);
+  },
+
+  async updateConfig(providerId: number, id: number, body: UpdateConfigRequest): Promise<MutationResponse> {
+    return api.put<MutationResponse>(`/image-hosting-providers/${providerId}/configs/${id}`, body);
+  },
+
+  async removeConfig(providerId: number, id: number): Promise<MutationResponse> {
+    return api.delete<MutationResponse>(`/image-hosting-providers/${providerId}/configs/${id}`);
   },
 };

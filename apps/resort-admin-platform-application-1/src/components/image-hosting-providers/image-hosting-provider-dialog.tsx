@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { ArrowRight, CloudIcon, RefreshCw, Save, X } from "lucide-react";
 import { Button, Sheet, SheetContent } from "@resort/shadcn-ui";
@@ -20,6 +20,7 @@ import { toast } from "sonner";
 import type { ImageHostingProviderDialogMode, ImageHostingProviderFormState } from "./types";
 import { ImageHostingProviderGeneralInfo } from "./image-hosting-provider-general-info";
 import { ImageHostingProviderConfigFields } from "./image-hosting-provider-config-fields";
+import { ImageHostingProviderConfigs } from "./image-hosting-provider-configs";
 
 export const emptyImageHostingProviderForm: ImageHostingProviderFormState = {
   code: "",
@@ -27,6 +28,7 @@ export const emptyImageHostingProviderForm: ImageHostingProviderFormState = {
   description: "",
   sort_order: 0,
   config_fields: [{ key: "", label: "", field_type: "TEXT", placeholder: "", default_value: "", is_required: true, sort_order: 1, _new: true }],
+  configs: [],
 };
 
 // Local autosave for the create form — never sent to the backend, just a browser-local checkpoint.
@@ -76,8 +78,16 @@ export function ImageHostingProviderDialog({
   const [submitting, setSubmitting] = useState(false);
   const [generalEditing, setGeneralEditing] = useState(false);
   const [configFieldsEditing, setConfigFieldsEditing] = useState(false);
+  const [configsEditing, setConfigsEditing] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
-  const [activeTab, setActiveTab] = useState<"general" | "configFields">("general");
+  const [activeTab, setActiveTab] = useState<"general" | "configFields" | "configs">("general");
+  const [refreshing, setRefreshing] = useState(false);
+  const [configFieldsLoaded, setConfigFieldsLoaded] = useState(false);
+  const [configsLoaded, setConfigsLoaded] = useState(false);
+  // Owned here (not inside ImageHostingProviderConfigs) so it survives that component unmounting
+  // when the user switches away from the tab and back — see [[feedback_tab_content_state]].
+  const [configsSearch, setConfigsSearch] = useState("");
+  const lastConfigsSearchKey = useRef("");
   const [draftPrompt, setDraftPrompt] = useState<ImageHostingProviderFormState | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const [draftSyncing, setDraftSyncing] = useState(false);
@@ -86,11 +96,16 @@ export function ImageHostingProviderDialog({
     if (!open) {
       setGeneralEditing(false);
       setConfigFieldsEditing(false);
+      setConfigsEditing(false);
       setConfirmClose(false);
       setActiveTab("general");
       setDraftPrompt(null);
       setDraftSavedAt(null);
       setDraftSyncing(false);
+      setConfigFieldsLoaded(false);
+      setConfigsLoaded(false);
+      setConfigsSearch("");
+      lastConfigsSearchKey.current = "";
     }
   }, [open]);
 
@@ -148,12 +163,117 @@ export function ImageHostingProviderDialog({
   ) : undefined;
 
   // Edit/view only — create is covered by the local draft, so closing it never needs a confirm.
-  const isDirty = generalEditing || configFieldsEditing;
+  const isDirty = generalEditing || configFieldsEditing || configsEditing;
 
   function requestClose() {
     if (mode === "create") { onOpenChange(false); return; }
     if (isDirty) setConfirmClose(true);
     else onOpenChange(false);
+  }
+
+  // Config fields are never embedded on the provider DTO — this sub-resource is the only way to
+  // read them, fetched once the first time the tab is selected (see effect below).
+  async function fetchConfigFields(): Promise<void> {
+    if (providerId == null) return;
+    const rows = await imageHostingProvidersService.listConfigFields(providerId);
+    onFormChange({
+      ...form,
+      config_fields: rows.map((f) => ({
+        id: f.id,
+        key: f.key,
+        label: f.label,
+        field_type: f.field_type,
+        placeholder: f.placeholder,
+        default_value: f.default_value,
+        is_required: f.is_required,
+        sort_order: f.sort_order,
+      })),
+    });
+  }
+
+  // Shared by the lazy first-load, the search box, and the manual refresh button. Configs are a
+  // genuinely paginated sub-resource; this dialog only ever holds one page (size 50), same
+  // simplification the Country pattern uses for locale translations.
+  async function fetchConfigs(name?: string): Promise<void> {
+    if (providerId == null) return;
+    const res = await imageHostingProvidersService.listConfigs(providerId, { size: 50, name: name || undefined });
+    onFormChange({
+      ...form,
+      configs: res.data.map((c) => ({ id: c.id, name: c.name, config: c.config })),
+    });
+  }
+
+  // Config fields and configs are only fetched once the tab is actually selected — not when the
+  // provider card is opened — and only the first time per dialog session; re-selecting the tab
+  // afterward reuses what's already loaded. Use the Refresh button for an explicit re-fetch.
+  useEffect(() => {
+    if (!open || mode === "create" || activeTab !== "configFields" || configFieldsLoaded) return;
+    setConfigFieldsLoaded(true);
+    fetchConfigFields().catch((err) => toast.error((err as Error).message));
+  }, [open, mode, activeTab, configFieldsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!open || mode === "create" || activeTab !== "configs" || configsLoaded) return;
+    setConfigsLoaded(true);
+    fetchConfigs().catch((err) => toast.error((err as Error).message));
+  }, [open, mode, activeTab, configsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The Configs tab renders one input per config field (see ImageHostingProviderConfigs), so it
+  // needs the schema too — load it here if the user lands on Configs before ever visiting Config
+  // Fields. Shares `configFieldsLoaded` with that tab's own effect, so whichever tab is visited
+  // first is the one that actually fetches.
+  useEffect(() => {
+    if (!open || mode === "create" || activeTab !== "configs" || configFieldsLoaded) return;
+    setConfigFieldsLoaded(true);
+    fetchConfigFields().catch((err) => toast.error((err as Error).message));
+  }, [open, mode, activeTab, configFieldsLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced server-side search — skipped while any config row has an open draft (a row being
+  // edited, or a new one being added), since replacing `form.configs` mid-edit would pull the rug
+  // out from under it.
+  useEffect(() => {
+    if (!open || mode === "create" || configsEditing) return;
+    if (lastConfigsSearchKey.current === configsSearch) return;
+    lastConfigsSearchKey.current = configsSearch;
+    const timer = setTimeout(() => {
+      fetchConfigs(configsSearch.trim()).catch((err) => toast.error((err as Error).message));
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [configsSearch, open, mode, configsEditing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Adding a config clears any active search and re-pulls the complete list first, so the new
+  // draft row doesn't get appended on top of a filtered view. `configsEditing` itself is no longer
+  // set here — ImageHostingProviderConfigs derives and reports it based on whether any row has an
+  // open draft.
+  function prepareAddConfig() {
+    setConfigsSearch("");
+    lastConfigsSearchKey.current = "";
+    fetchConfigs().catch((err) => toast.error((err as Error).message));
+  }
+
+  // Manual refresh only — switching tabs never re-fetches on its own otherwise. Pulls whichever
+  // the active tab needs.
+  async function handleRefresh() {
+    if (providerId == null) return;
+    setRefreshing(true);
+    try {
+      if (activeTab === "general") {
+        const res = await imageHostingProvidersService.get(providerId);
+        const full = res.data;
+        onFormChange({ ...form, name: full.name, description: full.description, sort_order: full.sort_order });
+      } else if (activeTab === "configFields") {
+        await fetchConfigFields();
+        setConfigFieldsLoaded(true);
+      } else {
+        await fetchConfigs(configsSearch.trim());
+        setConfigsLoaded(true);
+      }
+      toast.success(t("common.refreshed"));
+    } catch (err) {
+      toast.error((err as Error).message);
+    } finally {
+      setRefreshing(false);
+    }
   }
 
   // Silent check — drives the "config fields" tab's disabled state without firing toasts on every render.
@@ -232,7 +352,7 @@ export function ImageHostingProviderDialog({
     }
   }
 
-  const isEditing = generalEditing || configFieldsEditing;
+  const isEditing = generalEditing || configFieldsEditing || configsEditing;
   const headerTitle = mode === "create" ? t("dialog.imageHostingProvider.new") : (isEditing ? t("dialog.imageHostingProvider.edit") : t("dialog.imageHostingProvider.view"));
   const headerDesc = mode === "create" ? t("dialog.imageHostingProvider.desc.create") : (isEditing ? t("dialog.imageHostingProvider.desc.edit") : t("dialog.imageHostingProvider.desc.view"));
 
@@ -251,15 +371,33 @@ export function ImageHostingProviderDialog({
 
             <Tabs
               value={activeTab}
-              onValueChange={(v) => setActiveTab(v as "general" | "configFields")}
+              onValueChange={(v) => setActiveTab(v as "general" | "configFields" | "configs")}
               className="flex-1 min-h-0 flex-col"
             >
-              <TabsList className="mx-6 mt-4 w-fit shrink-0">
-                <TabsTrigger value="general">{t("common.generalInfo")}</TabsTrigger>
-                <TabsTrigger value="configFields" disabled={mode === "create" && !isGeneralInfoValid()}>
-                  {t("imageHostingProvider.configFields")}
-                </TabsTrigger>
-              </TabsList>
+              <div className="flex items-center justify-between mx-6 mt-4 gap-2">
+                <TabsList className="w-fit shrink-0">
+                  <TabsTrigger value="general">{t("common.generalInfo")}</TabsTrigger>
+                  <TabsTrigger value="configFields" disabled={mode === "create" && !isGeneralInfoValid()}>
+                    {t("imageHostingProvider.configFields")}
+                  </TabsTrigger>
+                  <TabsTrigger value="configs" disabled={mode === "create"}>
+                    {t("imageHostingProvider.configs")}
+                  </TabsTrigger>
+                </TabsList>
+                {mode !== "create" && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 shrink-0"
+                    onClick={handleRefresh}
+                    disabled={refreshing || (activeTab === "general" ? generalEditing : activeTab === "configFields" ? configFieldsEditing : configsEditing)}
+                    title={t("common.refresh")}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                  </Button>
+                )}
+              </div>
 
               <TabsContent value="general" className="min-h-0 overflow-y-auto px-6 py-5">
                 <ImageHostingProviderGeneralInfo
@@ -280,9 +418,23 @@ export function ImageHostingProviderDialog({
                   form={form}
                   onFormChange={onFormChange}
                   providerId={providerId}
-                  onSaved={onSaved}
-                  editing={configFieldsEditing}
+                  onSaved={async () => { await fetchConfigFields(); await onSaved?.(); }}
                   onEditingChange={setConfigFieldsEditing}
+                  open={open}
+                />
+              </TabsContent>
+
+              <TabsContent value="configs" className="min-h-0 overflow-y-auto px-6 py-5">
+                <ImageHostingProviderConfigs
+                  form={form}
+                  onFormChange={onFormChange}
+                  providerId={providerId}
+                  onSaved={onSaved}
+                  editing={configsEditing}
+                  onEditingChange={setConfigsEditing}
+                  onPrepareAdd={prepareAddConfig}
+                  search={configsSearch}
+                  onSearchChange={setConfigsSearch}
                   open={open}
                 />
               </TabsContent>

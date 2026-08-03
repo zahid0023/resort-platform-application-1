@@ -91,7 +91,7 @@ const currencyNavItems = [
 ];
 
 const hostingNavItems = [
-  { title: "Image Hosting Providers", url: "/image-hosting-providers", icon: CloudIcon },
+  { title: "Image Hosting", url: "/image-hosting-providers", icon: CloudIcon },
 ];
 
 const commonNavItems = [
