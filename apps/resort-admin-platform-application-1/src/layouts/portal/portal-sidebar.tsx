@@ -94,10 +94,13 @@ const hostingNavItems = [
   { title: "Image Hosting", url: "/image-hosting-providers", icon: CloudIcon },
 ];
 
-const commonNavItems = [
+const facilityNavItems = [
+  { title: "Facility Scopes", url: "/facility-scopes", icon: SettingsIcon },
   { title: "Facility Groups", url: "/facility-groups", icon: FolderIcon },
   { title: "Facilities", url: "/facilities", icon: BlocksIcon },
-  { title: "Facility Scopes", url: "/facility-scopes", icon: SettingsIcon },
+];
+
+const commonNavItems = [
   { title: "Locales", url: "/locales", icon: LanguagesIcon },
 ];
 
@@ -228,6 +231,23 @@ export function PortalSidebar() {
             <SidebarGroupLabel>Hosting</SidebarGroupLabel>
             <SidebarMenu className="gap-2">
               {hostingNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButtonActive
+                    icon={<item.icon />}
+                    title={item.title}
+                    url={item.url}
+                  />
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarGroupLabel>Facility</SidebarGroupLabel>
+            <SidebarMenu className="gap-2">
+              {facilityNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButtonActive
                     icon={<item.icon />}

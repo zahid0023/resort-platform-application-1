@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import { SidebarProvider } from "@resort/shadcn-ui"
 import { PortalHeader } from "@/layouts/portal/portal-header"
 import { PortalSidebar } from "@/layouts/portal/portal-sidebar"
+import { LocalesProvider } from "@/providers/locales-provider"
 import { getToken } from "../../services/api"
 
 export default function PortalLayout({
@@ -27,16 +28,18 @@ export default function PortalLayout({
   if (!ready) return null
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div className="flex min-h-screen w-full overflow-x-hidden">
-        <PortalSidebar />
-        <div className="flex flex-1 flex-col min-w-0">
-          <PortalHeader />
-          <main className="flex-1 overflow-auto bg-muted/30 p-4 lg:p-6">
-            {children}
-          </main>
+    <LocalesProvider>
+      <SidebarProvider defaultOpen={true}>
+        <div className="flex min-h-screen w-full overflow-x-hidden">
+          <PortalSidebar />
+          <div className="flex flex-1 flex-col min-w-0">
+            <PortalHeader />
+            <main className="flex-1 overflow-auto bg-muted/30 p-4 lg:p-6">
+              {children}
+            </main>
+          </div>
         </div>
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </LocalesProvider>
   )
 }

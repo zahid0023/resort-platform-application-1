@@ -49,7 +49,6 @@ export function LocaleGeneralInfo({
     setSubmitting(true);
     try {
       await localesService.update(localeId, {
-        code: form.code,
         name: local.name.trim(),
         sort_order: Number(local.sort_order) || 0,
       });

@@ -50,7 +50,8 @@ export function CountryCard({ country, defaultName, onNavigate, onView, onDelete
           </div>
           <div className="min-w-0">
             <h3 className="font-semibold truncate">{title}</h3>
-            {subtitle && <p className="text-xs text-muted-foreground truncate">{subtitle}</p>}
+
+
           </div>
         </div>
         {(onView || onDelete) && (

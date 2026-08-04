@@ -7,9 +7,12 @@ import { Input } from "@resort/shadcn-ui";
 import { Label } from "@resort/shadcn-ui";
 import { facilityScopesService } from "@/services/facility-scopes";
 import { toast } from "sonner";
-import type { FacilityScopeFormState } from "./types";
+import type { FacilityScopeDialogMode, FacilityScopeFormState } from "./types";
+
+const CODE_MAX_LENGTH = 50;
 
 export interface FacilityScopeGeneralInfoProps {
+  mode: FacilityScopeDialogMode;
   form: FacilityScopeFormState;
   onFormChange: (patch: Partial<FacilityScopeFormState>) => void;
   facilityScopeId?: number;
@@ -20,6 +23,7 @@ export interface FacilityScopeGeneralInfoProps {
 }
 
 export function FacilityScopeGeneralInfo({
+  mode,
   form,
   onFormChange,
   facilityScopeId,
@@ -60,6 +64,7 @@ export function FacilityScopeGeneralInfo({
   }
 
   const sortValue = editing ? local.sort_order : form.sort_order;
+  const isReadOnly = !editing && mode !== "create";
 
   return (
     <div className="space-y-4">
@@ -70,30 +75,17 @@ export function FacilityScopeGeneralInfo({
             {t("common.generalInfo")}
           </h3>
         </div>
-        {!editing && (
+        {mode !== "create" && !editing && (
           <Button type="button" size="sm" variant="outline" onClick={startEdit} className="h-7 text-xs px-2.5 gap-1.5">
             <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
           </Button>
         )}
         {editing && (
           <div className="flex items-center gap-1.5">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => onEditingChange(false)}
-              disabled={submitting}
-              className="h-7 text-xs px-2.5 gap-1.5"
-            >
+            <Button type="button" size="sm" variant="outline" onClick={() => onEditingChange(false)} disabled={submitting} className="h-7 text-xs px-2.5 gap-1.5">
               <X className="h-3.5 w-3.5" /> {t("common.cancel")}
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              onClick={save}
-              disabled={submitting}
-              className="h-7 text-xs px-2.5 gap-1.5"
-            >
+            <Button type="button" size="sm" onClick={save} disabled={submitting} className="h-7 text-xs px-2.5 gap-1.5">
               <Check className="h-3.5 w-3.5" />
               {submitting ? t("common.saving") : t("common.save")}
             </Button>
@@ -104,13 +96,16 @@ export function FacilityScopeGeneralInfo({
       <Card>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="fs-code" className="text-xs font-medium">{t("common.code")}</Label>
+            <Label htmlFor="fs-code" className="text-xs font-medium">{t("common.code")} *</Label>
             <Input
               id="fs-code"
               value={form.code}
-              disabled
-              className="font-mono"
-              onChange={() => {}}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value.length > CODE_MAX_LENGTH) { toast.error(t("toast.facilityScopeCodeMaxLength")); return; }
+                onFormChange({ code: value });
+              }}
+              placeholder="RESORT" required disabled={mode !== "create"} className="font-mono"
             />
           </div>
           <div className="space-y-2">
@@ -119,8 +114,8 @@ export function FacilityScopeGeneralInfo({
               id="fs-sort"
               type="number"
               value={sortValue}
-              onChange={(e) => setLocal((p) => ({ ...p, sort_order: Number(e.target.value) }))}
-              disabled={!editing}
+              onChange={(e) => mode === "create" ? onFormChange({ sort_order: Number(e.target.value) }) : setLocal((p) => ({ ...p, sort_order: Number(e.target.value) }))}
+              required={mode === "create"} disabled={isReadOnly}
             />
           </div>
         </CardContent>

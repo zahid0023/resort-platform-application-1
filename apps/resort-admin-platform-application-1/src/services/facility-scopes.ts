@@ -1,8 +1,9 @@
 import { api } from "./api";
+import type { Locale } from "./locales";
 
 export interface FacilityScopeLocale {
   id: number;
-  locale_id: number;
+  locale: Locale;
   name: string;
   description?: string;
   sort_order: number;
@@ -12,7 +13,8 @@ export interface FacilityScope {
   id: number;
   code: string;
   sort_order: number;
-  locales: FacilityScopeLocale[];
+  /** The single translation matching Accept-Language (falls back to en, then null) — on GET /{id} and list alike. */
+  locale: FacilityScopeLocale | null;
 }
 
 export interface FacilityScopeListResponse {
@@ -23,16 +25,42 @@ export interface FacilityScopeListResponse {
   page_size: number;
   has_next: boolean;
   has_previous: boolean;
+  searchable_fields?: string[];
+  sortable_fields?: string[];
 }
 
-export interface UpdateFacilityScopeRequest {
-  sort_order: number;
+export interface FacilityScopeLocaleListResponse {
+  data: FacilityScopeLocale[];
+  current_page: number;
+  total_pages: number;
+  total_elements: number;
+  page_size: number;
+  has_next: boolean;
+  has_previous: boolean;
+  searchable_fields?: string[];
+  sortable_fields?: string[];
 }
 
 export interface CreateFacilityScopeLocaleRequest {
   locale_id: number;
   name: string;
   description?: string;
+  sort_order: number;
+}
+
+// The initial translation is always resolved to the "en" locale server-side —
+// there's no locale_id here, and only a single locale entry is accepted at creation.
+export interface CreateFacilityScopeRequest {
+  code: string;
+  sort_order: number;
+  locale: {
+    name: string;
+    description: string;
+    sort_order: number;
+  };
+}
+
+export interface UpdateFacilityScopeRequest {
   sort_order: number;
 }
 
@@ -50,21 +78,30 @@ export interface MutationResponse {
 export interface ListParams {
   page?: number;
   size?: number;
-  sort_by?: string;
+  // sortBy=id throws 400 — it's only valid as the implicit default when sortBy is omitted entirely.
+  sort_by?: "createdAt" | "code" | "sortOrder";
   sort_dir?: "ASC" | "DESC";
   code?: string;
+  name?: string;
+}
+
+export interface ListLocalesParams {
+  page?: number;
+  size?: number;
+  localeCode?: string;
 }
 
 export const facilityScopesService = {
   async list(params: ListParams = {}): Promise<FacilityScopeListResponse> {
-    const { page = 0, size = 10, sort_by = "sortOrder", sort_dir = "ASC", code } = params;
+    const { page = 0, size = 10, sort_by, sort_dir = "ASC", code, name } = params;
     const query = new URLSearchParams({
       page: String(page),
       size: String(size),
-      sort_by,
-      sort_dir,
+      sortDir: sort_dir,
     });
+    if (sort_by) query.set("sortBy", sort_by);
     if (code) query.set("code", code);
+    if (name) query.set("name", name);
     return api.get<FacilityScopeListResponse>(`/facility-scopes?${query}`);
   },
 
@@ -72,8 +109,23 @@ export const facilityScopesService = {
     return api.get<{ data: FacilityScope }>(`/facility-scopes/${id}`);
   },
 
+  async listLocales(facilityScopeId: number, params: ListLocalesParams = {}): Promise<FacilityScopeLocaleListResponse> {
+    const { page = 0, size = 10, localeCode } = params;
+    const query = new URLSearchParams({ page: String(page), size: String(size) });
+    if (localeCode) query.set("localeCode", localeCode);
+    return api.get<FacilityScopeLocaleListResponse>(`/facility-scopes/${facilityScopeId}/locales?${query}`);
+  },
+
+  async create(body: CreateFacilityScopeRequest): Promise<MutationResponse> {
+    return api.post<MutationResponse>("/facility-scopes", body);
+  },
+
   async update(id: number, body: UpdateFacilityScopeRequest): Promise<MutationResponse> {
     return api.put<MutationResponse>(`/facility-scopes/${id}`, body);
+  },
+
+  async remove(id: number): Promise<MutationResponse> {
+    return api.delete<MutationResponse>(`/facility-scopes/${id}`);
   },
 
   async addLocale(facilityScopeId: number, body: CreateFacilityScopeLocaleRequest): Promise<MutationResponse> {

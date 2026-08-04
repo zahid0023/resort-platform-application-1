@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { Languages } from "lucide-react";
-import { Dialog, DialogContent } from "@resort/shadcn-ui";
+import { Sheet, SheetContent } from "@resort/shadcn-ui";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -96,9 +96,10 @@ export function LocaleDialog({
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(v) => { if (!v) requestClose(); }}>
-        <DialogContent
-          className="max-w-xl p-0 gap-0 overflow-hidden flex flex-col max-h-[90vh]"
+      <Sheet open={open} onOpenChange={(v) => { if (!v) requestClose(); }}>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-xl p-0 gap-0 overflow-hidden flex flex-col h-full"
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => { e.preventDefault(); requestClose(); }}
         >
@@ -126,8 +127,8 @@ export function LocaleDialog({
               <DialogCreateFooter submitting={submitting} onCancel={requestClose} />
             )}
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
         <AlertDialogContent>

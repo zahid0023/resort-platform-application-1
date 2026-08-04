@@ -79,7 +79,14 @@ export function FacilityGroupScopeAssignments({
         onFormChange({
           scope_assignments: [
             ...form.scope_assignments,
-            { facility_scope_id: scope.id, code: scope.code, sort_order: scope.sort_order, locales: scope.locales },
+            {
+              facility_scope_id: scope.id,
+              code: scope.code,
+              sort_order: scope.sort_order,
+              locales: scope.locale
+                ? [{ id: scope.locale.id, locale_id: scope.locale.locale.id, name: scope.locale.name, sort_order: scope.locale.sort_order }]
+                : [],
+            },
           ],
         })
       }
@@ -157,7 +164,7 @@ export function FacilityGroupScopeAssignments({
               <div className="flex flex-wrap gap-2">
                 {availableScopes.map((scope) => {
                   const selected = form.scope_ids.includes(scope.id)
-                  const scopeName = scope.locales[0]?.name
+                  const scopeName = scope.locale?.name
                   return (
                     <button
                       key={scope.id}
@@ -208,7 +215,7 @@ export function FacilityGroupScopeAssignments({
                 {availableScopes.map((scope) => {
                   const isAssigned = assignedIds.has(scope.id)
                   const busy = busyScopeIds.has(scope.id)
-                  const scopeName = scope.locales[0]?.name
+                  const scopeName = scope.locale?.name
                   const assignment = form.scope_assignments.find((a) => a.facility_scope_id === scope.id)
                   return (
                     <button

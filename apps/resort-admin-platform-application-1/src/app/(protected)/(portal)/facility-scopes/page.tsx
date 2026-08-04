@@ -3,59 +3,62 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { FacilityScopeCard } from "@/components/facility-scopes/facility-scope-card";
-import { FacilityScopeDialog } from "@/components/facility-scopes/facility-scope-dialog";
-import type { FacilityScopeFormState } from "@/components/facility-scopes/types";
-import { FieldSearchBar } from "@/components/shared/field-search-bar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@resort/shadcn-ui";
+import { PageActions } from "@/components/shared/page-actions";
 import { PageHeader } from "@/components/shared/page-header";
 import { Pagination } from "@/components/shared/pagination";
-import { SortControl } from "@/components/shared/sort-control";
+import { FacilityScopeCard } from "@/components/facility-scopes/facility-scope-card";
+import { FacilityScopeDialog, emptyFacilityScopeForm } from "@/components/facility-scopes/facility-scope-dialog";
+import type { FacilityScopeDialogMode, FacilityScopeFormState } from "@/components/facility-scopes/types";
 import { facilityScopesService, type FacilityScope, type ListParams } from "@/services/facility-scopes";
-import { localesService, type Locale } from "@/services/locales";
 
 const PAGE_SIZE = 20;
+
+// "all" is a frontend-only concept (client-side OR across all fields)
 const ALL_FIELD = "all";
 
-const emptyForm: FacilityScopeFormState = {
-  code: "",
-  sort_order: 0,
-  locales: [],
-};
-
-function buildApiFilters(field: string, q: string): Pick<ListParams, "code"> {
+function buildApiFilters(field: string, q: string): Pick<ListParams, "code" | "name"> {
   if (!q || field === ALL_FIELD) return {};
-  return { [field]: q } as Pick<ListParams, "code">;
+  return { [field]: q } as Pick<ListParams, "code" | "name">;
 }
 
 export default function FacilityScopesPage() {
   const { t } = useTranslation();
 
+  // List data
   const [scopes, setScopes] = useState<FacilityScope[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Pagination
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const [hasPrevious, setHasPrevious] = useState(false);
 
+  // Search
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState(ALL_FIELD);
 
-  const [sortBy, setSortBy] = useState("sortOrder");
+  // Sort — "id" is only valid as the implicit default when sortBy is omitted; never send it explicitly.
+  const [sortBy, setSortBy] = useState<NonNullable<ListParams["sort_by"]>>("code");
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC");
 
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
+  // Dialog
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [mode, setMode] = useState<FacilityScopeDialogMode>("create");
   const [activeId, setActiveId] = useState<number | undefined>(undefined);
-  const [form, setForm] = useState<FacilityScopeFormState>(emptyForm);
-
-  const dialogOpenRef = useRef(dialogOpen);
-  const activeIdRef = useRef(activeId);
-  useEffect(() => { dialogOpenRef.current = dialogOpen; }, [dialogOpen]);
-  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
-
-  const isFirstRender = useRef(true);
+  const [form, setForm] = useState<FacilityScopeFormState>(emptyFacilityScopeForm);
+  const [deleteTarget, setDeleteTarget] = useState<FacilityScope | null>(null);
 
   function toFieldOption(key: string) {
     return { value: key, label: t(`apiFields.${key}`) };
@@ -63,11 +66,12 @@ export default function FacilityScopesPage() {
 
   const searchFields = useMemo(() => [
     { value: ALL_FIELD, label: t("common.allFields") },
-    toFieldOption("code"),
+    ...["code", "name"].map(toFieldOption),
   ], [t]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // "id" is deliberately excluded — passing sortBy=id throws 400 (it's implicit-default only).
   const sortFields = useMemo(() => [
-    ...["sortOrder", "code", "createdAt"].map(toFieldOption),
+    ...["code", "sortOrder", "createdAt"].map(toFieldOption),
   ], [t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function refresh(overrides: Partial<ListParams> = {}) {
@@ -87,22 +91,6 @@ export default function FacilityScopesPage() {
       setTotalElements(res.total_elements);
       setHasNext(res.has_next);
       setHasPrevious(res.has_previous);
-
-      setForm((prev) => {
-        if (!dialogOpenRef.current || activeIdRef.current == null) return prev;
-        const updated = res.data.find((s) => s.id === activeIdRef.current);
-        if (!updated) return prev;
-        return {
-          ...prev,
-          locales: updated.locales.map((l) => ({
-            id: l.id,
-            locale_id: l.locale_id,
-            name: l.name,
-            description: l.description ?? "",
-            sort_order: l.sort_order,
-          })),
-        };
-      });
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -110,17 +98,16 @@ export default function FacilityScopesPage() {
     }
   }
 
+  // Initial load
   useEffect(() => { refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Debounced search — resets to page 0. Guarded by comparing against the last-applied key rather
+  // than a one-shot flag, since a boolean doesn't survive React Strict Mode's dev-only effect replay.
+  const lastSearchKey = useRef(`${searchField}:${search}`);
   useEffect(() => {
-    localesService
-      .list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableLocales(res.data))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    const key = `${searchField}:${search}`;
+    if (lastSearchKey.current === key) return;
+    lastSearchKey.current = key;
     setPage(0);
     const timer = setTimeout(
       () => refresh({ page: 0, ...buildApiFilters(searchField, search.trim()) }),
@@ -130,10 +117,11 @@ export default function FacilityScopesPage() {
   }, [search, searchField]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const scopeNames = useMemo(
-    () => Object.fromEntries(scopes.map((s) => [s.id, s.locales[0]?.name ?? ""])),
+    () => Object.fromEntries(scopes.map((s) => [s.id, s.locale?.name ?? ""])),
     [scopes],
   );
 
+  // Client-side OR filter only for "all" field (API has no OR-across-fields support)
   const displayScopes = useMemo(() => {
     if (searchField !== ALL_FIELD || !search.trim()) return scopes;
     const q = search.trim().toLowerCase();
@@ -144,26 +132,37 @@ export default function FacilityScopesPage() {
     });
   }, [scopes, scopeNames, search, searchField]);
 
-  function openDialog(scope: FacilityScope) {
-    setActiveId(scope.id);
-    setForm({
-      code: scope.code,
-      sort_order: scope.sort_order,
-      locales: scope.locales.map((l) => ({
-        id: l.id,
-        locale_id: l.locale_id,
-        name: l.name,
-        description: l.description ?? "",
-        sort_order: l.sort_order,
-      })),
-    });
+  function openCreate() {
+    setMode("create");
+    setActiveId(undefined);
+    setForm(emptyFacilityScopeForm);
     setDialogOpen(true);
   }
 
+  async function openDialog(s: FacilityScope) {
+    try {
+      const res = await facilityScopesService.get(s.id);
+      const full = res.data;
+      setMode("view");
+      setActiveId(full.id);
+      setForm({
+        code: full.code,
+        sort_order: full.sort_order,
+        locale: emptyFacilityScopeForm.locale,
+        // Lazily populated by FacilityScopeDialog the first time the Translations tab is selected.
+        locales: [],
+      });
+      setDialogOpen(true);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+
   function handleSortByChange(value: string) {
-    setSortBy(value);
+    const field = value as NonNullable<ListParams["sort_by"]>;
+    setSortBy(field);
     setPage(0);
-    refresh({ sort_by: value, page: 0 });
+    refresh({ sort_by: field, page: 0 });
   }
 
   function handleSortDirChange(dir: "ASC" | "DESC") {
@@ -177,33 +176,48 @@ export default function FacilityScopesPage() {
     refresh({ page: p });
   }
 
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    try {
+      await facilityScopesService.remove(deleteTarget.id);
+      toast.success(`${t("delete.facilityScope.title")}: ${deleteTarget.code}`);
+      setDeleteTarget(null);
+      await refresh({ page: 0 });
+      setPage(0);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
+  }
+
   return (
     <div className="max-w-6xl mx-auto flex flex-col gap-6">
 
+      {/* Header */}
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 w-full">
         <PageHeader
           eyebrow={t("common.admin")}
           title={t("facilityScope.title")}
           subtitle={t("facilityScope.subtitle")}
         />
-        <div className="grid gap-2">
-          <FieldSearchBar
-            fields={searchFields}
-            searchField={searchField}
-            onSearchFieldChange={setSearchField}
-            search={search}
-            onSearchChange={setSearch}
-          />
-          <SortControl
-            fields={sortFields}
-            sortBy={sortBy}
-            onSortByChange={handleSortByChange}
-            sortDir={sortDir}
-            onSortDirChange={handleSortDirChange}
-          />
-        </div>
+        <PageActions
+          fields={searchFields}
+          searchField={searchField}
+          onSearchFieldChange={setSearchField}
+          search={search}
+          onSearchChange={setSearch}
+          sort={{
+            fields: sortFields,
+            sortBy,
+            onSortByChange: handleSortByChange,
+            sortDir,
+            onSortDirChange: handleSortDirChange,
+          }}
+          newLabel={t("facilityScope.new")}
+          onNew={openCreate}
+        />
       </header>
 
+      {/* Main content */}
       <main className="flex flex-col gap-4">
         {loading ? (
           <div className="text-center py-16 text-muted-foreground">{t("facilityScope.loading")}</div>
@@ -219,6 +233,7 @@ export default function FacilityScopesPage() {
                 scope={s}
                 defaultName={scopeNames[s.id]}
                 onView={openDialog}
+                onDelete={setDeleteTarget}
               />
             ))}
           </div>
@@ -237,12 +252,27 @@ export default function FacilityScopesPage() {
       <FacilityScopeDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
+        mode={mode}
         facilityScopeId={activeId}
         form={form}
         onFormChange={setForm}
-        availableLocales={availableLocales}
         onSaved={() => refresh()}
       />
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("delete.facilityScope.title")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("delete.facilityScope.desc", { code: deleteTarget?.code })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>{t("common.delete")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

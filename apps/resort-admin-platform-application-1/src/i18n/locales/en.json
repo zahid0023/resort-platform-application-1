@@ -95,6 +95,7 @@
     "nameRequired": "Name is required.",
     "nameMaxLength": "Name can only be 100 characters.",
     "providerCodeMaxLength": "Code can only be 50 characters.",
+    "facilityScopeCodeMaxLength": "Code can only be 50 characters.",
     "configFieldKeyRequired": "Key is required.",
     "configFieldLabelRequired": "Label is required.",
     "configFieldTypeRequired": "Field type is required.",
@@ -156,15 +157,11 @@
   "facilityScope": {
     "title": "Facility Scopes",
     "subtitle": "Pre-seeded scopes that define where a facility can be applied (e.g. Resort, Room Category, Room).",
+    "new": "New Facility Scope",
     "loading": "Loading facility scopes…",
     "empty": "No facility scopes found.",
+    "createdToast": "Facility scope created successfully!",
     "updatedToast": "Facility scope updated successfully."
-  },
-  "facilityScopeDialog": {
-    "edit": "Edit Facility Scope",
-    "view": "Facility Scope Details",
-    "descEdit": "Update sort order and locale translations.",
-    "descView": "Facility scope details and locale translations."
   },
   "locale": {
     "translations": "Translations",
@@ -275,6 +272,16 @@
         "view": "Country details and locale translations."
       }
     },
+    "facilityScope": {
+      "new": "New Facility Scope",
+      "edit": "Edit Facility Scope",
+      "view": "Facility Scope Details",
+      "desc": {
+        "create": "Add a new facility scope with locale translations.",
+        "edit": "Update facility scope details and locale translations.",
+        "view": "Facility scope details and locale translations."
+      }
+    },
     "discardChanges": {
       "title": "Discard changes?",
       "desc": "You have unsaved changes. Are you sure you want to discard them?",
@@ -286,6 +293,7 @@
       "descCity": "You have an unsaved draft for a new city. Would you like to restore it or start fresh?",
       "descImageHostingProvider": "You have an unsaved draft for a new image hosting provider. Would you like to restore it or start fresh?",
       "descCurrency": "You have an unsaved draft for a new currency. Would you like to restore it or start fresh?",
+      "descFacilityScope": "You have an unsaved draft for a new facility scope. Would you like to restore it or start fresh?",
       "restore": "Restore draft",
       "discard": "Start fresh"
     },
@@ -394,6 +402,10 @@
     },
     "locale": {
       "title": "Delete Locale",
+      "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+    },
+    "facilityScope": {
+      "title": "Delete Facility Scope",
       "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
     }
   },

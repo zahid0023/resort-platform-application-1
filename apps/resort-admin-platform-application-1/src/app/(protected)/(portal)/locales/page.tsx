@@ -47,9 +47,12 @@ export default function LocalesPage() {
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState(ALL_FIELD);
 
-  // Sort
+  // Sort — sort_by/sort_dir are only sent once the user actively picks a sort, so the initial
+  // load hits the plain, unsorted endpoint (`/locales?page=0&size=20`) and lets the backend apply
+  // its own default ordering, instead of always echoing "sortOrder"/"ASC" back on every request.
   const [sortBy, setSortBy] = useState("sortOrder");
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC");
+  const sortTouched = useRef(false);
 
   // Dialog
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -63,8 +66,6 @@ export default function LocalesPage() {
   const activeIdRef = useRef(activeId);
   useEffect(() => { dialogOpenRef.current = dialogOpen; }, [dialogOpen]);
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
-
-  const isFirstRender = useRef(true);
 
   function toFieldOption(key: string) {
     return { value: key, label: t(`apiFields.${key}`) };
@@ -85,8 +86,10 @@ export default function LocalesPage() {
       const res = await localesService.list({
         page,
         size: PAGE_SIZE,
-        sort_by: sortBy as ListLocalesParams["sort_by"],
-        sort_dir: sortDir,
+        ...(sortTouched.current ? {
+          sort_by: sortBy as ListLocalesParams["sort_by"],
+          sort_dir: sortDir,
+        } : {}),
         ...buildApiFilters(searchField, search.trim()),
         ...overrides,
       });
@@ -118,9 +121,16 @@ export default function LocalesPage() {
   // Initial load
   useEffect(() => { refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Debounced search — resets to page 0
+  // Debounced search — resets to page 0. Guarded by comparing against the last-applied key rather
+  // than a one-shot "have I run" flag: a ref flip like `isFirstRender.current = false` doesn't
+  // survive React Strict Mode's dev-only effect replay (mount → cleanup → mount again on the same
+  // ref), so a boolean guard fires a spurious extra fetch on the replay. Comparing actual values
+  // is replay-safe since the key is identical — and still unchanged — across both passes.
+  const lastSearchKey = useRef(`${searchField}:${search}`);
   useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    const key = `${searchField}:${search}`;
+    if (lastSearchKey.current === key) return;
+    lastSearchKey.current = key;
     setPage(0);
     const timer = setTimeout(
       () => refresh({ page: 0, ...buildApiFilters(searchField, search.trim()) }),
@@ -157,15 +167,17 @@ export default function LocalesPage() {
   }
 
   function handleSortByChange(value: string) {
+    sortTouched.current = true;
     setSortBy(value);
     setPage(0);
-    refresh({ sort_by: value as ListLocalesParams["sort_by"], page: 0 });
+    refresh({ sort_by: value as ListLocalesParams["sort_by"], sort_dir: sortDir, page: 0 });
   }
 
   function handleSortDirChange(dir: "ASC" | "DESC") {
+    sortTouched.current = true;
     setSortDir(dir);
     setPage(0);
-    refresh({ sort_dir: dir, page: 0 });
+    refresh({ sort_by: sortBy as ListLocalesParams["sort_by"], sort_dir: dir, page: 0 });
   }
 
   function handlePageChange(p: number) {

@@ -24,6 +24,7 @@ import {
 } from "@resort/shadcn-ui";
 import { currenciesService } from "@/services/currencies";
 import type { Locale } from "@/services/locales";
+import { canAddLocaleTranslation } from "@/lib/locale";
 import { toast } from "sonner";
 import type { CurrencyDialogMode, CurrencyFormState, LocaleRow } from "./types";
 
@@ -53,6 +54,10 @@ export interface CurrencyLocaleTranslationsProps {
   /** Owned by the parent dialog (see [[feedback_tab_content_state]]) — fetched once per dialog
    * session there, not here, so it isn't lost every time this component unmounts on tab switch. */
   availableLocales: Locale[];
+  /** True total of active locales system-wide (from `GET /locales/count`), used instead of
+   * `availableLocales.length` to decide the Add button's disabled state — the list endpoint caps
+   * `size` at 50 per page, so `availableLocales` may undercount if more locales exist than that. */
+  totalLocaleCount: number | null;
 }
 
 export function CurrencyLocaleTranslations({
@@ -68,6 +73,7 @@ export function CurrencyLocaleTranslations({
   onSearchChange,
   open,
   availableLocales,
+  totalLocaleCount,
 }: CurrencyLocaleTranslationsProps) {
   const { t } = useTranslation();
   const [newLocaleRows, setNewLocaleRows] = useState<NewLocaleRow[]>([]);
@@ -220,13 +226,12 @@ export function CurrencyLocaleTranslations({
   }
 
   // Adding a translation always needs the complete list — clear any active search and re-pull
-  // everything first, so duplicate-locale checks never operate on a filtered subset. Also guards
-  // against the language catalog only being known lazily (fetched on first Add click, not eagerly on
-  // tab view — see [[feedback_dialog_lazy_tab_load]]): re-check against the freshly-awaited catalog
-  // before actually opening a new row, rather than opening an unusable one with no language left.
+  // everything first, so duplicate-locale checks never operate on a filtered subset. Whether
+  // there's room for another translation at all is a separate concern, delegated to
+  // canAddLocaleTranslation (see [[feedback_locales_provider_pattern]]) rather than computed here.
   async function handleAddLocale() {
     const catalog = await onPrepareAdd();
-    if (catalog.length > 0 && usedLocaleIds().size >= catalog.length) {
+    if (!canAddLocaleTranslation(usedLocaleIds().size, totalLocaleCount)) {
       toast.error(t("locale.allLanguagesAdded"));
       return;
     }
@@ -250,10 +255,7 @@ export function CurrencyLocaleTranslations({
         </div>
         {mode !== "create" && (
           <Button type="button" size="sm" variant="outline" onClick={handleAddLocale}
-            // The language catalog is only fetched lazily on first use (see prepareAddLocale in
-            // CurrencyDialog), so `availableLocales` starts empty — don't let that read as "no
-            // languages left" and disable Add before the catalog has ever been loaded.
-            disabled={newLocaleRows.length > 0 || (availableLocales.length > 0 && (form.locales.length + newLocaleRows.length) >= availableLocales.length)}
+            disabled={newLocaleRows.length > 0 || !canAddLocaleTranslation(usedLocaleIds().size, totalLocaleCount)}
             className="h-7 text-xs px-2.5"
           >
             <Plus className="h-3.5 w-3.5 mr-1" /> {t("locale.add")}

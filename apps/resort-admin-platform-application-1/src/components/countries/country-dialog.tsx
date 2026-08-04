@@ -16,7 +16,8 @@ import {
 import { DialogEntityHeader } from "@/components/shared/dialog-entity-header";
 import { DialogCreateFooter } from "@/components/shared/dialog-create-footer";
 import { countriesService } from "@/services/countries";
-import { localesService, type Locale } from "@/services/locales";
+import type { Locale } from "@/services/locales";
+import { useLocales } from "@/providers/locales-provider";
 import { toast } from "sonner";
 import type { CountryDialogMode, CountryFormState } from "./types";
 import { CountryGeneralInfo } from "./country-general-info";
@@ -89,14 +90,12 @@ export function CountryDialog({
   const [activeTab, setActiveTab] = useState<"general" | "locales">("general");
   const [refreshing, setRefreshing] = useState(false);
   const [localesLoaded, setLocalesLoaded] = useState(false);
-  // Owned here (not inside CountryLocaleTranslations) for the same reason `localesLoaded` above is —
-  // Radix unmounts inactive TabsContent panels, so any "have I fetched this" flag kept inside that
-  // child resets to false every time the user switches back to the Translations tab, causing a
-  // pointless refetch of the language catalog on every tab reselect. Fetched lazily on first "Add
-  // Translation" click (see prepareAddLocale) rather than as soon as the tab is viewed, so simply
-  // opening the Translations tab only ever issues the one locales-list request, not two.
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
-  const [languagesLoaded, setLanguagesLoaded] = useState(false);
+  // The language catalog is loaded once per session (right after login) by LocalesProvider and
+  // shared across every entity dialog — no per-dialog fetch needed. `refreshLocalesCatalog` is only
+  // used as an explicit re-sync (manual Refresh button, or as a fallback in prepareAddLocale) for
+  // locales created elsewhere during the current session, since the shared copy otherwise never
+  // auto-updates.
+  const { locales: availableLocales, totalCount: totalLocaleCount, refresh: refreshLocalesCatalog } = useLocales();
   // Owned here (not inside CountryLocaleTranslations) so it survives that component unmounting
   // when the user switches away from the tab and back — otherwise the search text resets to
   // empty on remount while `form.locales` stays whatever the last search had filtered it to,
@@ -117,7 +116,6 @@ export function CountryDialog({
       setDraftSavedAt(null);
       setDraftSyncing(false);
       setLocalesLoaded(false);
-      setLanguagesLoaded(false);
       setLocaleSearch("");
       lastLocaleSearchKey.current = "";
     }
@@ -231,20 +229,10 @@ export function CountryDialog({
     });
   }
 
-  // The language catalog (for the "add translation" dropdown and the Add button's disabled state)
-  // is only ever needed once the user actually starts adding a translation — see prepareAddLocale
-  // below — not just because the Translations tab is open. Fetched at most once per dialog session,
-  // gated by `languagesLoaded` here rather than inside CountryLocaleTranslations, since that
-  // component unmounts on every tab switch and a flag kept there would reset each time.
-  async function fetchAvailableLocales(): Promise<Locale[]> {
-    const res = await localesService.list({ size: 50, sort_by: "sortOrder", sort_dir: "ASC" });
-    setAvailableLocales(res.data);
-    return res.data;
-  }
-
   // Translations are only fetched once the tab is actually selected — not when the country card
   // is opened — and only the first time per dialog session; re-selecting the tab afterward reuses
-  // what's already loaded. Use the Refresh button for an explicit re-fetch.
+  // what's already loaded. Use the Refresh button for an explicit re-fetch. The language catalog
+  // needs no fetch here at all — LocalesProvider already loaded it once for the whole session.
   useEffect(() => {
     if (!open || mode === "create" || activeTab !== "locales" || localesLoaded) return;
     setLocalesLoaded(true);
@@ -266,21 +254,20 @@ export function CountryDialog({
   // Adding a translation always needs the complete list — clear any active search and re-pull
   // everything first, so duplicate-locale checks never operate on a filtered subset. Editing an
   // existing translation doesn't need this: CountryLocaleTranslations drives `translationsEditing`
-  // itself based on whether any row has an open draft. This is also the first point the language
-  // catalog is actually needed (for the new row's language dropdown), so it's fetched here too —
-  // once per dialog session — rather than eagerly whenever the Translations tab is merely viewed.
+  // itself based on whether any row has an open draft. The shared language catalog is normally
+  // already loaded (LocalesProvider fetched it at session start) — this only re-fetches it as a
+  // fallback if the provider's own load somehow hasn't resolved yet.
   //
   // Returns the up-to-date catalog (not just fires the fetch) so the caller can reliably check
-  // "are all locales already used" right after awaiting this — reading the `availableLocales` state
-  // variable here wouldn't work, since a `setState` call doesn't update the value already captured
-  // in this closure; only the returned array reflects what was just fetched.
+  // "are all locales already used" right after awaiting this — reading the `availableLocales`
+  // variable here wouldn't work if a refresh were in flight, since its value from this closure
+  // wouldn't reflect a fetch that resolves later; only the returned array does.
   function prepareAddLocale(): Promise<Locale[]> {
     setLocaleSearch("");
     lastLocaleSearchKey.current = "";
     fetchLocales().catch((err) => toast.error((err as Error).message));
-    if (!languagesLoaded) {
-      setLanguagesLoaded(true);
-      return fetchAvailableLocales().catch((err) => {
+    if (availableLocales.length === 0) {
+      return refreshLocalesCatalog().catch((err) => {
         toast.error((err as Error).message);
         return availableLocales;
       });
@@ -290,7 +277,8 @@ export function CountryDialog({
 
   // Manual refresh only — switching tabs never re-fetches on its own otherwise. Pulls whichever the
   // active tab needs: general info re-hits GET /countries/{id}, translations re-hits the locales
-  // sub-resource (honoring whatever search filter is currently applied).
+  // sub-resource (honoring whatever search filter is currently applied) plus the shared language
+  // catalog, so this doubles as the way to pick up locales created elsewhere during the session.
   async function handleRefresh() {
     if (countryId == null) return;
     setRefreshing(true);
@@ -306,9 +294,8 @@ export function CountryDialog({
           sort_order: full.sort_order,
         });
       } else {
-        await Promise.all([fetchLocales(localeSearch.trim()), fetchAvailableLocales()]);
+        await Promise.all([fetchLocales(localeSearch.trim()), refreshLocalesCatalog()]);
         setLocalesLoaded(true);
-        setLanguagesLoaded(true);
       }
       toast.success(t("common.refreshed"));
     } catch (err) {
@@ -430,6 +417,7 @@ export function CountryDialog({
                   onSearchChange={setLocaleSearch}
                   open={open}
                   availableLocales={availableLocales}
+                  totalLocaleCount={totalLocaleCount}
                 />
               </TabsContent>
             </Tabs>
