@@ -77,6 +77,7 @@ export function FacilityCard({ facility, defaultName, groupName, onView, onDelet
           {onView && (
             <Button size="icon" variant="ghost" className="h-8 w-8"
               onClick={(e) => { e.stopPropagation(); onView(facility) }}
+              title="View details"
             >
               <Eye className="h-3.5 w-3.5" />
             </Button>
@@ -93,10 +94,7 @@ export function FacilityCard({ facility, defaultName, groupName, onView, onDelet
       </div>
 
       <div className="mt-4 pt-3 border-t flex items-center justify-between">
-        <Badge variant="secondary">#{facility.sort_order ?? 0}</Badge>
-        <span className="text-xs text-muted-foreground">
-          {facility.locales.length} locale{facility.locales.length !== 1 ? "s" : ""}
-        </span>
+        <Badge variant="secondary">#{facility.sort_order}</Badge>
       </div>
     </Card>
   )

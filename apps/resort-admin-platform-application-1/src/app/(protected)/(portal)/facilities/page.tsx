@@ -30,7 +30,7 @@ import {
   type FacilitySummary,
   type ListParams,
 } from "@/services/facilities";
-import { listFacilityGroups } from "@/services/facility-groups";
+import { listFacilityGroups, type FacilityGroupSummary } from "@/services/facility-groups";
 import { localesService, type Locale } from "@/services/locales";
 
 const PAGE_SIZE = 20;
@@ -96,11 +96,6 @@ export default function FacilitiesPage() {
   const [form, setForm] = useState<FacilityFormState>(emptyFacilityForm);
   const [deleteTarget, setDeleteTarget] = useState<FacilitySummary | null>(null);
 
-  const dialogOpenRef = useRef(dialogOpen);
-  const activeIdRef = useRef(activeId);
-  useEffect(() => { dialogOpenRef.current = dialogOpen; }, [dialogOpen]);
-  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
-
   const isFirstRender = useRef(true);
 
   // ── Derived ────────────────────────────────────────────────────────────────
@@ -118,7 +113,7 @@ export default function FacilitiesPage() {
   ], [t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const facilityNames = useMemo(
-    () => Object.fromEntries(facilities.map((f) => [f.id, f.locales[0]?.name ?? ""])),
+    () => Object.fromEntries(facilities.map((f) => [f.id, f.locale?.name ?? ""])),
     [facilities],
   );
 
@@ -151,22 +146,6 @@ export default function FacilitiesPage() {
       setTotalElements(res.total_elements);
       setHasNext(res.has_next);
       setHasPrevious(res.has_previous);
-
-      setForm((prev) => {
-        if (!dialogOpenRef.current || activeIdRef.current == null) return prev;
-        const updated = res.data.find((f) => f.id === activeIdRef.current);
-        if (!updated) return prev;
-        return {
-          ...prev,
-          locales: updated.locales.map((l) => ({
-            id: l.id,
-            locale_id: l.locale_id,
-            name: l.name,
-            description: l.description ?? "",
-            sort_order: l.sort_order,
-          })),
-        };
-      });
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -301,17 +280,13 @@ export default function FacilitiesPage() {
     setMode("view");
     setActiveId(f.id);
     setForm({
-      facility_group_id: f.facility_group_id,
+      facility_group: f.facility_group,
       code: f.code,
-      sort_order: f.sort_order ?? 0,
+      sort_order: f.sort_order,
       icon: toIconValue(f),
-      locales: f.locales.map((l) => ({
-        id: l.id,
-        locale_id: l.locale_id,
-        name: l.name,
-        description: l.description ?? "",
-        sort_order: l.sort_order,
-      })),
+      locale: emptyFacilityForm.locale,
+      // Lazily populated by FacilityDialog the first time the Translations tab is selected.
+      locales: [],
     });
     setDialogOpen(true);
   }
@@ -475,9 +450,9 @@ export default function FacilitiesPage() {
             groupSections.map((section) => {
               const groupIcon = groupToIconValue(section.group);
               const accentColor = groupIcon.meta?.color || undefined;
-              const groupName = section.group.locales[0]?.name || section.group.code;
+              const groupName = section.group.locale?.name || section.group.code;
               const sectionFacilityNames = Object.fromEntries(
-                section.facilities.map((f) => [f.id, f.locales[0]?.name ?? ""]),
+                section.facilities.map((f) => [f.id, f.locale?.name ?? ""]),
               );
 
               return (

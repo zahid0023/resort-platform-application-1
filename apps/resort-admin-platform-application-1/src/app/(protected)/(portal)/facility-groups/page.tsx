@@ -27,10 +27,8 @@ import {
   deleteFacilityGroup,
   type FacilityGroupSummary,
   type ListParams,
-  type ScopeAssignment,
 } from "@/services/facility-groups";
-import { facilityScopesService, type FacilityScope } from "@/services/facility-scopes";
-import { localesService, type Locale } from "@/services/locales";
+import { useLocales } from "@/providers/locales-provider";
 
 const PAGE_SIZE = 20;
 const ALL_FIELD = "all";
@@ -63,12 +61,10 @@ export default function FacilityGroupsPage() {
   const [sortBy, setSortBy] = useState("sortOrder");
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC");
 
-  // Scope assignments cache (populated as dialogs are opened)
-  const [scopeMap, setScopeMap] = useState<Record<number, ScopeAssignment[]>>({});
-
   // Dialog
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
-  const [availableScopes, setAvailableScopes] = useState<FacilityScope[]>([]);
+  // FacilityGroupDialog lazily refreshes the shared locale catalog itself the first time its
+  // +Add picker actually needs it (see [[feedback_locales_provider_pattern]]).
+  const { locales: availableLocales } = useLocales();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<FacilityGroupDialogMode>("create");
   const [activeId, setActiveId] = useState<number | undefined>(undefined);
@@ -80,8 +76,6 @@ export default function FacilityGroupsPage() {
   const activeIdRef = useRef(activeId);
   useEffect(() => { dialogOpenRef.current = dialogOpen; }, [dialogOpen]);
   useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
-
-  const isFirstRender = useRef(true);
 
   function toFieldOption(key: string) {
     return { value: key, label: t(`apiFields.${key}`) };
@@ -114,22 +108,6 @@ export default function FacilityGroupsPage() {
       setHasNext(res.has_next);
       setHasPrevious(res.has_previous);
 
-      // Sync open dialog locales with refreshed data
-      setForm((prev) => {
-        if (!dialogOpenRef.current || activeIdRef.current == null) return prev;
-        const updated = res.data.find((g) => g.id === activeIdRef.current);
-        if (!updated) return prev;
-        return {
-          ...prev,
-          locales: updated.locales.map((l) => ({
-            id: l.id,
-            locale_id: l.locale_id,
-            name: l.name,
-            description: l.description ?? "",
-            sort_order: l.sort_order,
-          })),
-        };
-      });
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -140,25 +118,16 @@ export default function FacilityGroupsPage() {
   // Initial load
   useEffect(() => { refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Locales for dialog
+  // Debounced search — resets to page 0. Guarded by comparing against the last-applied key rather
+  // than a one-shot "have I run" flag: a ref flip like `isFirstRender.current = false` doesn't
+  // survive React Strict Mode's dev-only effect replay (mount → cleanup → mount again on the same
+  // ref), so a boolean guard fires a spurious extra fetch on the replay. Comparing actual values
+  // is replay-safe since the key is identical — and still unchanged — across both passes.
+  const lastSearchKey = useRef(`${searchField}:${search}`);
   useEffect(() => {
-    localesService
-      .list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableLocales(res.data))
-      .catch(() => {});
-  }, []);
-
-  // Scopes for dialog
-  useEffect(() => {
-    facilityScopesService
-      .list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableScopes(res.data))
-      .catch(() => {});
-  }, []);
-
-  // Debounced search — resets to page 0
-  useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    const key = `${searchField}:${search}`;
+    if (lastSearchKey.current === key) return;
+    lastSearchKey.current = key;
     setPage(0);
     const timer = setTimeout(
       () => refresh({ page: 0, ...buildApiFilters(searchField, search.trim()) }),
@@ -168,7 +137,7 @@ export default function FacilityGroupsPage() {
   }, [search, searchField]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const groupNames = useMemo(
-    () => Object.fromEntries(groups.map((g) => [g.id, g.locales[0]?.name ?? ""])),
+    () => Object.fromEntries(groups.map((g) => [g.id, g.locale?.name ?? ""])),
     [groups],
   );
 
@@ -186,11 +155,7 @@ export default function FacilityGroupsPage() {
   function openCreate() {
     setMode("create");
     setActiveId(undefined);
-    const resortScope = availableScopes.find((s) => s.code === "RESORT");
-    setForm({
-      ...emptyFacilityGroupForm,
-      scope_ids: resortScope ? [resortScope.id] : [],
-    });
+    setForm({ ...emptyFacilityGroupForm });
     setDialogOpen(true);
   }
 
@@ -200,21 +165,16 @@ export default function FacilityGroupsPage() {
       const full = res.data;
       setMode("view");
       setActiveId(full.id);
-      const assignments = full.scope_assignments ?? [];
-      setScopeMap((prev) => ({ ...prev, [full.id]: assignments }));
       setForm({
         code: full.code,
         sort_order: full.sort_order,
         icon: toIconValue(full),
-        locales: full.locales.map((l) => ({
-          id: l.id,
-          locale_id: l.locale_id,
-          name: l.name,
-          description: l.description ?? "",
-          sort_order: l.sort_order,
-        })),
-        scope_ids: [],
-        scope_assignments: assignments,
+        // Left empty here — the dialog lazily fetches the full translation list itself from the
+        // paginated /locales sub-resource the first time it opens (see FacilityGroupDialog).
+        locale: { name: "", description: "", sort_order: 0 },
+        locales: [],
+        scopes: [],
+        facility_scopes: full.facility_scopes,
       });
       setDialogOpen(true);
     } catch (err) {
@@ -295,8 +255,6 @@ export default function FacilityGroupsPage() {
                 key={g.id}
                 group={g}
                 defaultName={groupNames[g.id]}
-                scopeAssignments={scopeMap[g.id]}
-                availableLocales={availableLocales}
                 onNavigate={(g) => router.push(`/facility-groups/${g.id}`)}
                 onView={openDialog}
                 onDelete={setDeleteTarget}
@@ -323,7 +281,6 @@ export default function FacilityGroupsPage() {
         form={form}
         onFormChange={setForm}
         availableLocales={availableLocales}
-        availableScopes={availableScopes}
         onSaved={() => refresh()}
       />
 

@@ -27,7 +27,9 @@
     "loadMore": "Load more",
     "refresh": "Refresh",
     "refreshed": "Refreshed",
-    "remove": "Remove"
+    "remove": "Remove",
+    "assign": "Assign",
+    "unassign": "Unassign"
   },
   "auth": {
     "login": {
@@ -70,6 +72,7 @@
     "isDefault": "Default Currency",
     "shortName": "Short Name",
     "facilityGroup": "Facility Group",
+    "facilityScopes": "Facility Scopes",
     "purpose": "Purpose",
     "usageExample": "Usage Example",
     "calculationMethod": "Calculation Method"
@@ -121,6 +124,20 @@
     "selectPrompt": "Select country…",
     "change": "Change",
     "loadFailed": "Failed to load countries."
+  },
+  "facilityGroupPicker": {
+    "title": "Select Facility Group",
+    "count": "{{n}} facility groups",
+    "searchPlaceholder": "Search by code…",
+    "empty": "No facility groups found.",
+    "loadFailed": "Failed to load facility groups."
+  },
+  "facilityScopePicker": {
+    "title": "Select Facility Scope",
+    "count": "{{n}} facility scopes",
+    "searchPlaceholder": "Search by code…",
+    "empty": "No facility scopes found.",
+    "loadFailed": "Failed to load facility scopes."
   },
   "imageHostingProviderConfigPicker": {
     "title": "Select Storage Config",
@@ -190,7 +207,9 @@
       "resortPermissionType": "No locale translations for this resort permission type.",
       "contactType": "No locale translations for this contact type.",
       "commChannel": "No locale translations for this communication channel.",
-      "facilityScope": "No locale translations for this facility scope."
+      "facilityScope": "No locale translations for this facility scope.",
+      "facilityGroup": "No locale translations for this facility group.",
+      "facility": "No locale translations for this facility."
     },
     "row": {
       "label": "Locale {{n}}",
@@ -218,6 +237,10 @@
     "resortPermissionTypeDescription": "Optional description...",
     "facilityScopeName": "Scope name in this language",
     "facilityScopeDescription": "Optional description...",
+    "facilityGroupName": "Group name in this language",
+    "facilityGroupDescription": "Optional description...",
+    "facilityName": "Facility name in this language",
+    "facilityDescription": "Optional description...",
     "providerCode": "AWS_S3",
     "providerName": "Amazon S3",
     "providerDescription": "Optional description...",
@@ -453,13 +476,19 @@
     "notFound": "Facility group not found.",
     "back": "Back to Facility Groups",
     "noFacilities": "No facilities in this group yet.",
+    "viewFacilities": "View Facilities",
     "scopes": "Scope Assignments",
     "scopeEmpty": "No scopes assigned.",
     "scopeRequired": "Please assign at least one scope.",
+    "addScope": "Add Scope",
     "scopeAssigned": "Scope assigned.",
     "scopeUnassigned": "Scope unassigned.",
     "scopeUnassignTitle": "Remove scope assignment?",
-    "scopeUnassignDesc": "Are you sure you want to unassign {{code}}? This action cannot be undone."
+    "scopeUnassignDesc": "Are you sure you want to unassign {{code}}? This action cannot be undone.",
+    "scopeLoadFailed": "Failed to load facility scopes.",
+    "scopeAssignFailed": "Failed to assign scope.",
+    "scopeUnassignFailed": "Failed to unassign scope.",
+    "scopeAssignmentNotFound": "Couldn't find this scope's assignment record."
   },
   "facilityGroupDialog": {
     "create": "New Facility Group",

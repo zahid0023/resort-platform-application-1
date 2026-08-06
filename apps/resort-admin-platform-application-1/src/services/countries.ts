@@ -1,5 +1,5 @@
 import { api } from "./api";
-import type { Locale } from "./locales";
+import type { Locale, LocaleCount } from "./locales";
 
 export interface CountryLocale {
   id: number;
@@ -125,6 +125,13 @@ export const countriesService = {
     const query = new URLSearchParams({ page: String(page), size: String(size) });
     if (localeCode) query.set("localeCode", localeCode);
     return api.get<CountryLocaleListResponse>(`/countries/${countryId}/locales?${query}`);
+  },
+
+  // `codes` here is the authoritative, complete set of locale codes this country already has a
+  // translation for — unlike listLocales, which is paginated (size 10) and can miss codes past the
+  // first page. Compare against `localesService.count()`'s codes to know what's still addable.
+  async countLocales(countryId: number): Promise<LocaleCount> {
+    return api.get<LocaleCount>(`/countries/${countryId}/locales/count`);
   },
 
   async create(body: CreateCountryRequest): Promise<MutationResponse> {

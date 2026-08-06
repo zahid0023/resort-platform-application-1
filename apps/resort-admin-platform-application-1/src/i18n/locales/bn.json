@@ -27,7 +27,9 @@
     "loadMore": "আরো লোড করুন",
     "refresh": "রিফ্রেশ",
     "refreshed": "রিফ্রেশ হয়েছে",
-    "remove": "সরান"
+    "remove": "সরান",
+    "assign": "নির্ধারণ করুন",
+    "unassign": "বাতিল করুন"
   },
   "auth": {
     "login": {
@@ -70,6 +72,7 @@
     "isDefault": "ডিফল্ট মুদ্রা",
     "shortName": "সংক্ষিপ্ত নাম",
     "facilityGroup": "সুবিধা গ্রুপ",
+    "facilityScopes": "সুবিধা স্কোপ",
     "purpose": "উদ্দেশ্য",
     "usageExample": "ব্যবহারের উদাহরণ",
     "calculationMethod": "গণনা পদ্ধতি"
@@ -121,6 +124,20 @@
     "selectPrompt": "দেশ নির্বাচন করুন…",
     "change": "পরিবর্তন করুন",
     "loadFailed": "দেশের তালিকা লোড করতে ব্যর্থ হয়েছে।"
+  },
+  "facilityGroupPicker": {
+    "title": "সুবিধা গ্রুপ নির্বাচন করুন",
+    "count": "{{n}}টি সুবিধা গ্রুপ",
+    "searchPlaceholder": "কোড দিয়ে খুঁজুন…",
+    "empty": "কোনো সুবিধা গ্রুপ পাওয়া যায়নি।",
+    "loadFailed": "সুবিধা গ্রুপের তালিকা লোড করতে ব্যর্থ হয়েছে।"
+  },
+  "facilityScopePicker": {
+    "title": "সুবিধা স্কোপ নির্বাচন করুন",
+    "count": "{{n}}টি সুবিধা স্কোপ",
+    "searchPlaceholder": "কোড দিয়ে খুঁজুন…",
+    "empty": "কোনো সুবিধা স্কোপ পাওয়া যায়নি।",
+    "loadFailed": "সুবিধা স্কোপের তালিকা লোড করতে ব্যর্থ হয়েছে।"
   },
   "imageHostingProviderConfigPicker": {
     "title": "স্টোরেজ কনফিগ নির্বাচন করুন",
@@ -190,7 +207,9 @@
       "resortPermissionType": "এই রিসোর্ট অনুমতি ধরনের কোনো লোকেল অনুবাদ নেই।",
       "contactType": "এই যোগাযোগ ধরনের কোনো লোকেল অনুবাদ নেই।",
       "commChannel": "এই যোগাযোগ চ্যানেলের কোনো লোকেল অনুবাদ নেই।",
-      "facilityScope": "এই সুবিধার পরিধির কোনো লোকেল অনুবাদ নেই।"
+      "facilityScope": "এই সুবিধার পরিধির কোনো লোকেল অনুবাদ নেই।",
+      "facilityGroup": "এই সুবিধা গ্রুপের কোনো লোকেল অনুবাদ নেই।",
+      "facility": "এই সুবিধার কোনো লোকেল অনুবাদ নেই।"
     },
     "row": {
       "label": "লোকেল {{n}}",
@@ -216,6 +235,12 @@
     "resortAccessTypeDescription": "ঐচ্ছিক বিবরণ...",
     "resortPermissionTypeName": "এই ভাষায় অনুমতি ধরনের নাম",
     "resortPermissionTypeDescription": "ঐচ্ছিক বিবরণ...",
+    "facilityScopeName": "এই ভাষায় পরিধির নাম",
+    "facilityScopeDescription": "ঐচ্ছিক বিবরণ...",
+    "facilityGroupName": "এই ভাষায় গ্রুপের নাম",
+    "facilityGroupDescription": "ঐচ্ছিক বিবরণ...",
+    "facilityName": "এই ভাষায় সুবিধার নাম",
+    "facilityDescription": "ঐচ্ছিক বিবরণ...",
     "providerCode": "AWS_S3",
     "providerName": "Amazon S3",
     "providerDescription": "ঐচ্ছিক বিবরণ...",
@@ -450,7 +475,19 @@
     "order": "ক্রম: {{n}}",
     "notFound": "সুবিধা গ্রুপ পাওয়া যায়নি।",
     "back": "সুবিধা গ্রুপে ফিরে যান",
-    "noFacilities": "এই গ্রুপে এখনো কোনো সুবিধা নেই।"
+    "noFacilities": "এই গ্রুপে এখনো কোনো সুবিধা নেই।",
+    "viewFacilities": "সুবিধাসমূহ দেখুন",
+    "scopeRequired": "অন্তত একটি স্কোপ নির্বাচন করুন।",
+    "addScope": "স্কোপ যোগ করুন",
+    "scopeEmpty": "কোনো স্কোপ নির্ধারিত নেই।",
+    "scopeAssigned": "স্কোপ নির্ধারিত হয়েছে।",
+    "scopeUnassigned": "স্কোপ বাতিল করা হয়েছে।",
+    "scopeUnassignTitle": "স্কোপ নির্ধারণ বাতিল করবেন?",
+    "scopeUnassignDesc": "আপনি কি নিশ্চিত যে {{code}} বাতিল করতে চান? এই পদক্ষেপটি পূর্বাবস্থায় ফেরানো যাবে না।",
+    "scopeLoadFailed": "সুবিধা স্কোপ লোড করতে ব্যর্থ হয়েছে।",
+    "scopeAssignFailed": "স্কোপ নির্ধারণ করতে ব্যর্থ হয়েছে।",
+    "scopeUnassignFailed": "স্কোপ বাতিল করতে ব্যর্থ হয়েছে।",
+    "scopeAssignmentNotFound": "এই স্কোপের নির্ধারণ রেকর্ড খুঁজে পাওয়া যায়নি।"
   },
   "facilityGroupDialog": {
     "create": "নতুন সুবিধা গ্রুপ",

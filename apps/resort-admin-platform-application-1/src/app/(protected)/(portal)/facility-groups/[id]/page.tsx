@@ -24,7 +24,6 @@ import { FacilityDialog, emptyFacilityForm } from "@/components/facilities/facil
 import type { FacilityDialogMode, FacilityFormState } from "@/components/facilities/types";
 import { toIconValue } from "@/components/facilities/types";
 import { getFacilityGroup, type FacilityGroup } from "@/services/facility-groups";
-import { pickTranslation } from "@/lib/locale";
 import {
   listFacilities,
   deleteFacility,
@@ -75,13 +74,6 @@ export default function FacilityGroupDetailPage() {
   const [form, setForm] = useState<FacilityFormState>(emptyFacilityForm);
   const [deleteTarget, setDeleteTarget] = useState<FacilitySummary | null>(null);
 
-  const dialogOpenRef = useRef(dialogOpen);
-  const activeIdRef = useRef(activeId);
-  useEffect(() => { dialogOpenRef.current = dialogOpen; }, [dialogOpen]);
-  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
-
-  const isFirstRender = useRef(true);
-
   function toFieldOption(key: string) {
     return { value: key, label: t(`apiFields.${key}`) };
   }
@@ -112,22 +104,6 @@ export default function FacilityGroupDetailPage() {
       setTotalElements(res.total_elements);
       setHasNext(res.has_next);
       setHasPrevious(res.has_previous);
-
-      setForm((prev) => {
-        if (!dialogOpenRef.current || activeIdRef.current == null) return prev;
-        const updated = res.data.find((f) => f.id === activeIdRef.current);
-        if (!updated) return prev;
-        return {
-          ...prev,
-          locales: updated.locales.map((l) => ({
-            id: l.id,
-            locale_id: l.locale_id,
-            name: l.name,
-            description: l.description ?? "",
-            sort_order: l.sort_order,
-          })),
-        };
-      });
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -161,9 +137,16 @@ export default function FacilityGroupDetailPage() {
       .catch(() => {});
   }, []);
 
-  // Debounced search
+  // Debounced search — resets to page 0. Guarded by comparing against the last-applied key rather
+  // than a one-shot "have I run" flag: a ref flip like `isFirstRender.current = false` doesn't
+  // survive React Strict Mode's dev-only effect replay (mount → cleanup → mount again on the same
+  // ref), so a boolean guard fires a spurious extra fetch on the replay. Comparing actual values
+  // is replay-safe since the key is identical — and still unchanged — across both passes.
+  const lastSearchKey = useRef(`${searchField}:${search}`);
   useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    const key = `${searchField}:${search}`;
+    if (lastSearchKey.current === key) return;
+    lastSearchKey.current = key;
     setPage(0);
     const timer = setTimeout(
       () => refreshFacilities({ page: 0, ...buildApiFilters(searchField, search.trim()) }),
@@ -173,7 +156,7 @@ export default function FacilityGroupDetailPage() {
   }, [search, searchField]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const facilityNames = useMemo(
-    () => Object.fromEntries(facilities.map((f) => [f.id, f.locales[0]?.name ?? ""])),
+    () => Object.fromEntries(facilities.map((f) => [f.id, f.locale?.name ?? ""])),
     [facilities],
   );
 
@@ -187,12 +170,13 @@ export default function FacilityGroupDetailPage() {
     });
   }, [facilities, facilityNames, search, searchField]);
 
-  const groupName = pickTranslation(group?.locales, availableLocales)?.name ?? group?.code ?? "";
+  const groupName = group?.locale?.name ?? group?.code ?? "";
 
   function openCreate() {
     setMode("create");
     setActiveId(undefined);
-    setForm({ ...emptyFacilityForm, facility_group_id: groupId });
+    // Group is pre-filled by FacilityGeneralInfo itself from the `fixedFacilityGroup` prop below.
+    setForm({ ...emptyFacilityForm });
     setDialogOpen(true);
   }
 
@@ -200,17 +184,13 @@ export default function FacilityGroupDetailPage() {
     setMode("view");
     setActiveId(f.id);
     setForm({
-      facility_group_id: f.facility_group_id,
+      facility_group: f.facility_group,
       code: f.code,
-      sort_order: f.sort_order ?? 0,
+      sort_order: f.sort_order,
       icon: toIconValue(f),
-      locales: f.locales.map((l) => ({
-        id: l.id,
-        locale_id: l.locale_id,
-        name: l.name,
-        description: l.description ?? "",
-        sort_order: l.sort_order,
-      })),
+      locale: emptyFacilityForm.locale,
+      // Lazily populated by FacilityDialog the first time the Translations tab is selected.
+      locales: [],
     });
     setDialogOpen(true);
   }
@@ -337,7 +317,7 @@ export default function FacilityGroupDetailPage() {
         form={form}
         onFormChange={setForm}
         availableLocales={availableLocales}
-        fixedFacilityGroupId={groupId}
+        fixedFacilityGroup={group}
         onSaved={() => refreshFacilities()}
       />
 

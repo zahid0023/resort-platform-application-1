@@ -24,6 +24,10 @@ interface LocalesContextValue {
    * the catalog (e.g. opening the language picker) or wants to pick up locales created elsewhere
    * (e.g. another tab, another admin) during the current session. */
   refresh: () => Promise<Locale[]>;
+  /** Re-fetches only `GET /locales/count`, leaving the catalog untouched. Use this for a manual
+   * "Refresh" action on a translations tab — it only needs the up-to-date total to drive the +Add
+   * button's disabled state, not the full paginated catalog (that's only ever needed by +Add itself). */
+  refreshCount: () => Promise<number>;
 }
 
 const LocalesContext = createContext<LocalesContextValue | null>(null);
@@ -58,6 +62,13 @@ export function LocalesProvider({ children }: { children: React.ReactNode }) {
     return promise;
   }, []);
 
+  const refreshCount = useCallback((): Promise<number> => {
+    return localesService.count().then((res) => {
+      setTotalCount(res.count);
+      return res.count;
+    });
+  }, []);
+
   // Session start (page load/refresh) only needs the count — cheap, and enough to drive disabled
   // states before any dialog is even opened. The full catalog (`GET /locales`) is deferred to
   // `refresh()`, fired on demand the first time a consumer needs it (see `refresh` above).
@@ -69,7 +80,7 @@ export function LocalesProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <LocalesContext.Provider value={{ locales, totalCount, loading, loaded, refresh }}>
+    <LocalesContext.Provider value={{ locales, totalCount, loading, loaded, refresh, refreshCount }}>
       {children}
     </LocalesContext.Provider>
   );

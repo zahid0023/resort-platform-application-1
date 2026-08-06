@@ -84,12 +84,19 @@ export function FacilityScopeDialog({
   const [activeTab, setActiveTab] = useState<"general" | "locales">("general");
   const [refreshing, setRefreshing] = useState(false);
   const [localesLoaded, setLocalesLoaded] = useState(false);
+  // Authoritative set of locale codes this facility scope already has a translation for, from
+  // `GET /facility-scopes/{id}/locales/count` — not derived from `form.locales`, which only ever
+  // holds one page (size 10) of the paginated sub-resource and can undercount past that. Compared
+  // against the platform-wide codes from `useLocales()` to know which languages are still addable.
+  // `null` until the first fetch resolves.
+  const [facilityScopeLocaleCodes, setFacilityScopeLocaleCodes] = useState<string[] | null>(null);
   // The language catalog is loaded once per session (right after login) by LocalesProvider and
   // shared across every entity dialog — no per-dialog fetch needed. `refreshLocalesCatalog` is only
-  // used as an explicit re-sync (manual Refresh button, or as a fallback in prepareAddLocale) for
-  // locales created elsewhere during the current session, since the shared copy otherwise never
-  // auto-updates.
-  const { locales: availableLocales, totalCount: totalLocaleCount, refresh: refreshLocalesCatalog } = useLocales();
+  // used as an explicit re-sync (a fallback in prepareAddLocale) for locales created elsewhere during
+  // the current session, since the shared copy otherwise never auto-updates. The manual Refresh
+  // button only needs `refreshLocalesCount` (GET /locales/count) — the full paginated catalog
+  // (GET /locales) is only ever needed by the +Add language picker.
+  const { locales: availableLocales, totalCount: totalLocaleCount, refresh: refreshLocalesCatalog, refreshCount: refreshLocalesCount } = useLocales();
   // Owned here so it survives CountryLocaleTranslations-style unmount on tab switch — see
   // [[feedback_tab_content_state]].
   const [localeSearch, setLocaleSearch] = useState("");
@@ -110,6 +117,7 @@ export function FacilityScopeDialog({
       setLocalesLoaded(false);
       setLocaleSearch("");
       lastLocaleSearchKey.current = "";
+      setFacilityScopeLocaleCodes(null);
     }
   }, [open]);
 
@@ -213,6 +221,16 @@ export function FacilityScopeDialog({
     });
   }
 
+  // Companion to fetchLocales — hits the facility scope's own /locales/count sub-resource for the
+  // authoritative, unpaginated set of locale codes it already has a translation for. Kept separate
+  // from fetchLocales since it doesn't need to re-run on every search keystroke, only on tab load,
+  // manual refresh, and right before the +Add picker needs an up-to-date used/available split.
+  async function fetchLocaleCodes(): Promise<void> {
+    if (facilityScopeId == null) return;
+    const res = await facilityScopesService.countLocales(facilityScopeId);
+    setFacilityScopeLocaleCodes(res.codes);
+  }
+
   // Translations are only fetched once the tab is actually selected — not when the scope card is
   // opened — and only the first time per dialog session; re-selecting the tab afterward reuses
   // what's already loaded. Use the Refresh button for an explicit re-fetch. The language catalog
@@ -220,7 +238,7 @@ export function FacilityScopeDialog({
   useEffect(() => {
     if (!open || mode === "create" || activeTab !== "locales" || localesLoaded) return;
     setLocalesLoaded(true);
-    fetchLocales().catch((err) => toast.error((err as Error).message));
+    Promise.all([fetchLocales(), fetchLocaleCodes()]).catch((err) => toast.error((err as Error).message));
   }, [open, mode, activeTab, localesLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced server-side search, view mode only — edit mode always needs the complete,
@@ -246,6 +264,7 @@ export function FacilityScopeDialog({
     setLocaleSearch("");
     lastLocaleSearchKey.current = "";
     fetchLocales().catch((err) => toast.error((err as Error).message));
+    fetchLocaleCodes().catch((err) => toast.error((err as Error).message));
     if (availableLocales.length === 0) {
       return refreshLocalesCatalog().catch((err) => {
         toast.error((err as Error).message);
@@ -256,8 +275,9 @@ export function FacilityScopeDialog({
   }
 
   // Manual refresh only — switching tabs never re-fetches on its own otherwise. On the locales tab
-  // this also re-syncs the shared language catalog, so it doubles as the way to pick up locales
-  // created elsewhere during the session.
+  // this re-syncs just the shared language count (GET /locales/count) and this scope's own
+  // locale-code count — the full paginated catalog (GET /locales) is only ever needed by the +Add
+  // language picker, not by a refresh.
   async function handleRefresh() {
     if (facilityScopeId == null) return;
     setRefreshing(true);
@@ -267,7 +287,7 @@ export function FacilityScopeDialog({
         const full = res.data;
         onFormChange({ ...form, sort_order: full.sort_order });
       } else {
-        await Promise.all([fetchLocales(localeSearch.trim()), refreshLocalesCatalog()]);
+        await Promise.all([fetchLocales(localeSearch.trim()), refreshLocalesCount(), fetchLocaleCodes()]);
         setLocalesLoaded(true);
       }
       toast.success(t("common.refreshed"));
@@ -386,6 +406,7 @@ export function FacilityScopeDialog({
                   open={open}
                   availableLocales={availableLocales}
                   totalLocaleCount={totalLocaleCount}
+                  facilityScopeLocaleCodes={facilityScopeLocaleCodes}
                 />
               </TabsContent>
             </Tabs>

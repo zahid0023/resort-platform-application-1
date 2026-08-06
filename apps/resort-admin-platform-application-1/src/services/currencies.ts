@@ -1,5 +1,5 @@
 import { api } from "./api";
-import type { Locale } from "./locales";
+import type { Locale, LocaleCount } from "./locales";
 import type { CountryLocale } from "./countries";
 
 export interface CurrencyLocale {
@@ -147,6 +147,13 @@ export const currenciesService = {
     const query = new URLSearchParams({ page: String(page), size: String(size) });
     if (localeCode) query.set("localeCode", localeCode);
     return api.get<CurrencyLocaleListResponse>(`/currencies/${currencyId}/locales?${query}`);
+  },
+
+  // `codes` here is the authoritative, complete set of locale codes this currency already has a
+  // translation for — unlike listLocales, which is paginated (size 10) and can miss codes past the
+  // first page. Compare against `localesService.count()`'s codes to know what's still addable.
+  async countLocales(currencyId: number): Promise<LocaleCount> {
+    return api.get<LocaleCount>(`/currencies/${currencyId}/locales/count`);
   },
 
   async create(body: CreateCurrencyRequest): Promise<MutationResponse> {

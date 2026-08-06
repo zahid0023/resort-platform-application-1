@@ -58,6 +58,11 @@ export interface CurrencyLocaleTranslationsProps {
    * `availableLocales.length` to decide the Add button's disabled state — the list endpoint caps
    * `size` at 50 per page, so `availableLocales` may undercount if more locales exist than that. */
   totalLocaleCount: number | null;
+  /** Authoritative set of locale codes this currency already has a translation for, from
+   * `GET /currencies/{id}/locales/count` — not `form.locales`, which only ever holds one page
+   * (size 10) of the paginated sub-resource and can miss codes past that page. `null` until the
+   * first fetch resolves, in which case `usedLocaleIds` falls back to `form.locales`. */
+  currencyLocaleCodes: string[] | null;
 }
 
 export function CurrencyLocaleTranslations({
@@ -74,6 +79,7 @@ export function CurrencyLocaleTranslations({
   open,
   availableLocales,
   totalLocaleCount,
+  currencyLocaleCodes,
 }: CurrencyLocaleTranslationsProps) {
   const { t } = useTranslation();
   const [newLocaleRows, setNewLocaleRows] = useState<NewLocaleRow[]>([]);
@@ -198,13 +204,35 @@ export function CurrencyLocaleTranslations({
   }
 
   function usedLocaleIds(excludeKey?: string): Set<number> {
-    const existing = form.locales
-      .filter((r) => rowKey(r) !== excludeKey)
-      .map((r) => r.locale?.id);
     const added = newLocaleRows
       .filter((r) => r._rkey !== excludeKey)
       .map((r) => r.locale_id);
+
+    // Prefer the authoritative, unpaginated code list from the currency's own /locales/count
+    // sub-resource — form.locales only ever holds one page (size 10) and can miss codes past that,
+    // which would otherwise let a user pick an already-used language in the +Add dropdown.
+    if (currencyLocaleCodes) {
+      const idByCode = new Map(availableLocales.map((l) => [l.code, l.id]));
+      const existing = currencyLocaleCodes.map((c) => idByCode.get(c));
+      return new Set([...existing, ...added].filter((v): v is number => typeof v === "number"));
+    }
+
+    const existing = form.locales
+      .filter((r) => rowKey(r) !== excludeKey)
+      .map((r) => r.locale?.id);
     return new Set([...existing, ...added].filter((v): v is number => typeof v === "number"));
+  }
+
+  // Count-only version of usedLocaleIds, for the "is there room left" checks below. Deliberately
+  // doesn't route through the code->id lookup: that map is built from `availableLocales`, which is
+  // empty until something has triggered the shared catalog fetch (e.g. a prior +Add click anywhere
+  // in the session) — before that, every code in `currencyLocaleCodes` would resolve to `undefined`
+  // and get silently dropped, undercounting used locales and leaving +Add wrongly enabled even when
+  // every locale already has a translation.
+  function usedLocaleCount(excludeKey?: string): number {
+    const addedCount = newLocaleRows.filter((r) => r._rkey !== excludeKey).length;
+    if (currencyLocaleCodes) return currencyLocaleCodes.length + addedCount;
+    return form.locales.filter((r) => rowKey(r) !== excludeKey).length + addedCount;
   }
 
   // `catalog` is passed explicitly (rather than read off the `availableLocales` prop) because the
@@ -231,7 +259,7 @@ export function CurrencyLocaleTranslations({
   // canAddLocaleTranslation (see [[feedback_locales_provider_pattern]]) rather than computed here.
   async function handleAddLocale() {
     const catalog = await onPrepareAdd();
-    if (!canAddLocaleTranslation(usedLocaleIds().size, totalLocaleCount)) {
+    if (!canAddLocaleTranslation(usedLocaleCount(), totalLocaleCount)) {
       toast.error(t("locale.allLanguagesAdded"));
       return;
     }
@@ -255,7 +283,7 @@ export function CurrencyLocaleTranslations({
         </div>
         {mode !== "create" && (
           <Button type="button" size="sm" variant="outline" onClick={handleAddLocale}
-            disabled={newLocaleRows.length > 0 || !canAddLocaleTranslation(usedLocaleIds().size, totalLocaleCount)}
+            disabled={newLocaleRows.length > 0 || !canAddLocaleTranslation(usedLocaleCount(), totalLocaleCount)}
             className="h-7 text-xs px-2.5"
           >
             <Plus className="h-3.5 w-3.5 mr-1" /> {t("locale.add")}

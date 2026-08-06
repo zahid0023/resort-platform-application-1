@@ -73,13 +73,6 @@ export function IconPicker({ value, onChange, readOnly = false }: IconPickerProp
         </div>
       )}
 
-      {/* Footer — meta fields */}
-      {metaContent && (
-        <div className="px-4 py-4 border-t">
-          {metaContent}
-        </div>
-      )}
-
       {/* Preview toggle */}
       {strategy && value.value && (
         <>
@@ -107,6 +100,13 @@ export function IconPicker({ value, onChange, readOnly = false }: IconPickerProp
             </div>
           )}
         </>
+      )}
+
+      {/* Footer — meta fields (color, size) */}
+      {metaContent && (
+        <div className="px-4 py-4 border-t">
+          {metaContent}
+        </div>
       )}
     </Card>
   )

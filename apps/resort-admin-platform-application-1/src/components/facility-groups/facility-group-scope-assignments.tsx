@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react"
+"use client"
+
+import { useState } from "react"
 import { useTranslation } from "react-i18next"
-import { Check, Pencil, Plus, X } from "lucide-react"
+import { Layers, Loader2, Minus, Plus } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -14,234 +16,107 @@ import {
 import { Badge } from "@resort/shadcn-ui"
 import { Button } from "@resort/shadcn-ui"
 import { Card, CardContent } from "@resort/shadcn-ui"
-import { assignScope, unassignScope } from "@/services/facility-groups"
 import type { FacilityScope } from "@/services/facility-scopes"
-import { toast } from "sonner"
-import type { FacilityGroupDialogMode, FacilityGroupFormState, ScopeAssignment } from "./types"
-import type { Locale } from "@/services/locales"
-import { pickTranslation } from "@/lib/locale"
 
 export interface FacilityGroupScopeAssignmentsProps {
-  mode: FacilityGroupDialogMode
-  form: FacilityGroupFormState
-  onFormChange: (patch: Partial<FacilityGroupFormState>) => void
-  facilityGroupId?: number
-  availableScopes: FacilityScope[]
-  availableLocales: Locale[]
-  onSaved?: () => void | Promise<void>
-  editing: boolean
-  onEditingChange: (v: boolean) => void
-  open: boolean
+  scopes: FacilityScope[]
+  assignedIds: Set<number>
+  loading: boolean
+  onAssign: (scope: FacilityScope) => Promise<void>
+  onUnassign: (scope: FacilityScope) => Promise<void>
 }
 
-export function FacilityGroupScopeAssignments({
-  mode,
-  form,
-  onFormChange,
-  facilityGroupId,
-  availableScopes,
-  availableLocales,
-  onSaved,
-  editing,
-  onEditingChange,
-  open,
-}: FacilityGroupScopeAssignmentsProps) {
+// Purely presentational — the scope catalog, assigned ids, and the actual assign/unassign API calls
+// all live in the parent FacilityGroupDialog (see its `scopeCatalog`/`assignedScopeIds` state), since
+// Radix TabsContent unmounts this component whenever the "scopes" tab isn't selected; keeping the
+// loaded data here would mean re-fetching from scratch on every reselect. Only in-flight/confirm UI
+// state (which scope is busy, which is pending an unassign confirmation) lives locally — losing that
+// on a tab switch is fine.
+export function FacilityGroupScopeAssignments({ scopes, assignedIds, loading, onAssign, onUnassign }: FacilityGroupScopeAssignmentsProps) {
   const { t } = useTranslation()
   const [busyScopeIds, setBusyScopeIds] = useState<Set<number>>(new Set())
-  const [pendingUnassign, setPendingUnassign] = useState<ScopeAssignment | null>(null)
+  const [pendingUnassign, setPendingUnassign] = useState<FacilityScope | null>(null)
 
-  useEffect(() => {
-    if (!open) setBusyScopeIds(new Set())
-  }, [open])
-
-  function setScopeBusy(id: number, busy: boolean) {
+  function setBusy(scopeId: number, busy: boolean) {
     setBusyScopeIds((prev) => {
-      const n = new Set(prev)
-      busy ? n.add(id) : n.delete(id)
-      return n
+      const next = new Set(prev)
+      if (busy) next.add(scopeId)
+      else next.delete(scopeId)
+      return next
     })
   }
 
-  function toggleScopeId(scopeId: number, selected: boolean) {
-    const next = selected
-      ? form.scope_ids.filter((id) => id !== scopeId)
-      : [...form.scope_ids, scopeId]
-    onFormChange({ scope_ids: next })
-  }
-
-  async function doAssign(scopeId: number) {
-    if (facilityGroupId == null) return
-    setScopeBusy(scopeId, true)
-    try {
-      await assignScope(facilityGroupId, scopeId)
-      const scope = availableScopes.find((s) => s.id === scopeId)
-      if (scope) {
-        onFormChange({
-          scope_assignments: [
-            ...form.scope_assignments,
-            {
-              facility_scope_id: scope.id,
-              code: scope.code,
-              sort_order: scope.sort_order,
-              locales: scope.locale
-                ? [{ id: scope.locale.id, locale_id: scope.locale.locale.id, name: scope.locale.name, sort_order: scope.locale.sort_order }]
-                : [],
-            },
-          ],
-        })
-      }
-      toast.success(t("facilityGroup.scopeAssigned"))
-      await onSaved?.()
-    } catch (err) {
-      toast.error((err as Error).message)
-    } finally {
-      setScopeBusy(scopeId, false)
-    }
+  async function handleAssignClick(scope: FacilityScope) {
+    setBusy(scope.id, true)
+    await onAssign(scope)
+    setBusy(scope.id, false)
   }
 
   async function confirmUnassign() {
-    if (!pendingUnassign || facilityGroupId == null) return
-    const scopeId = pendingUnassign.facility_scope_id
+    if (!pendingUnassign) return
+    const scope = pendingUnassign
     setPendingUnassign(null)
-    setScopeBusy(scopeId, true)
-    try {
-      await unassignScope(facilityGroupId, scopeId)
-      onFormChange({
-        scope_assignments: form.scope_assignments.filter((a) => a.facility_scope_id !== scopeId),
-      })
-      toast.success(t("facilityGroup.scopeUnassigned"))
-      await onSaved?.()
-    } catch (err) {
-      toast.error((err as Error).message)
-    } finally {
-      setScopeBusy(scopeId, false)
-    }
+    setBusy(scope.id, true)
+    await onUnassign(scope)
+    setBusy(scope.id, false)
   }
 
-  const assignedIds = new Set(form.scope_assignments.map((a) => a.facility_scope_id))
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (scopes.length === 0) {
+    return <p className="text-sm text-muted-foreground">{t("facilityGroup.scopeEmpty")}</p>
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="h-1 w-1 rounded-full bg-primary" />
-          <h3 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
-            {t("facilityGroup.scopes")}
-          </h3>
-        </div>
-        {mode !== "create" && !editing && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onEditingChange(true)}
-            className="h-7 text-xs px-2.5 gap-1.5"
-          >
-            <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-          </Button>
-        )}
-        {editing && (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => onEditingChange(false)}
-            className="h-7 text-xs px-2.5 gap-1.5"
-          >
-            <X className="h-3.5 w-3.5" /> {t("common.close")}
-          </Button>
-        )}
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {scopes.map((scope) => {
+          const assigned = assignedIds.has(scope.id)
+          const busy = busyScopeIds.has(scope.id)
+          return (
+            <Card key={scope.id}>
+              <CardContent className="flex items-center gap-3 py-3">
+                <div
+                  className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${
+                    assigned ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  <Layers className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-sm truncate">{scope.locale?.name ?? scope.code}</p>
+                  <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 h-4 mt-1">
+                    {scope.code}
+                  </Badge>
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={assigned ? "outline" : "default"}
+                  disabled={busy}
+                  onClick={() => (assigned ? setPendingUnassign(scope) : handleAssignClick(scope))}
+                  className="gap-1.5 shrink-0"
+                >
+                  {busy ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : assigned ? (
+                    <Minus className="h-3.5 w-3.5" />
+                  ) : (
+                    <Plus className="h-3.5 w-3.5" />
+                  )}
+                  {assigned ? t("common.unassign") : t("common.assign")}
+                </Button>
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
-
-      <Card>
-        <CardContent className="pt-4">
-
-          {/* CREATE mode — select scope_ids (buffered, no API) */}
-          {mode === "create" && (
-            availableScopes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("facilityGroup.scopeEmpty")}</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {availableScopes.map((scope) => {
-                  const selected = form.scope_ids.includes(scope.id)
-                  const scopeName = scope.locale?.name
-                  return (
-                    <button
-                      key={scope.id}
-                      type="button"
-                      onClick={() => toggleScopeId(scope.id, selected)}
-                      className={[
-                        "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
-                        selected
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-input bg-background text-foreground hover:bg-accent",
-                      ].join(" ")}
-                    >
-                      {selected && <Check className="h-3 w-3" />}
-                      <span className="font-mono">{scope.code}</span>
-                      {scopeName && <span className="text-[10px] opacity-70">({scopeName})</span>}
-                    </button>
-                  )
-                })}
-              </div>
-            )
-          )}
-
-          {/* VIEW mode — show assigned scope badges */}
-          {mode !== "create" && !editing && (
-            form.scope_assignments.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("facilityGroup.scopeEmpty")}</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {form.scope_assignments.map((a) => {
-                  const scopeName = pickTranslation(a.locales, availableLocales)?.name
-                  return (
-                    <Badge key={a.facility_scope_id} variant="secondary" className="gap-1.5 font-mono text-xs">
-                      {a.code}
-                      {scopeName && <span className="font-sans font-normal opacity-70">({scopeName})</span>}
-                    </Badge>
-                  )
-                })}
-              </div>
-            )
-          )}
-
-          {/* EDIT mode — toggle assign/unassign per scope */}
-          {mode !== "create" && editing && (
-            availableScopes.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t("facilityGroup.scopeEmpty")}</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {availableScopes.map((scope) => {
-                  const isAssigned = assignedIds.has(scope.id)
-                  const busy = busyScopeIds.has(scope.id)
-                  const scopeName = scope.locale?.name
-                  const assignment = form.scope_assignments.find((a) => a.facility_scope_id === scope.id)
-                  return (
-                    <button
-                      key={scope.id}
-                      type="button"
-                      disabled={busy}
-                      onClick={() => isAssigned ? setPendingUnassign(assignment!) : doAssign(scope.id)}
-                      className={[
-                        "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50",
-                        isAssigned
-                          ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-                          : "border-input bg-background text-foreground hover:bg-accent",
-                      ].join(" ")}
-                    >
-                      {isAssigned ? <X className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
-                      <span className="font-mono">{scope.code}</span>
-                      {scopeName && <span className="text-[10px] opacity-70">({scopeName})</span>}
-                    </button>
-                  )
-                })}
-              </div>
-            )
-          )}
-
-        </CardContent>
-      </Card>
 
       <AlertDialog open={!!pendingUnassign} onOpenChange={(o) => !o && setPendingUnassign(null)}>
         <AlertDialogContent>
@@ -257,6 +132,6 @@ export function FacilityGroupScopeAssignments({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </>
   )
 }

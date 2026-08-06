@@ -97,6 +97,12 @@ export function CurrencyDialog({
   const [activeTab, setActiveTab] = useState<"general" | "locales">("general");
   const [refreshing, setRefreshing] = useState(false);
   const [localesLoaded, setLocalesLoaded] = useState(false);
+  // Authoritative set of locale codes this currency already has a translation for, from
+  // `GET /currencies/{id}/locales/count` — not derived from `form.locales`, which only ever holds
+  // one page (size 10) of the paginated sub-resource and can undercount past that. Compared against
+  // the platform-wide codes from `useLocales()` to know which languages are still addable. `null`
+  // until the first fetch resolves.
+  const [currencyLocaleCodes, setCurrencyLocaleCodes] = useState<string[] | null>(null);
   // Owned here (not inside CurrencyLocaleTranslations) so it survives that component unmounting when
   // the user switches away from the tab and back — see [[feedback_tab_content_state]] and
   // [[feedback_dialog_lazy_tab_load]] (same fix already applied to Country and City).
@@ -104,10 +110,11 @@ export function CurrencyDialog({
   const lastLocaleSearchKey = useRef("");
   // The language catalog is loaded once per session (right after login) by LocalesProvider and
   // shared across every entity dialog — no per-dialog fetch needed. `refreshLocalesCatalog` is only
-  // used as an explicit re-sync (manual Refresh button, or as a fallback in prepareAddLocale) for
-  // locales created elsewhere during the current session, since the shared copy otherwise never
-  // auto-updates.
-  const { locales: availableLocales, totalCount: totalLocaleCount, refresh: refreshLocalesCatalog } = useLocales();
+  // used as an explicit re-sync (a fallback in prepareAddLocale) for locales created elsewhere during
+  // the current session, since the shared copy otherwise never auto-updates. The manual Refresh
+  // button only needs `refreshLocalesCount` (GET /locales/count) — the full paginated catalog
+  // (GET /locales) is only ever needed by the +Add language picker.
+  const { locales: availableLocales, totalCount: totalLocaleCount, refresh: refreshLocalesCatalog, refreshCount: refreshLocalesCount } = useLocales();
   const [draftPrompt, setDraftPrompt] = useState<CurrencyFormState | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const [draftSyncing, setDraftSyncing] = useState(false);
@@ -121,6 +128,7 @@ export function CurrencyDialog({
       setLocalesLoaded(false);
       setLocaleSearch("");
       lastLocaleSearchKey.current = "";
+      setCurrencyLocaleCodes(null);
       setDraftPrompt(null);
       setDraftSavedAt(null);
       setDraftSyncing(false);
@@ -232,6 +240,16 @@ export function CurrencyDialog({
     });
   }
 
+  // Companion to fetchLocales — hits the currency's own /locales/count sub-resource for the
+  // authoritative, unpaginated set of locale codes it already has a translation for. Kept separate
+  // from fetchLocales since it doesn't need to re-run on every search keystroke, only on tab load,
+  // manual refresh, and right before the +Add picker needs an up-to-date used/available split.
+  async function fetchLocaleCodes(): Promise<void> {
+    if (currencyId == null) return;
+    const res = await currenciesService.countLocales(currencyId);
+    setCurrencyLocaleCodes(res.codes);
+  }
+
   // Translations are only fetched once the tab is actually selected — not when the currency card
   // is opened — and only the first time per dialog session; re-selecting the tab afterward reuses
   // what's already loaded. Use the Refresh button for an explicit re-fetch. The language catalog
@@ -239,7 +257,7 @@ export function CurrencyDialog({
   useEffect(() => {
     if (!open || mode === "create" || activeTab !== "locales" || localesLoaded) return;
     setLocalesLoaded(true);
-    fetchLocales().catch((err) => toast.error((err as Error).message));
+    Promise.all([fetchLocales(), fetchLocaleCodes()]).catch((err) => toast.error((err as Error).message));
   }, [open, mode, activeTab, localesLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced server-side search, view mode only — edit mode always needs the complete,
@@ -269,6 +287,7 @@ export function CurrencyDialog({
     setLocaleSearch("");
     lastLocaleSearchKey.current = "";
     fetchLocales().catch((err) => toast.error((err as Error).message));
+    fetchLocaleCodes().catch((err) => toast.error((err as Error).message));
     if (availableLocales.length === 0) {
       return refreshLocalesCatalog().catch((err) => {
         toast.error((err as Error).message);
@@ -280,8 +299,9 @@ export function CurrencyDialog({
 
   // Manual refresh only — switching tabs never re-fetches on its own otherwise. Pulls whichever the
   // active tab needs: general info re-hits GET /currencies/{id}, translations re-hits the locales
-  // sub-resource (honoring whatever search filter is currently applied) plus the shared language
-  // catalog, so this doubles as the way to pick up locales created elsewhere during the session.
+  // sub-resource (honoring whatever search filter is currently applied) plus just the shared
+  // language count (GET /locales/count) and this currency's own locale-code count — the full
+  // paginated catalog (GET /locales) is only ever needed by the +Add language picker, not a refresh.
   async function handleRefresh() {
     if (currencyId == null) return;
     setRefreshing(true);
@@ -297,7 +317,7 @@ export function CurrencyDialog({
           sort_order: full.sort_order,
         });
       } else {
-        await Promise.all([fetchLocales(localeSearch.trim()), refreshLocalesCatalog()]);
+        await Promise.all([fetchLocales(localeSearch.trim()), refreshLocalesCount(), fetchLocaleCodes()]);
         setLocalesLoaded(true);
       }
       toast.success(t("common.refreshed"));
@@ -424,6 +444,7 @@ export function CurrencyDialog({
                   open={open}
                   availableLocales={availableLocales}
                   totalLocaleCount={totalLocaleCount}
+                  currencyLocaleCodes={currencyLocaleCodes}
                 />
               </TabsContent>
             </Tabs>

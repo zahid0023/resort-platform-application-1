@@ -1,27 +1,26 @@
-import { Eye, Trash2 } from "lucide-react"
+import { useTranslation } from "react-i18next"
+import { ArrowRight, Eye, Trash2 } from "lucide-react"
 import { Badge } from "@resort/shadcn-ui"
 import { Button } from "@resort/shadcn-ui"
-import { Card } from "@resort/shadcn-ui"
+import { Card, CardHeader, CardAction, CardContent, CardFooter } from "@resort/shadcn-ui"
 import { IconRenderer } from "@/components/shared/icon-picker"
-import type { FacilityGroupSummary, ScopeAssignment } from "@/services/facility-groups"
+import type { FacilityGroupSummary } from "@/services/facility-groups"
 import { toIconValue } from "./types"
-import type { Locale } from "@/services/locales"
-import { pickTranslation } from "@/lib/locale"
 
 export interface FacilityGroupCardProps {
   group: FacilityGroupSummary
   defaultName?: string
-  scopeAssignments?: ScopeAssignment[]
-  availableLocales?: Locale[]
   onNavigate?: (group: FacilityGroupSummary) => void
   onView?: (group: FacilityGroupSummary) => void
   onDelete?: (group: FacilityGroupSummary) => void
 }
 
-export function FacilityGroupCard({ group, defaultName, scopeAssignments, availableLocales, onNavigate, onView, onDelete }: FacilityGroupCardProps) {
+export function FacilityGroupCard({ group, defaultName, onNavigate, onView, onDelete }: FacilityGroupCardProps) {
+  const { t } = useTranslation()
   const icon = toIconValue(group)
   const accentColor = icon.meta?.color || undefined
   const title = defaultName?.trim() || group.code
+  const scopes = group.facility_scopes ?? []
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -33,13 +32,13 @@ export function FacilityGroupCard({ group, defaultName, scopeAssignments, availa
     <Card
       role="button"
       tabIndex={0}
-      onClick={() => onNavigate?.(group)}
+      onClick={() => onView?.(group)}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigate?.(group) }
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onView?.(group) }
       }}
-      className="group p-5 hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      className="group hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
-      <div className="flex items-start justify-between">
+      <CardHeader>
         <div className="flex items-center gap-3 min-w-0">
           {/* Icon avatar */}
           <div
@@ -65,51 +64,54 @@ export function FacilityGroupCard({ group, defaultName, scopeAssignments, availa
 
           <div className="min-w-0">
             <h3 className="font-semibold truncate">{title}</h3>
-            <p className="text-xs text-muted-foreground truncate font-mono">{group.code} · ID #{group.id}</p>
+            <p className="text-xs text-muted-foreground truncate font-mono">{group.code}</p>
           </div>
         </div>
+        {(onView || onDelete) && (
+          <CardAction
+            className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            {onView && (
+              <Button size="icon" variant="ghost" className="h-8 w-8"
+                onClick={(e) => { e.stopPropagation(); onView(group) }}
+                title="View details"
+              >
+                <Eye className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            {onDelete && (
+              <Button size="icon" variant="ghost"
+                className="h-8 w-8 text-destructive hover:text-destructive"
+                onClick={handleDelete}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            )}
+          </CardAction>
+        )}
+      </CardHeader>
 
-        {/* Hover actions */}
-        <div
-          className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-          onClick={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {onView && (
-            <Button size="icon" variant="ghost" className="h-8 w-8"
-              onClick={(e) => { e.stopPropagation(); onView(group) }}
-              title="View details"
-            >
-              <Eye className="h-3.5 w-3.5" />
-            </Button>
-          )}
-          {onDelete && (
-            <Button size="icon" variant="ghost"
-              className="h-8 w-8 text-destructive hover:text-destructive"
-              onClick={handleDelete}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {scopeAssignments && scopeAssignments.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1">
-          {scopeAssignments.map((a) => (
-            <Badge key={a.facility_scope_id} variant="outline" className="font-mono text-[10px] px-1.5 py-0 h-5">
-              {pickTranslation(a.locales, availableLocales ?? [])?.name ?? a.code}
-            </Badge>
-          ))}
-        </div>
+      {scopes.length > 0 && (
+        <CardContent>
+          <div className="flex flex-wrap gap-1">
+            {scopes.map((s) => (
+              <Badge key={s.id} variant="outline" className="font-mono text-[10px] px-1.5 py-0 h-5">
+                {s.locale?.name ?? s.code}
+              </Badge>
+            ))}
+          </div>
+        </CardContent>
       )}
 
-      <div className="mt-4 pt-3 border-t flex items-center justify-between">
-        <Badge variant="secondary">#{group.sort_order}</Badge>
-        <span className="text-xs text-muted-foreground">
-          {group.locales.length} locale{group.locales.length !== 1 ? "s" : ""}
-        </span>
-      </div>
+      <CardFooter
+        className="justify-between text-xs font-medium text-primary hover:underline"
+        onClick={(e) => { e.stopPropagation(); onNavigate?.(group) }}
+      >
+        <span>{t("facilityGroup.viewFacilities")}</span>
+        <ArrowRight className="h-3.5 w-3.5" />
+      </CardFooter>
     </Card>
   )
 }
