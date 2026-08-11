@@ -1,6 +1,7 @@
 import { api } from "./api";
 import type { Locale, LocaleCount } from "./locales";
 import type { FacilityGroupSummary } from "./facility-groups";
+import type { FacilityScope } from "./facility-scopes";
 
 export type IconType = "LUCIDE" | "IMAGE" | "SVG" | "EXTERNAL";
 
@@ -14,7 +15,9 @@ export interface FacilityLocale {
 
 export interface FacilitySummary {
   id: number;
-  facility_group: FacilityGroupSummary;
+  /** Every facility group this facility belongs to — read-only here; managed afterward via
+   * `POST/DELETE /facilities/{facility-id}/group-assignments` under this facility resource. */
+  facility_groups: FacilityGroupSummary[];
   code: string;
   sort_order: number;
   icon_type: IconType;
@@ -22,11 +25,16 @@ export interface FacilitySummary {
   icon_meta?: Record<string, unknown>;
   /** The single translation matching Accept-Language (falls back to en, then null) — on GET /{id} and list alike. */
   locale: FacilityLocale | null;
+  /** Every facility scope this facility is assigned to — read-only here; managed afterward via
+   * `POST/DELETE /facilities/{facility-id}/scope-assignments` under this facility resource. */
+  facility_scopes: FacilityScope[];
 }
 
 export interface Facility {
   id: number;
-  facility_group: FacilityGroupSummary;
+  /** Every facility group this facility belongs to — read-only here; managed afterward via
+   * `POST/DELETE /facilities/{facility-id}/group-assignments` under this facility resource. */
+  facility_groups: FacilityGroupSummary[];
   code: string;
   sort_order: number;
   icon_type: IconType;
@@ -34,6 +42,9 @@ export interface Facility {
   icon_meta?: Record<string, unknown>;
   /** The single translation matching Accept-Language (falls back to en, then null) — on GET /{id} and list alike. */
   locale: FacilityLocale | null;
+  /** Every facility scope this facility is assigned to — read-only here; managed afterward via
+   * `POST/DELETE /facilities/{facility-id}/scope-assignments` under this facility resource. */
+  facility_scopes: FacilityScope[];
 }
 
 export interface FacilityListResponse {
@@ -71,7 +82,8 @@ export interface CreateFacilityLocaleRequest {
 // there's no locale_id here, and only a single locale entry is accepted at creation.
 export interface CreateFacilityRequest {
   code: string;
-  facility_group_id: number;
+  facility_group_ids: number[];
+  facility_scope_ids: number[];
   sort_order: number;
   icon_type: IconType;
   icon_value?: string;
@@ -168,3 +180,22 @@ export const updateFacilityLocale = (facilityId: number, localeId: number, body:
 
 export const removeFacilityLocale = (facilityId: number, localeId: number): Promise<MutationResponse> =>
   api.delete<MutationResponse>(`/facilities/${facilityId}/locales/${localeId}`);
+
+export const assignFacilityScope = (facilityId: number, facilityScopeId: number): Promise<MutationResponse> =>
+  api.post<MutationResponse>(`/facilities/${facilityId}/scope-assignments`, { facility_scope_id: facilityScopeId });
+
+// Identified by the facility scope's own id, not an assignment row id — a facility can have at most
+// one active assignment to a given scope, so (facility-id, facility-scope-id) is always enough.
+export const unassignFacilityScope = (facilityId: number, facilityScopeId: number): Promise<MutationResponse> =>
+  api.delete<MutationResponse>(`/facilities/${facilityId}/scope-assignments/${facilityScopeId}`);
+
+// The facility group being assigned must itself be scoped to every facility scope this facility is
+// currently assigned to — violating that returns 409 CONFLICT, same as assigning a duplicate group.
+export const assignFacilityGroup = (facilityId: number, facilityGroupId: number): Promise<MutationResponse> =>
+  api.post<MutationResponse>(`/facilities/${facilityId}/group-assignments`, { facility_group_id: facilityGroupId });
+
+// Identified by the facility group's own id, not an assignment row id — a facility can have at most
+// one active assignment to a given group, so (facility-id, facility-group-id) is always enough.
+// Unassigning a facility's only remaining group is allowed — it can end up with zero groups.
+export const unassignFacilityGroup = (facilityId: number, facilityGroupId: number): Promise<MutationResponse> =>
+  api.delete<MutationResponse>(`/facilities/${facilityId}/group-assignments/${facilityGroupId}`);

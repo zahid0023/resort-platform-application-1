@@ -1,6 +1,7 @@
 import type { IconValue } from "@/components/shared/icon-picker"
 import type { Facility, FacilitySummary, IconType } from "@/services/facilities"
 import type { FacilityGroupSummary } from "@/services/facility-groups"
+import type { FacilityScope } from "@/services/facility-scopes"
 import type { Locale } from "@/services/locales"
 
 export type FacilityDialogMode = "create" | "view"
@@ -18,10 +19,16 @@ export interface LocaleRow {
 }
 
 export interface FacilityFormState {
-  /** The full owning group, not just its id — `Facility`/`FacilitySummary` embed it directly (per the
-   * Facilities API spec), and the create-mode picker dialog also hands back the full object, so there's
-   * never a need to separately re-fetch the group's display name. `null` until one is picked/loaded. */
-  facility_group: FacilityGroupSummary | null
+  /** The full owning groups, not just their ids — `Facility`/`FacilitySummary` embed them directly (per
+   * the Facilities API spec), and the create-mode picker dialog also hands back the full object, so
+   * there's never a need to separately re-fetch a group's display name. A facility must belong to at
+   * least one group at creation; membership afterward is read-only here (managed via the Facility Group
+   * Facility Assignments API under the facility group resource, not this dialog). */
+  facility_groups: FacilityGroupSummary[]
+  /** The full assigned scopes, not just their ids — same rationale as `facility_groups` above. A
+   * facility must be assigned at least one scope at creation; membership afterward is read-only here
+   * (managed via `POST/DELETE /facility-scopes/{facility-scope-id}/facility-assignments`). */
+  facility_scopes: FacilityScope[]
   code: string
   sort_order: number
   icon: IconValue

@@ -76,6 +76,11 @@ export interface MutationResponse {
   id: number;
 }
 
+export interface FacilityScopeCount {
+  count: number;
+  codes: string[];
+}
+
 export interface ListParams {
   page?: number;
   size?: number;
@@ -130,6 +135,13 @@ export const facilityScopesService = {
 
   async get(id: number): Promise<{ data: FacilityScope }> {
     return api.get<{ data: FacilityScope }>(`/facility-scopes/${id}`);
+  },
+
+  // Authoritative, unpaginated count of every active facility scope, plus each one's code — unlike
+  // `list`, which is paginated (size 10 default) and can undercount past the first page. Used to
+  // know whether a facility group still has any assignable scopes left.
+  async count(): Promise<FacilityScopeCount> {
+    return api.get<FacilityScopeCount>("/facility-scopes/count");
   },
 
   async listLocales(facilityScopeId: number, params: ListLocalesParams = {}): Promise<FacilityScopeLocaleListResponse> {

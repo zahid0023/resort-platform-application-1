@@ -26,12 +26,13 @@ import { toIconValue as groupToIconValue } from "@/components/facility-groups/ty
 import { IconRenderer } from "@/components/shared/icon-picker";
 import {
   listFacilities,
+  getFacility,
   deleteFacility,
   type FacilitySummary,
   type ListParams,
 } from "@/services/facilities";
 import { listFacilityGroups, type FacilityGroupSummary } from "@/services/facility-groups";
-import { localesService, type Locale } from "@/services/locales";
+import { useLocales } from "@/providers/locales-provider";
 
 const PAGE_SIZE = 20;
 const GROUPS_PER_PAGE = 4;
@@ -88,8 +89,8 @@ export default function FacilitiesPage() {
   const byGroupInitialized = useRef(false);
 
   // ── Dialog / locale ────────────────────────────────────────────────────────
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
-  const dialogDepsLoaded = useRef(false);
+  // Shared, session-scoped catalog — loaded once by LocalesProvider, not re-fetched per dialog open.
+  const { locales: availableLocales } = useLocales();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<FacilityDialogMode>("create");
   const [activeId, setActiveId] = useState<number | undefined>(undefined);
@@ -234,15 +235,6 @@ export default function FacilitiesPage() {
   // ── Effects ────────────────────────────────────────────────────────────────
   useEffect(() => { refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function loadDialogDeps() {
-    if (dialogDepsLoaded.current) return;
-    dialogDepsLoaded.current = true;
-    localesService
-      .list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableLocales(res.data))
-      .catch(() => {});
-  }
-
   // Debounced search — resets to page 0 (all-facilities only)
   useEffect(() => {
     if (isFirstRender.current) {
@@ -268,27 +260,32 @@ export default function FacilitiesPage() {
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   function openCreate() {
-    loadDialogDeps();
     setMode("create");
     setActiveId(undefined);
     setForm(emptyFacilityForm);
     setDialogOpen(true);
   }
 
-  function openDialog(f: FacilitySummary) {
-    loadDialogDeps();
-    setMode("view");
-    setActiveId(f.id);
-    setForm({
-      facility_group: f.facility_group,
-      code: f.code,
-      sort_order: f.sort_order,
-      icon: toIconValue(f),
-      locale: emptyFacilityForm.locale,
-      // Lazily populated by FacilityDialog the first time the Translations tab is selected.
-      locales: [],
-    });
-    setDialogOpen(true);
+  async function openDialog(f: FacilitySummary) {
+    try {
+      const res = await getFacility(f.id);
+      const full = res.data;
+      setMode("view");
+      setActiveId(full.id);
+      setForm({
+        facility_groups: full.facility_groups,
+        facility_scopes: full.facility_scopes,
+        code: full.code,
+        sort_order: full.sort_order,
+        icon: toIconValue(full),
+        locale: emptyFacilityForm.locale,
+        // Lazily populated by FacilityDialog the first time the Translations tab is selected.
+        locales: [],
+      });
+      setDialogOpen(true);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
   }
 
   function handleSaved() {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
-import { ArrowRight, Check, Layers, Pencil, Plus, RefreshCw, X } from "lucide-react"
+import { ArrowRight, Check, Layers, Loader2, Pencil, Plus, RefreshCw, X } from "lucide-react"
 import { Sheet, SheetContent } from "@resort/shadcn-ui"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@resort/shadcn-ui"
 import {
@@ -15,6 +15,7 @@ import {
 } from "@resort/shadcn-ui"
 import { Badge } from "@resort/shadcn-ui"
 import { Button } from "@resort/shadcn-ui"
+import { Card, CardContent } from "@resort/shadcn-ui"
 import { DialogEntityHeader } from "@/components/shared/dialog-entity-header"
 import { DialogCreateFooter } from "@/components/shared/dialog-create-footer"
 import {
@@ -23,6 +24,8 @@ import {
   getFacilityGroup,
   listFacilityGroupLocales,
   countFacilityGroupLocales,
+  assignFacilityGroupScope,
+  unassignFacilityGroupScope,
 } from "@/services/facility-groups"
 import type { Locale } from "@/services/locales"
 import { facilityScopesService, type FacilityScope } from "@/services/facility-scopes"
@@ -35,7 +38,6 @@ import { IconPicker, EMPTY_ICON_VALUE } from "@/components/shared/icon-picker"
 import type { IconValue } from "@/components/shared/icon-picker"
 import { FacilityGroupGeneralInfo } from "./facility-group-general-info"
 import { FacilityGroupLocaleTranslations } from "./facility-group-locale-translations"
-import { FacilityGroupScopeAssignments } from "./facility-group-scope-assignments"
 
 export const emptyFacilityGroupForm: FacilityGroupFormState = {
   code: "",
@@ -85,13 +87,16 @@ export function FacilityGroupDialog({
   const [localesLoaded, setLocalesLoaded] = useState(false)
   const [localeSearch, setLocaleSearch] = useState("")
   const lastLocaleSearchKey = useRef("")
-  // Facility scope catalog + this group's assigned ids — owned here (not by
-  // FacilityGroupScopeAssignments) because Radix TabsContent unmounts inactive panels, so state that
-  // must survive switching away from the "scopes" tab and back has to live above that boundary.
-  const [scopeCatalog, setScopeCatalog] = useState<FacilityScope[]>([])
-  const [assignedScopeIds, setAssignedScopeIds] = useState<Set<number>>(new Set())
   const [scopesLoaded, setScopesLoaded] = useState(false)
-  const [scopesLoading, setScopesLoading] = useState(false)
+  // Platform-wide total of active facility scopes (from a size-1 `GET /facility-scopes` list call) —
+  // compared against `form.facility_scopes.length` (edit/view mode only) to know whether every scope
+  // is already assigned, in which case the "Assign Facility Scope" tile is disabled since the picker
+  // would have nothing to offer. `null` until the first fetch resolves.
+  const [totalScopeCount, setTotalScopeCount] = useState<number | null>(null)
+  // Edit/view mode only — ids of facility scopes currently mid-assign or mid-unassign, so the
+  // affected card can show a spinner and the rest of the tab stays interactive.
+  const [busyScopeIds, setBusyScopeIds] = useState<Set<number>>(new Set())
+  const [pendingUnassignScope, setPendingUnassignScope] = useState<FacilityScope | null>(null)
   // Authoritative set of locale codes this facility group already has a translation for, from
   // `GET /facility-groups/{id}/locales/count` — not derived from `form.locales`, which only ever
   // holds one page (size 10) of the paginated sub-resource and can undercount past that.
@@ -114,9 +119,10 @@ export function FacilityGroupDialog({
       setLocaleSearch("")
       lastLocaleSearchKey.current = ""
       setFacilityGroupLocaleCodes(null)
-      setScopeCatalog([])
-      setAssignedScopeIds(new Set())
       setScopesLoaded(false)
+      setTotalScopeCount(null)
+      setBusyScopeIds(new Set())
+      setPendingUnassignScope(null)
     }
   }, [open])
 
@@ -127,6 +133,13 @@ export function FacilityGroupDialog({
       || form.locale.description.trim() !== ""
       || form.scopes.length > 0
     : generalEditing || iconEditing || translationsEditing
+
+  // Every active facility scope is already picked/assigned — the picker would have nothing left to
+  // offer, so the "Assign Facility Scope" tile is disabled rather than opening onto an empty list.
+  // Create mode compares against the locally-picked `form.scopes`; view/edit compares against the
+  // group's actually-assigned `form.facility_scopes`.
+  const allScopesAssigned = totalScopeCount !== null
+    && (mode === "create" ? form.scopes.length : form.facility_scopes.length) >= totalScopeCount
 
   function requestClose() {
     if (isDirty) setConfirmClose(true)
@@ -258,79 +271,64 @@ export function FacilityGroupDialog({
     Promise.all([fetchLocales(), fetchLocaleCodes()]).catch((err) => toast.error((err as Error).message))
   }, [open, mode, activeTab, localesLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Full scope catalog is small enough to fetch in one page; which of those are assigned comes from
-  // `form.facility_scopes`, already fetched by the card click that opened this dialog (GET
-  // /facility-groups/{id} embeds it) — no need to re-hit that endpoint here. Same lazy-once-per-tab-
-  // selection pattern as locales above.
-  async function loadScopes(): Promise<void> {
-    setScopesLoading(true)
-    try {
-      const res = await facilityScopesService.list({ page: 0, size: 20, sort_by: "sortOrder" })
-      setScopeCatalog(res.data)
-      setAssignedScopeIds(new Set(form.facility_scopes.map((s) => s.id)))
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : t("facilityGroup.scopeLoadFailed"))
-    } finally {
-      setScopesLoading(false)
-    }
+  // Platform-wide active-scope total, from `GET /facility-scopes/count` — compared against the picked
+  // or assigned scope count to know whether the "Assign Facility Scope" tile should be disabled
+  // because every scope is already picked/assigned. Needed in create mode too (not just view/edit),
+  // since the tile there compares against `form.scopes` rather than a fetched `form.facility_scopes`.
+  async function fetchScopeCount(): Promise<void> {
+    const res = await facilityScopesService.count()
+    setTotalScopeCount(res.count)
   }
 
+  // Same lazy-once-per-tab-selection pattern as the locales tab above.
   useEffect(() => {
-    if (!open || mode === "create" || activeTab !== "scopes" || scopesLoaded) return
+    if (!open || activeTab !== "scopes" || scopesLoaded) return
     setScopesLoaded(true)
-    loadScopes()
+    fetchScopeCount().catch((err) => toast.error((err as Error).message))
   }, [open, mode, activeTab, scopesLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Manual refresh only (see handleRefresh) — re-fetches both the scope catalog and the facility
-  // group itself, since `form.facility_scopes` (what loadScopes above compares against) is only ever
-  // as fresh as the card click that opened this dialog. Assign/unassign already keep assignedScopeIds
-  // in sync locally, but this is the explicit "pull the truth from the server" action, so it re-hits
-  // both endpoints rather than trusting either cached value.
-  async function refreshScopes(): Promise<void> {
-    if (facilityGroupId == null) return
-    setScopesLoading(true)
-    try {
-      const [scopesRes, groupRes] = await Promise.all([
-        facilityScopesService.list({ page: 0, size: 20, sort_by: "sortOrder" }),
-        getFacilityGroup(facilityGroupId),
-      ])
-      setScopeCatalog(scopesRes.data)
-      setAssignedScopeIds(new Set(groupRes.data.facility_scopes.map((s) => s.id)))
-      onFormChange({ ...form, facility_scopes: groupRes.data.facility_scopes })
-    } finally {
-      setScopesLoading(false)
-    }
+  function setScopeBusy(scopeId: number, busy: boolean) {
+    setBusyScopeIds((prev) => {
+      const next = new Set(prev)
+      if (busy) next.add(scopeId)
+      else next.delete(scopeId)
+      return next
+    })
   }
 
+  // Edit/view mode only — `POST /facility-groups/{id}/scope-assignments`. Assignment is immediate (no
+  // Save step for this tab), so the card updates optimistically only after the call succeeds.
   async function handleAssignScope(scope: FacilityScope): Promise<void> {
     if (facilityGroupId == null) return
+    if (form.facility_scopes.some((s) => s.id === scope.id)) return
+    setScopeBusy(scope.id, true)
     try {
-      await facilityScopesService.assignGroup(scope.id, facilityGroupId)
-      setAssignedScopeIds((prev) => new Set(prev).add(scope.id))
+      await assignFacilityGroupScope(facilityGroupId, scope.id)
+      onFormChange({ ...form, facility_scopes: [...form.facility_scopes, scope] })
       toast.success(t("facilityGroup.scopeAssigned"))
-      await onSaved?.()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("facilityGroup.scopeAssignFailed"))
+    } finally {
+      setScopeBusy(scope.id, false)
     }
   }
 
-  // Unassigning needs the assignment row's own id, which the scope catalog doesn't carry — resolved
-  // on demand here, only for the scope actually being unassigned.
-  async function handleUnassignScope(scope: FacilityScope): Promise<void> {
+  // Edit/view mode only — `DELETE /facility-groups/{id}/scope-assignments/{facility-scope-id}`,
+  // identified by the scope's own id (a facility group can only ever have one active assignment to a
+  // given scope).
+  async function confirmUnassignScope(): Promise<void> {
+    if (!pendingUnassignScope || facilityGroupId == null) return
+    const scope = pendingUnassignScope
+    setPendingUnassignScope(null)
+    setScopeBusy(scope.id, true)
     try {
-      const res = await facilityScopesService.listGroupAssignments(scope.id, { size: 20 })
-      const match = res.data.find((a) => a.facility_group.id === facilityGroupId)
-      if (!match) { toast.error(t("facilityGroup.scopeAssignmentNotFound")); return }
-      await facilityScopesService.unassignGroup(scope.id, match.id)
-      setAssignedScopeIds((prev) => {
-        const next = new Set(prev)
-        next.delete(scope.id)
-        return next
-      })
+      await unassignFacilityGroupScope(facilityGroupId, scope.id)
+      onFormChange({ ...form, facility_scopes: form.facility_scopes.filter((s) => s.id !== scope.id) })
       toast.success(t("facilityGroup.scopeUnassigned"))
-      await onSaved?.()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("facilityGroup.scopeUnassignFailed"))
+    } finally {
+      setScopeBusy(scope.id, false)
     }
   }
 
@@ -348,7 +346,9 @@ export function FacilityGroupDialog({
         await Promise.all([fetchLocales(localeSearch.trim()), fetchLocaleCodes()])
       }
       if (activeTab === "scopes") {
-        await refreshScopes()
+        const [groupRes] = await Promise.all([getFacilityGroup(facilityGroupId), fetchScopeCount()])
+        onFormChange({ ...form, facility_scopes: groupRes.data.facility_scopes ?? [] })
+        setScopesLoaded(true)
       }
       toast.success(t("common.refreshed"))
     } catch (err) {
@@ -550,41 +550,138 @@ export function FacilityGroupDialog({
 
                   {mode === "create" ? (
                     <>
-                      {form.scopes.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5">
-                          {form.scopes.map((s) => (
-                            <Badge key={s.id} variant="secondary" className="gap-1.5 pr-1 font-mono text-xs">
-                              {s.code}
-                              {s.locale?.name && <span className="font-sans font-normal opacity-70">({s.locale.name})</span>}
-                              <button
-                                type="button"
-                                onClick={() => removeScope(s.id)}
-                                className="rounded-full hover:bg-background/60 p-0.5"
-                              >
-                                <X className="h-3 w-3" />
-                              </button>
-                            </Badge>
-                          ))}
-                        </div>
+                      {form.scopes.length === 0 && (
+                        <p className="text-sm text-muted-foreground">{t("facilityGroup.scopeEmpty")}</p>
                       )}
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => setScopePickerOpen(true)}
-                      >
-                        <Plus className="h-3.5 w-3.5" /> {t("facilityGroup.addScope")}
-                      </Button>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {form.scopes.map((s) => (
+                          <Card key={s.id}>
+                            <CardContent className="flex items-center gap-3 py-3">
+                              <div className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0 bg-primary/20 text-primary">
+                                <Layers className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-semibold text-sm truncate">{s.locale?.name ?? s.code}</p>
+                                <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 h-4 mt-1">
+                                  {s.code}
+                                </Badge>
+                              </div>
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 shrink-0"
+                                onClick={() => removeScope(s.id)}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </CardContent>
+                          </Card>
+                        ))}
+                        <Card
+                          role="button"
+                          aria-disabled={allScopesAssigned}
+                          tabIndex={allScopesAssigned ? -1 : 0}
+                          onClick={() => { if (!allScopesAssigned) setScopePickerOpen(true) }}
+                          onKeyDown={(e) => {
+                            if (allScopesAssigned) return
+                            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setScopePickerOpen(true) }
+                          }}
+                          className={
+                            allScopesAssigned
+                              ? "cursor-not-allowed border-2 border-dashed border-muted-foreground/20 bg-muted/20 shadow-none ring-0 opacity-60"
+                              : "group/assign cursor-pointer border-2 border-dashed border-primary/25 bg-primary/3 shadow-none ring-0 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary hover:bg-primary/5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          }
+                        >
+                          <CardContent className="flex items-center gap-3 py-3">
+                            <div
+                              className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 ${
+                                allScopesAssigned ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary group-hover/assign:scale-110 group-hover/assign:rotate-90"
+                              }`}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className={`font-semibold text-sm truncate ${allScopesAssigned ? "text-muted-foreground" : "text-primary"}`}>
+                                {t("facilityGroup.assignScope")}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {allScopesAssigned ? t("facilityGroup.assignScopeAllAssigned") : t("facilityGroup.assignScopeHint")}
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
                     </>
                   ) : (
-                    <FacilityGroupScopeAssignments
-                      scopes={scopeCatalog}
-                      assignedIds={assignedScopeIds}
-                      loading={scopesLoading}
-                      onAssign={handleAssignScope}
-                      onUnassign={handleUnassignScope}
-                    />
+                    <>
+                      {form.facility_scopes.length === 0 && (
+                        <p className="text-sm text-muted-foreground">{t("facilityGroup.scopeEmpty")}</p>
+                      )}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {form.facility_scopes.map((s) => {
+                          const busy = busyScopeIds.has(s.id)
+                          return (
+                            <Card key={s.id}>
+                              <CardContent className="flex items-center gap-3 py-3">
+                                <div className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0 bg-primary/20 text-primary">
+                                  <Layers className="h-4 w-4" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="font-semibold text-sm truncate">{s.locale?.name ?? s.code}</p>
+                                  <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 h-4 mt-1">
+                                    {s.code}
+                                  </Badge>
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 shrink-0"
+                                  disabled={busy}
+                                  onClick={() => setPendingUnassignScope(s)}
+                                >
+                                  {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          )
+                        })}
+                        <Card
+                          role="button"
+                          aria-disabled={allScopesAssigned}
+                          tabIndex={allScopesAssigned ? -1 : 0}
+                          onClick={() => { if (!allScopesAssigned) setScopePickerOpen(true) }}
+                          onKeyDown={(e) => {
+                            if (allScopesAssigned) return
+                            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setScopePickerOpen(true) }
+                          }}
+                          className={
+                            allScopesAssigned
+                              ? "cursor-not-allowed border-2 border-dashed border-muted-foreground/20 bg-muted/20 shadow-none ring-0 opacity-60"
+                              : "group/assign cursor-pointer border-2 border-dashed border-primary/25 bg-primary/3 shadow-none ring-0 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary hover:bg-primary/5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          }
+                        >
+                          <CardContent className="flex items-center gap-3 py-3">
+                            <div
+                              className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 ${
+                                allScopesAssigned ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary group-hover/assign:scale-110 group-hover/assign:rotate-90"
+                              }`}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className={`font-semibold text-sm truncate ${allScopesAssigned ? "text-muted-foreground" : "text-primary"}`}>
+                                {t("facilityGroup.assignScope")}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {allScopesAssigned ? t("facilityGroup.assignScopeAllAssigned") : t("facilityGroup.assignScopeHint")}
+                              </p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </>
                   )}
                 </div>
               </TabsContent>
@@ -634,8 +731,8 @@ export function FacilityGroupDialog({
       <FacilityScopePickerDialog
         open={scopePickerOpen}
         onOpenChange={setScopePickerOpen}
-        excludeIds={form.scopes.map((s) => s.id)}
-        onSelect={addScope}
+        excludeIds={(mode === "create" ? form.scopes : form.facility_scopes).map((s) => s.id)}
+        onSelect={mode === "create" ? addScope : handleAssignScope}
       />
 
       <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
@@ -647,6 +744,21 @@ export function FacilityGroupDialog({
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => onOpenChange(false)}>{t("dialog.discardChanges.confirm")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!pendingUnassignScope} onOpenChange={(v) => { if (!v) setPendingUnassignScope(null) }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("facilityGroup.scopeUnassignTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("facilityGroup.scopeUnassignDesc", { code: pendingUnassignScope?.code })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmUnassignScope}>{t("common.delete")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

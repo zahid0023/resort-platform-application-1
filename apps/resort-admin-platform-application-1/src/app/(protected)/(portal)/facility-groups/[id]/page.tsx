@@ -26,11 +26,12 @@ import { toIconValue } from "@/components/facilities/types";
 import { getFacilityGroup, type FacilityGroup } from "@/services/facility-groups";
 import {
   listFacilities,
+  getFacility,
   deleteFacility,
   type FacilitySummary,
   type ListParams,
 } from "@/services/facilities";
-import { localesService, type Locale } from "@/services/locales";
+import { useLocales } from "@/providers/locales-provider";
 
 const PAGE_SIZE = 20;
 const ALL_FIELD = "all";
@@ -67,7 +68,8 @@ export default function FacilityGroupDetailPage() {
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC");
 
   // Dialog
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
+  // Shared, session-scoped catalog — loaded once by LocalesProvider, not re-fetched per page.
+  const { locales: availableLocales } = useLocales();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<FacilityDialogMode>("create");
   const [activeId, setActiveId] = useState<number | undefined>(undefined);
@@ -130,13 +132,6 @@ export default function FacilityGroupDetailPage() {
     refreshFacilities();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Locales for dialog
-  useEffect(() => {
-    localesService.list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableLocales(res.data))
-      .catch(() => {});
-  }, []);
-
   // Debounced search — resets to page 0. Guarded by comparing against the last-applied key rather
   // than a one-shot "have I run" flag: a ref flip like `isFirstRender.current = false` doesn't
   // survive React Strict Mode's dev-only effect replay (mount → cleanup → mount again on the same
@@ -175,24 +170,31 @@ export default function FacilityGroupDetailPage() {
   function openCreate() {
     setMode("create");
     setActiveId(undefined);
-    // Group is pre-filled by FacilityGeneralInfo itself from the `fixedFacilityGroup` prop below.
+    // Group is pre-filled by FacilityDialog itself from the `fixedFacilityGroup` prop below.
     setForm({ ...emptyFacilityForm });
     setDialogOpen(true);
   }
 
-  function openDialog(f: FacilitySummary) {
-    setMode("view");
-    setActiveId(f.id);
-    setForm({
-      facility_group: f.facility_group,
-      code: f.code,
-      sort_order: f.sort_order,
-      icon: toIconValue(f),
-      locale: emptyFacilityForm.locale,
-      // Lazily populated by FacilityDialog the first time the Translations tab is selected.
-      locales: [],
-    });
-    setDialogOpen(true);
+  async function openDialog(f: FacilitySummary) {
+    try {
+      const res = await getFacility(f.id);
+      const full = res.data;
+      setMode("view");
+      setActiveId(full.id);
+      setForm({
+        facility_groups: full.facility_groups,
+        facility_scopes: full.facility_scopes,
+        code: full.code,
+        sort_order: full.sort_order,
+        icon: toIconValue(full),
+        locale: emptyFacilityForm.locale,
+        // Lazily populated by FacilityDialog the first time the Translations tab is selected.
+        locales: [],
+      });
+      setDialogOpen(true);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
   }
 
   function handleSortByChange(value: string) {

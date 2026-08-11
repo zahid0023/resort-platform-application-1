@@ -15,11 +15,12 @@ const PAGE_SIZE = 20;
 export interface FacilityGroupPickerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedId?: number;
+  /** Already-picked group ids — excluded from the pickable list so the same group can't be added twice. */
+  excludeIds?: number[];
   onSelect: (group: FacilityGroupSummary) => void;
 }
 
-export function FacilityGroupPickerDialog({ open, onOpenChange, selectedId, onSelect }: FacilityGroupPickerDialogProps) {
+export function FacilityGroupPickerDialog({ open, onOpenChange, excludeIds, onSelect }: FacilityGroupPickerDialogProps) {
   const { t } = useTranslation();
   const [groups, setGroups] = useState<FacilityGroupSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -78,6 +79,9 @@ export function FacilityGroupPickerDialog({ open, onOpenChange, selectedId, onSe
     onOpenChange(false);
   }
 
+  const excluded = new Set(excludeIds ?? []);
+  const selectable = groups.filter((g) => !excluded.has(g.id));
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden flex flex-col max-h-[85vh]">
@@ -114,14 +118,13 @@ export function FacilityGroupPickerDialog({ open, onOpenChange, selectedId, onSe
             <div className="flex items-center justify-center py-16">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-          ) : groups.length === 0 ? (
+          ) : selectable.length === 0 ? (
             <div className="text-center py-16 text-sm text-muted-foreground border rounded-xl border-dashed">
               {t("facilityGroupPicker.empty")}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {groups.map((g) => {
-                const isSelected = g.id === selectedId;
+              {selectable.map((g) => {
                 const icon = toIconValue(g);
                 const accentColor = icon.meta?.color || undefined;
                 const name = g.locale?.name ?? g.code;
@@ -130,11 +133,7 @@ export function FacilityGroupPickerDialog({ open, onOpenChange, selectedId, onSe
                     key={g.id}
                     type="button"
                     onClick={() => handleSelect(g)}
-                    className={`text-left rounded-xl border p-4 transition-all hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      isSelected
-                        ? "border-primary bg-primary/5 ring-1 ring-primary/30"
-                        : "bg-card hover:border-primary/40"
-                    }`}
+                    className="text-left rounded-xl border p-4 transition-all hover:shadow-md hover:-translate-y-0.5 bg-card hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <div className="flex items-start gap-3">
                       <div

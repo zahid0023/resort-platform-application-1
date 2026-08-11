@@ -164,3 +164,11 @@ export const updateFacilityGroupLocale = (groupId: number, localeId: number, bod
 
 export const removeFacilityGroupLocale = (groupId: number, localeId: number): Promise<MutationResponse> =>
   api.delete<MutationResponse>(`/facility-groups/${groupId}/locales/${localeId}`);
+
+export const assignFacilityGroupScope = (groupId: number, facilityScopeId: number): Promise<MutationResponse> =>
+  api.post<MutationResponse>(`/facility-groups/${groupId}/scope-assignments`, { facility_scope_id: facilityScopeId });
+
+// Identified by the facility scope's own id, not an assignment row id — a facility group can have at
+// most one active assignment to a given scope, so (facility-group-id, facility-scope-id) is always enough.
+export const unassignFacilityGroupScope = (groupId: number, facilityScopeId: number): Promise<MutationResponse> =>
+  api.delete<MutationResponse>(`/facility-groups/${groupId}/scope-assignments/${facilityScopeId}`);

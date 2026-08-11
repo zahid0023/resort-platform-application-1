@@ -93,9 +93,28 @@ export function FacilityCard({ facility, defaultName, groupName, onView, onDelet
         </div>
       </div>
 
-      <div className="mt-4 pt-3 border-t flex items-center justify-between">
-        <Badge variant="secondary">#{facility.sort_order}</Badge>
-      </div>
+      {(facility.facility_scopes.length > 0 || facility.facility_groups.length > 0) && (
+        <div className="mt-4 pt-3 border-t">
+          {facility.facility_scopes.length > 0 && (
+            <div className={`flex flex-wrap gap-1.5 ${facility.facility_groups.length > 0 ? "pb-2.5 mb-2.5 border-b" : ""}`}>
+              {facility.facility_scopes.map((s) => (
+                <Badge key={s.id} variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                  {s.locale?.name ?? s.code}
+                </Badge>
+              ))}
+            </div>
+          )}
+          {facility.facility_groups.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {facility.facility_groups.map((g) => (
+                <Badge key={g.id} variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                  {g.locale?.name ?? g.code}
+                </Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </Card>
   )
 }
