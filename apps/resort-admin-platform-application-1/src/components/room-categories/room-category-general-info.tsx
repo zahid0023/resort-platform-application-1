@@ -9,6 +9,8 @@ import { roomCategoriesService } from "@/services/room-categories";
 import { toast } from "sonner";
 import type { RoomCategoryDialogMode, RoomCategoryFormState } from "./types";
 
+const CODE_MAX_LENGTH = 50;
+
 export interface RoomCategoryGeneralInfoProps {
   mode: RoomCategoryDialogMode;
   form: RoomCategoryFormState;
@@ -98,11 +100,12 @@ export function RoomCategoryGeneralInfo({
             <Input
               id="rc-code"
               value={form.code}
-              onChange={(e) => onFormChange({ code: e.target.value })}
-              placeholder="DELUXE"
-              required
-              disabled={mode !== "create"}
-              className="font-mono"
+              onChange={(e) => {
+                const value = e.target.value.toUpperCase();
+                if (value.length > CODE_MAX_LENGTH) { toast.error(t("toast.roomCategoryCodeMaxLength")); return; }
+                onFormChange({ code: value });
+              }}
+              placeholder="DLX" required disabled={mode !== "create"} className="font-mono"
             />
           </div>
           <div className="space-y-2">
@@ -116,8 +119,7 @@ export function RoomCategoryGeneralInfo({
                   ? onFormChange({ sort_order: Number(e.target.value) })
                   : setLocal((p) => ({ ...p, sort_order: Number(e.target.value) }))
               }
-              required={mode === "create"}
-              disabled={isReadOnly}
+              required={mode === "create"} disabled={isReadOnly}
             />
           </div>
         </CardContent>

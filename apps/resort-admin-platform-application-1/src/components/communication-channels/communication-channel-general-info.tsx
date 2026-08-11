@@ -10,7 +10,9 @@ import { communicationChannelsService } from "@/services/communication-channels"
 import { toast } from "sonner";
 import type { CommunicationChannelDialogMode, CommunicationChannelFormState } from "./types";
 
-interface LocalState {
+const CODE_MAX_LENGTH = 50;
+
+interface LocalFlags {
   sort_order: number;
   is_url: boolean;
   is_phone: boolean;
@@ -40,7 +42,7 @@ export function CommunicationChannelGeneralInfo({
   open,
 }: CommunicationChannelGeneralInfoProps) {
   const { t } = useTranslation();
-  const [local, setLocal] = useState<LocalState>({
+  const [local, setLocal] = useState<LocalFlags>({
     sort_order: 0,
     is_url: false,
     is_phone: false,
@@ -66,6 +68,10 @@ export function CommunicationChannelGeneralInfo({
 
   async function save() {
     if (channelId == null) return;
+    if (!local.is_phone && !local.is_email && !local.is_url) {
+      toast.error(t("toast.commChannelTypeRequired"));
+      return;
+    }
     setSubmitting(true);
     try {
       await communicationChannelsService.update(channelId, {
@@ -130,11 +136,12 @@ export function CommunicationChannelGeneralInfo({
             <Input
               id="cc-code"
               value={form.code}
-              onChange={(e) => onFormChange({ code: e.target.value })}
-              placeholder="PHONE"
-              required
-              disabled={mode !== "create"}
-              className="font-mono"
+              onChange={(e) => {
+                const value = e.target.value.toUpperCase();
+                if (value.length > CODE_MAX_LENGTH) { toast.error(t("toast.commChannelCodeMaxLength")); return; }
+                onFormChange({ code: value });
+              }}
+              placeholder="PHONE" required disabled={mode !== "create"} className="font-mono"
             />
           </div>
           <div className="space-y-2">
@@ -148,15 +155,14 @@ export function CommunicationChannelGeneralInfo({
                   ? onFormChange({ sort_order: Number(e.target.value) })
                   : setLocal((p) => ({ ...p, sort_order: Number(e.target.value) }))
               }
-              required={mode === "create"}
-              disabled={isReadOnly}
+              required={mode === "create"} disabled={isReadOnly}
             />
           </div>
           <div className="space-y-3 pt-1">
             <Label className="text-xs font-medium">{t("commChannelField.valueType")}</Label>
             <div className="grid grid-cols-3 gap-2">
               {(["is_phone", "is_email", "is_url"] as const).map((flag) => {
-                const active = mode === "create" ? form[flag] : flags[flag];
+                const active = flags[flag];
                 return (
                   <button
                     key={flag}
@@ -177,7 +183,7 @@ export function CommunicationChannelGeneralInfo({
             <div className="flex items-center justify-between">
               <Label className="text-xs font-medium">{t("commChannelField.is_clickable")}</Label>
               <Switch
-                checked={mode === "create" ? form.is_clickable : flags.is_clickable}
+                checked={flags.is_clickable}
                 onCheckedChange={(v) => {
                   if (mode === "create") onFormChange({ is_clickable: v });
                   else setLocal((p) => ({ ...p, is_clickable: v }));

@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  BedDoubleIcon,
   BlocksIcon,
+  CalendarDaysIcon,
   CloudIcon,
   CoinsIcon,
   CreditCardIcon,
@@ -17,6 +19,7 @@ import {
   PhoneCallIcon,
   RadioIcon,
   SettingsIcon,
+  TargetIcon,
   ZapIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -68,12 +71,20 @@ const builderNavItems = [
   },
 ];
 
-const resortNavItems = [
-  { title: "Room Categories", url: "/room-categories", icon: SettingsIcon },
+const priceNavItems = [
+  { title: "Price Scopes", url: "/price-scopes", icon: TargetIcon },
   { title: "Price Types", url: "/price-types", icon: CreditCardIcon },
   { title: "Price Units", url: "/price-units", icon: CreditCardIcon },
+];
+
+const resortNavItems = [
   { title: "Resort Access Types", url: "/resort-access-types", icon: SettingsIcon },
   { title: "Resort Permission Types", url: "/resort-permission-types", icon: SettingsIcon },
+];
+
+const roomNavItems = [
+  { title: "Room Categories", url: "/room-categories", icon: SettingsIcon },
+  { title: "Bed Types", url: "/bed-types", icon: BedDoubleIcon },
 ];
 
 const contactNavItems = [
@@ -102,6 +113,7 @@ const facilityNavItems = [
 
 const commonNavItems = [
   { title: "Locales", url: "/locales", icon: LanguagesIcon },
+  { title: "Days of Week", url: "/days-of-week", icon: CalendarDaysIcon },
 ];
 
 export function PortalSidebar() {
@@ -160,9 +172,43 @@ export function PortalSidebar() {
 
         <SidebarGroup>
           <SidebarGroupContent>
+            <SidebarGroupLabel>Price</SidebarGroupLabel>
+            <SidebarMenu className="gap-2">
+              {priceNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButtonActive
+                    icon={<item.icon />}
+                    title={item.title}
+                    url={item.url}
+                  />
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
             <SidebarGroupLabel>Resort</SidebarGroupLabel>
             <SidebarMenu className="gap-2">
               {resortNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButtonActive
+                    icon={<item.icon />}
+                    title={item.title}
+                    url={item.url}
+                  />
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarGroupLabel>Room</SidebarGroupLabel>
+            <SidebarMenu className="gap-2">
+              {roomNavItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButtonActive
                     icon={<item.icon />}

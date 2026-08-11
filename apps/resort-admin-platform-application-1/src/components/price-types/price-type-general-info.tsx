@@ -9,6 +9,8 @@ import { priceTypesService } from "@/services/price-types";
 import { toast } from "sonner";
 import type { PriceTypeDialogMode, PriceTypeFormState } from "./types";
 
+const CODE_MAX_LENGTH = 50;
+
 export interface PriceTypeGeneralInfoProps {
   mode: PriceTypeDialogMode;
   form: PriceTypeFormState;
@@ -50,7 +52,7 @@ export function PriceTypeGeneralInfo({
       await priceTypesService.update(priceTypeId, {
         sort_order: Number(local.sort_order) || 0,
       });
-      toast.success(t("priceType.updated"));
+      toast.success(t("priceType.updatedToast"));
       onEditingChange(false);
       onFormChange({ sort_order: Number(local.sort_order) || 0 });
       await onSaved?.();
@@ -98,11 +100,12 @@ export function PriceTypeGeneralInfo({
             <Input
               id="pt-code"
               value={form.code}
-              onChange={(e) => onFormChange({ code: e.target.value })}
-              placeholder="WEEKEND"
-              required
-              disabled={mode !== "create"}
-              className="font-mono"
+              onChange={(e) => {
+                const value = e.target.value.toUpperCase();
+                if (value.length > CODE_MAX_LENGTH) { toast.error(t("toast.priceTypeCodeMaxLength")); return; }
+                onFormChange({ code: value });
+              }}
+              placeholder="WKE" required disabled={mode !== "create"} className="font-mono"
             />
           </div>
           <div className="space-y-2">
@@ -116,8 +119,7 @@ export function PriceTypeGeneralInfo({
                   ? onFormChange({ sort_order: Number(e.target.value) })
                   : setLocal((p) => ({ ...p, sort_order: Number(e.target.value) }))
               }
-              required={mode === "create"}
-              disabled={isReadOnly}
+              required={mode === "create"} disabled={isReadOnly}
             />
           </div>
         </CardContent>

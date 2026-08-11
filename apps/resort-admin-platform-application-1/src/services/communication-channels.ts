@@ -1,8 +1,9 @@
 import { api } from "./api";
+import type { Locale, LocaleCount } from "./locales";
 
 export interface CommunicationChannelLocale {
   id: number;
-  locale_id: number;
+  locale: Locale;
   name: string;
   description?: string;
   sort_order: number;
@@ -16,7 +17,8 @@ export interface CommunicationChannel {
   is_phone: boolean;
   is_email: boolean;
   is_clickable: boolean;
-  locales: CommunicationChannelLocale[];
+  /** The single translation matching Accept-Language (falls back to en, then null) — on GET /{id} and list alike. */
+  locale: CommunicationChannelLocale | null;
 }
 
 export interface CommunicationChannelListResponse {
@@ -27,6 +29,20 @@ export interface CommunicationChannelListResponse {
   page_size: number;
   has_next: boolean;
   has_previous: boolean;
+  searchable_fields?: string[];
+  sortable_fields?: string[];
+}
+
+export interface CommunicationChannelLocaleListResponse {
+  data: CommunicationChannelLocale[];
+  current_page: number;
+  total_pages: number;
+  total_elements: number;
+  page_size: number;
+  has_next: boolean;
+  has_previous: boolean;
+  searchable_fields?: string[];
+  sortable_fields?: string[];
 }
 
 export interface CreateCommunicationChannelLocaleRequest {
@@ -36,6 +52,8 @@ export interface CreateCommunicationChannelLocaleRequest {
   sort_order: number;
 }
 
+// The initial translation is always resolved to the "en" locale server-side —
+// there's no locale_id here, and only a single locale entry is accepted at creation.
 export interface CreateCommunicationChannelRequest {
   code: string;
   sort_order: number;
@@ -43,7 +61,11 @@ export interface CreateCommunicationChannelRequest {
   is_phone: boolean;
   is_email: boolean;
   is_clickable: boolean;
-  locales?: CreateCommunicationChannelLocaleRequest[];
+  locale: {
+    name: string;
+    description: string;
+    sort_order: number;
+  };
 }
 
 export interface UpdateCommunicationChannelRequest {
@@ -68,21 +90,49 @@ export interface MutationResponse {
 export interface ListParams {
   page?: number;
   size?: number;
-  sort_by?: string;
+  // sortBy=id throws 400 — it's only valid as the implicit default when sortBy is omitted entirely.
+  sort_by?: "createdAt" | "code" | "name";
   sort_dir?: "ASC" | "DESC";
   code?: string;
+  name?: string;
+}
+
+export interface ListLocalesParams {
+  page?: number;
+  size?: number;
+  localeCode?: string;
 }
 
 export const communicationChannelsService = {
   async list(params: ListParams = {}): Promise<CommunicationChannelListResponse> {
-    const { page = 0, size = 10, sort_by = "id", sort_dir = "ASC", code } = params;
-    const query = new URLSearchParams({ page: String(page), size: String(size), sort_by, sort_dir });
+    const { page = 0, size = 10, sort_by, sort_dir = "ASC", code, name } = params;
+    const query = new URLSearchParams({
+      page: String(page),
+      size: String(size),
+      sortDir: sort_dir,
+    });
+    if (sort_by) query.set("sortBy", sort_by);
     if (code) query.set("code", code);
+    if (name) query.set("name", name);
     return api.get<CommunicationChannelListResponse>(`/communication-channels?${query}`);
   },
 
   async get(id: number): Promise<{ data: CommunicationChannel }> {
     return api.get<{ data: CommunicationChannel }>(`/communication-channels/${id}`);
+  },
+
+  async listLocales(channelId: number, params: ListLocalesParams = {}): Promise<CommunicationChannelLocaleListResponse> {
+    const { page = 0, size = 10, localeCode } = params;
+    const query = new URLSearchParams({ page: String(page), size: String(size) });
+    if (localeCode) query.set("localeCode", localeCode);
+    return api.get<CommunicationChannelLocaleListResponse>(`/communication-channels/${channelId}/locales?${query}`);
+  },
+
+  // `codes` here is the authoritative, complete set of locale codes this channel already has a
+  // translation for — unlike listLocales, which is paginated (size 10) and can miss codes past the
+  // first page. Compare against `localesService.count()`'s codes to know what's still addable.
+  async countLocales(channelId: number): Promise<LocaleCount> {
+    return api.get<LocaleCount>(`/communication-channels/${channelId}/locales/count`);
   },
 
   async create(body: CreateCommunicationChannelRequest): Promise<MutationResponse> {

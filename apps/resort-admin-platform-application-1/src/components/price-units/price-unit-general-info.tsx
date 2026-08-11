@@ -9,6 +9,8 @@ import { priceUnitsService } from "@/services/price-units";
 import { toast } from "sonner";
 import type { PriceUnitDialogMode, PriceUnitFormState } from "./types";
 
+const CODE_MAX_LENGTH = 50;
+
 export interface PriceUnitGeneralInfoProps {
   mode: PriceUnitDialogMode;
   form: PriceUnitFormState;
@@ -50,7 +52,7 @@ export function PriceUnitGeneralInfo({
       await priceUnitsService.update(priceUnitId, {
         sort_order: Number(local.sort_order) || 0,
       });
-      toast.success(t("priceUnit.updated"));
+      toast.success(t("priceUnit.updatedToast"));
       onEditingChange(false);
       onFormChange({ sort_order: Number(local.sort_order) || 0 });
       await onSaved?.();
@@ -98,11 +100,12 @@ export function PriceUnitGeneralInfo({
             <Input
               id="pu-code"
               value={form.code}
-              onChange={(e) => onFormChange({ code: e.target.value })}
-              placeholder="PER_NIGHT"
-              required
-              disabled={mode !== "create"}
-              className="font-mono"
+              onChange={(e) => {
+                const value = e.target.value.toUpperCase();
+                if (value.length > CODE_MAX_LENGTH) { toast.error(t("toast.priceUnitCodeMaxLength")); return; }
+                onFormChange({ code: value });
+              }}
+              placeholder="PER_NIGHT" required disabled={mode !== "create"} className="font-mono"
             />
           </div>
           <div className="space-y-2">
@@ -116,8 +119,7 @@ export function PriceUnitGeneralInfo({
                   ? onFormChange({ sort_order: Number(e.target.value) })
                   : setLocal((p) => ({ ...p, sort_order: Number(e.target.value) }))
               }
-              required={mode === "create"}
-              disabled={isReadOnly}
+              required={mode === "create"} disabled={isReadOnly}
             />
           </div>
         </CardContent>

@@ -85,6 +85,7 @@
     "localeDescriptionRequired": "Locale row {{n}}: description is required.",
     "localeNameEnglishOnly": "Name must be in English — the initial translation is always the English one.",
     "localeDescriptionEnglishOnly": "Description must be in English — the initial translation is always the English one.",
+    "localeShortNameRequired": "Locale row {{n}}: short name is required.",
     "facilityGroupRequired": "Please select a facility group.",
     "commChannelTypeRequired": "Please select a value type (Phone, Email, or URL).",
     "iso3Invalid": "ISO3 code must be exactly 3 uppercase letters (e.g. BGD).",
@@ -99,6 +100,22 @@
     "nameMaxLength": "Name can only be 100 characters.",
     "providerCodeMaxLength": "Code can only be 50 characters.",
     "facilityScopeCodeMaxLength": "Code can only be 50 characters.",
+    "contactTypeCodeMaxLength": "Code can only be 50 characters.",
+    "bedTypeCodeMaxLength": "Code can only be 50 characters.",
+    "commChannelCodeMaxLength": "Code can only be 50 characters.",
+    "roomCategoryCodeMaxLength": "Code can only be 50 characters.",
+    "priceTypeScopeCodeMaxLength": "Code can only be 50 characters.",
+    "priceTypeCodeMaxLength": "Code can only be 50 characters.",
+    "priceTypePurposeRequired": "Purpose is required.",
+    "priceTypePurposeEnglishOnly": "Purpose must be in English — the initial translation is always the English one.",
+    "priceTypeUsageExampleRequired": "Usage example is required.",
+    "priceTypeUsageExampleEnglishOnly": "Usage example must be in English — the initial translation is always the English one.",
+    "priceScopeCodeMaxLength": "Code can only be 50 characters.",
+    "priceUnitCodeMaxLength": "Code can only be 50 characters.",
+    "priceUnitPurposeRequired": "Purpose is required.",
+    "priceUnitPurposeEnglishOnly": "Purpose must be in English — the initial translation is always the English one.",
+    "priceUnitUsageExampleRequired": "Usage example is required.",
+    "priceUnitUsageExampleEnglishOnly": "Usage example must be in English — the initial translation is always the English one.",
     "configFieldKeyRequired": "Key is required.",
     "configFieldLabelRequired": "Label is required.",
     "configFieldTypeRequired": "Field type is required.",
@@ -138,6 +155,13 @@
     "searchPlaceholder": "Search by code…",
     "empty": "No facility scopes found.",
     "loadFailed": "Failed to load facility scopes."
+  },
+  "priceScopePicker": {
+    "title": "Select Price Scope",
+    "count": "{{n}} price scopes",
+    "searchPlaceholder": "Search by code…",
+    "empty": "No price scopes found.",
+    "loadFailed": "Failed to load price scopes."
   },
   "imageHostingProviderConfigPicker": {
     "title": "Select Storage Config",
@@ -206,10 +230,14 @@
       "resortAccessType": "No locale translations for this resort access type.",
       "resortPermissionType": "No locale translations for this resort permission type.",
       "contactType": "No locale translations for this contact type.",
+      "priceScope": "No locale translations for this price scope.",
       "commChannel": "No locale translations for this communication channel.",
       "facilityScope": "No locale translations for this facility scope.",
+      "priceTypeScope": "No locale translations for this price type scope.",
       "facilityGroup": "No locale translations for this facility group.",
-      "facility": "No locale translations for this facility."
+      "facility": "No locale translations for this facility.",
+      "dayOfWeek": "No locale translations for this day of week.",
+      "bedType": "No locale translations for this bed type."
     },
     "row": {
       "label": "Locale {{n}}",
@@ -237,6 +265,23 @@
     "resortPermissionTypeDescription": "Optional description...",
     "facilityScopeName": "Scope name in this language",
     "facilityScopeDescription": "Optional description...",
+    "contactTypeName": "Contact type name in this language",
+    "contactTypeDescription": "Optional description...",
+    "dayOfWeekName": "Day name in this language",
+    "dayOfWeekShortName": "Mon",
+    "dayOfWeekDescription": "Optional description...",
+    "bedTypeName": "Bed type name in this language",
+    "bedTypeDescription": "Optional description...",
+    "priceTypeName": "Price type name in this language",
+    "priceTypeDescription": "Optional description...",
+    "priceTypePurpose": "Business purpose of this price type...",
+    "priceTypeUsageExample": "Example scenario shown to administrators...",
+    "priceScopeName": "Scope name in this language",
+    "priceScopeDescription": "Optional description...",
+    "priceUnitName": "Price unit name in this language",
+    "priceUnitDescription": "Optional description...",
+    "priceUnitPurpose": "Business purpose of this price unit...",
+    "priceUnitUsageExample": "Example scenario shown to administrators...",
     "facilityGroupName": "Group name in this language",
     "facilityGroupDescription": "Optional description...",
     "facilityName": "Facility name in this language",
@@ -305,6 +350,64 @@
         "view": "Facility scope details and locale translations."
       }
     },
+    "contactType": {
+      "new": "New Contact Type",
+      "edit": "Edit Contact Type",
+      "view": "Contact Type Details",
+      "desc": {
+        "create": "Add a new contact type with locale translations.",
+        "edit": "Update contact type details and locale translations.",
+        "view": "Contact type details and locale translations."
+      }
+    },
+    "priceType": {
+      "new": "New Price Type",
+      "edit": "Edit Price Type",
+      "view": "Price Type Details",
+      "desc": {
+        "create": "Add a new price type with locale translations.",
+        "edit": "Update price type details and locale translations.",
+        "view": "Price type details and locale translations."
+      }
+    },
+    "priceScope": {
+      "new": "New Price Scope",
+      "edit": "Edit Price Scope",
+      "view": "Price Scope Details",
+      "desc": {
+        "create": "Add a new price scope with locale translations.",
+        "edit": "Update price scope details and locale translations.",
+        "view": "Price scope details and locale translations."
+      }
+    },
+    "priceUnit": {
+      "new": "New Price Unit",
+      "edit": "Edit Price Unit",
+      "view": "Price Unit Details",
+      "desc": {
+        "create": "Add a new price unit with locale translations.",
+        "edit": "Update price unit details and locale translations.",
+        "view": "Price unit details and locale translations."
+      }
+    },
+    "dayOfWeek": {
+      "view": "Day of Week Details",
+      "edit": "Edit Day of Week Translations",
+      "desc": {
+        "view": "Day details and locale translations.",
+        "edit": "Add, update, or remove locale translations."
+      }
+    },
+    "bedType": {
+      "new": "New Bed Type",
+      "edit": "Edit Bed Type",
+      "view": "Bed Type Details",
+      "desc": {
+        "create": "Add a new bed type with locale translations.",
+        "edit": "Update bed type details and locale translations.",
+        "view": "Bed type details and locale translations."
+      }
+    },
     "discardChanges": {
       "title": "Discard changes?",
       "desc": "You have unsaved changes. Are you sure you want to discard them?",
@@ -317,6 +420,14 @@
       "descImageHostingProvider": "You have an unsaved draft for a new image hosting provider. Would you like to restore it or start fresh?",
       "descCurrency": "You have an unsaved draft for a new currency. Would you like to restore it or start fresh?",
       "descFacilityScope": "You have an unsaved draft for a new facility scope. Would you like to restore it or start fresh?",
+      "descContactType": "You have an unsaved draft for a new contact type. Would you like to restore it or start fresh?",
+      "descPriceType": "You have an unsaved draft for a new price type. Would you like to restore it or start fresh?",
+      "descPriceScope": "You have an unsaved draft for a new price scope. Would you like to restore it or start fresh?",
+      "descPriceUnit": "You have an unsaved draft for a new price unit. Would you like to restore it or start fresh?",
+      "descCommChannel": "You have an unsaved draft for a new communication channel. Would you like to restore it or start fresh?",
+      "descRoomCategory": "You have an unsaved draft for a new room category. Would you like to restore it or start fresh?",
+      "descPriceTypeScope": "You have an unsaved draft for a new price type scope. Would you like to restore it or start fresh?",
+      "descBedType": "You have an unsaved draft for a new bed type. Would you like to restore it or start fresh?",
       "restore": "Restore draft",
       "discard": "Start fresh"
     },
@@ -429,6 +540,26 @@
     },
     "facilityScope": {
       "title": "Delete Facility Scope",
+      "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+    },
+    "contactType": {
+      "title": "Delete Contact Type",
+      "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+    },
+    "bedType": {
+      "title": "Delete Bed Type",
+      "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+    },
+    "priceType": {
+      "title": "Delete Price Type",
+      "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+    },
+    "priceScope": {
+      "title": "Delete Price Scope",
+      "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+    },
+    "priceUnit": {
+      "title": "Delete Price Unit",
       "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
     }
   },
@@ -587,51 +718,79 @@
     "title": "Price Types",
     "subtitle": "Manage pricing categories for room rate periods.",
     "new": "New Price Type",
-    "empty": "No price types found.",
     "loading": "Loading price types…",
-    "errLoad": "Failed to load price types.",
-    "errDelete": "Failed to delete price type.",
-    "deleted": "Price type deleted.",
-    "created": "Price type created successfully!",
-    "updated": "Price type updated successfully!",
-    "deleteTitle": "Delete Price Type",
-    "deleteDesc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+    "empty": "No price types found.",
+    "createdToast": "Price type created successfully!",
+    "updatedToast": "Price type updated successfully.",
+    "scopes": "Price Scopes",
+    "scopeEmpty": "No price scopes selected.",
+    "scopeRequired": "Please select at least one price scope.",
+    "addScope": "Add Scope",
+    "assignScope": "Assign Price Scope",
+    "assignScopeHint": "Pick from the scope catalog",
+    "assignScopeAllAssigned": "All price scopes are already assigned",
+    "scopeAssigned": "Scope assigned.",
+    "scopeUnassigned": "Scope unassigned.",
+    "scopeUnassignTitle": "Remove scope assignment?",
+    "scopeUnassignDesc": "Are you sure you want to unassign {{code}}? This action cannot be undone.",
+    "scopeAssignFailed": "Failed to assign scope.",
+    "scopeUnassignFailed": "Failed to unassign scope.",
+    "noScopeAssigned": "No Price Scope Assigned"
   },
-  "priceTypeDialog": {
-    "create": "New Price Type",
-    "edit": "Edit Price Type",
-    "view": "Price Type Details",
-    "descCreate": "Add a new price type with locale translations.",
-    "descEdit": "Update price type details and locale translations.",
-    "descView": "Price type details and locale translations.",
-    "namePlaceholder": "Price type name in this language",
-    "purposePlaceholder": "Business purpose of this price type...",
-    "usageExamplePlaceholder": "Example scenario shown to administrators..."
+  "priceScope": {
+    "title": "Price Scopes",
+    "subtitle": "Manage where pricing can apply (e.g. Room Category, Room, Resort Facility).",
+    "new": "New Price Scope",
+    "loading": "Loading price scopes…",
+    "empty": "No price scopes found.",
+    "createdToast": "Price scope created successfully!",
+    "updatedToast": "Price scope updated successfully."
   },
   "priceUnit": {
     "title": "Price Units",
-    "subtitle": "Manage units of measurement applied to price periods.",
+    "subtitle": "Manage the billing basis a price can be applied against (e.g. Per Night, Per Hour, Per Person).",
     "new": "New Price Unit",
-    "empty": "No price units found.",
     "loading": "Loading price units…",
-    "errLoad": "Failed to load price units.",
-    "errDelete": "Failed to delete price unit.",
-    "deleted": "Price unit deleted.",
-    "created": "Price unit created successfully!",
-    "updated": "Price unit updated successfully!",
-    "deleteTitle": "Delete Price Unit",
+    "empty": "No price units found.",
+    "createdToast": "Price unit created successfully!",
+    "updatedToast": "Price unit updated successfully.",
+    "scopes": "Price Scopes",
+    "scopeEmpty": "No price scopes selected.",
+    "scopeRequired": "Please select at least one price scope.",
+    "addScope": "Add Scope",
+    "assignScope": "Assign Price Scope",
+    "assignScopeHint": "Pick from the scope catalog",
+    "assignScopeAllAssigned": "All price scopes are already assigned",
+    "scopeAssigned": "Scope assigned.",
+    "scopeUnassigned": "Scope unassigned.",
+    "scopeUnassignTitle": "Remove scope assignment?",
+    "scopeUnassignDesc": "Are you sure you want to unassign {{code}}? This action cannot be undone.",
+    "scopeAssignFailed": "Failed to assign scope.",
+    "scopeUnassignFailed": "Failed to unassign scope.",
+    "noScopeAssigned": "No Price Scope Assigned"
+  },
+  "priceTypeScope": {
+    "title": "Price Type Scopes",
+    "subtitle": "Manage where price types can apply (e.g. Room Category, Room, Resort Facility).",
+    "new": "New Price Type Scope",
+    "empty": "No price type scopes found.",
+    "loading": "Loading price type scopes…",
+    "errLoad": "Failed to load price type scopes.",
+    "errDelete": "Failed to delete price type scope.",
+    "deleted": "Price type scope deleted.",
+    "created": "Price type scope created successfully!",
+    "updated": "Price type scope updated successfully!",
+    "deleteTitle": "Delete Price Type Scope",
     "deleteDesc": "Are you sure you want to delete {{code}}? This action cannot be undone."
   },
-  "priceUnitDialog": {
-    "create": "New Price Unit",
-    "edit": "Edit Price Unit",
-    "view": "Price Unit Details",
-    "descCreate": "Add a new price unit with locale translations.",
-    "descEdit": "Update price unit details and locale translations.",
-    "descView": "Price unit details and locale translations.",
-    "namePlaceholder": "Price unit name in this language",
-    "calculationMethodPlaceholder": "How the unit is applied when calculating a price...",
-    "usageExamplePlaceholder": "Example scenario shown to administrators..."
+  "priceTypeScopeDialog": {
+    "create": "New Price Type Scope",
+    "edit": "Edit Price Type Scope",
+    "view": "Price Type Scope Details",
+    "descCreate": "Add a new price type scope with locale translations.",
+    "descEdit": "Update price type scope details and locale translations.",
+    "descView": "Price type scope details and locale translations.",
+    "namePlaceholder": "Scope name in this language"
   },
   "uiBlockSection": {
     "title": "UI Block Sections",
@@ -756,25 +915,25 @@
     "title": "Contact Types",
     "subtitle": "Manage contact categories used across resorts in the platform.",
     "new": "New Contact Type",
-    "empty": "No contact types found.",
     "loading": "Loading contact types…",
-    "errLoad": "Failed to load contact types.",
-    "errDelete": "Failed to delete contact type.",
-    "deleted": "Contact type deleted.",
-    "created": "Contact type created successfully!",
-    "updated": "Contact type updated successfully!",
-    "deleteTitle": "Delete Contact Type",
-    "deleteDesc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+    "empty": "No contact types found.",
+    "createdToast": "Contact type created successfully!",
+    "updatedToast": "Contact type updated successfully."
   },
-  "contactTypeDialog": {
-    "create": "New Contact Type",
-    "edit": "Edit Contact Type",
-    "view": "Contact Type Details",
-    "descCreate": "Add a new contact type with locale translations.",
-    "descEdit": "Update contact type details and locale translations.",
-    "descView": "Contact type details and locale translations.",
-    "namePlaceholder": "Contact type name in this language",
-    "descriptionPlaceholder": "Optional description..."
+  "dayOfWeek": {
+    "title": "Days of Week",
+    "subtitle": "Platform-seeded days of the week — view details and manage locale translations.",
+    "loading": "Loading days of week…",
+    "empty": "No days of week found."
+  },
+  "bedType": {
+    "title": "Bed Types",
+    "subtitle": "Manage the kinds of beds a room can offer (e.g. Single, Queen, King).",
+    "new": "New Bed Type",
+    "loading": "Loading bed types…",
+    "empty": "No bed types found.",
+    "createdToast": "Bed type created successfully!",
+    "updatedToast": "Bed type updated successfully."
   },
   "pagination": {
     "info": "Page {{current}} of {{total}} — {{elements}} total"

@@ -20,14 +20,15 @@ import { PriceUnitCard } from "@/components/price-units/price-unit-card";
 import { PriceUnitDialog, emptyPriceUnitForm } from "@/components/price-units/price-unit-dialog";
 import type { PriceUnitDialogMode, PriceUnitFormState } from "@/components/price-units/types";
 import { priceUnitsService, type PriceUnit, type ListParams } from "@/services/price-units";
-import { localesService, type Locale } from "@/services/locales";
 
 const PAGE_SIZE = 20;
+
+// "all" is a frontend-only concept (client-side OR across all fields)
 const ALL_FIELD = "all";
 
-function buildApiFilters(field: string, q: string): Pick<ListParams, "code"> {
+function buildApiFilters(field: string, q: string): Pick<ListParams, "code" | "name"> {
   if (!q || field === ALL_FIELD) return {};
-  return { [field]: q } as Pick<ListParams, "code">;
+  return { [field]: q } as Pick<ListParams, "code" | "name">;
 }
 
 export default function PriceUnitsPage() {
@@ -48,25 +49,16 @@ export default function PriceUnitsPage() {
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState(ALL_FIELD);
 
-  // Sort
-  const [sortBy, setSortBy] = useState("sortOrder");
+  // Sort — "id" is only valid as the implicit default when sortBy is omitted; never send it explicitly.
+  const [sortBy, setSortBy] = useState<NonNullable<ListParams["sort_by"]>>("code");
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC");
 
-  // Dialog / locale
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
+  // Dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<PriceUnitDialogMode>("create");
   const [activeId, setActiveId] = useState<number | undefined>(undefined);
   const [form, setForm] = useState<PriceUnitFormState>(emptyPriceUnitForm);
   const [deleteTarget, setDeleteTarget] = useState<PriceUnit | null>(null);
-
-  // Refs to avoid stale closures in refresh
-  const dialogOpenRef = useRef(dialogOpen);
-  const activeIdRef = useRef(activeId);
-  useEffect(() => { dialogOpenRef.current = dialogOpen; }, [dialogOpen]);
-  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
-
-  const isFirstRender = useRef(true);
 
   function toFieldOption(key: string) {
     return { value: key, label: t(`apiFields.${key}`) };
@@ -74,11 +66,12 @@ export default function PriceUnitsPage() {
 
   const searchFields = useMemo(() => [
     { value: ALL_FIELD, label: t("common.allFields") },
-    toFieldOption("code"),
+    ...["code", "name"].map(toFieldOption),
   ], [t]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // "id" is deliberately excluded — passing sortBy=id throws 400 (it's implicit-default only).
   const sortFields = useMemo(() => [
-    ...["sortOrder", "code", "createdAt"].map(toFieldOption),
+    ...["code", "name", "createdAt"].map(toFieldOption),
   ], [t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function refresh(overrides: Partial<ListParams> = {}) {
@@ -98,25 +91,6 @@ export default function PriceUnitsPage() {
       setTotalElements(res.total_elements);
       setHasNext(res.has_next);
       setHasPrevious(res.has_previous);
-
-      // Sync open dialog form with refreshed data
-      setForm((prev) => {
-        if (!dialogOpenRef.current || activeIdRef.current == null) return prev;
-        const updated = res.data.find((p) => p.id === activeIdRef.current);
-        if (!updated) return prev;
-        return {
-          ...prev,
-          locales: updated.locales.map((l) => ({
-            id: l.id,
-            locale_id: l.locale_id,
-            name: l.name,
-            description: l.description ?? "",
-            sort_order: l.sort_order,
-            calculation_method: l.calculation_method ?? "",
-            usage_example: l.usage_example ?? "",
-          })),
-        };
-      });
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -127,17 +101,13 @@ export default function PriceUnitsPage() {
   // Initial load
   useEffect(() => { refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Locales for dialog
+  // Debounced search — skip on first render — compare against a last-applied key, not a boolean
+  // flag, since a boolean doesn't survive React Strict Mode's dev-only effect replay.
+  const lastSearchKey = useRef(`${searchField}:${search}`);
   useEffect(() => {
-    localesService
-      .list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableLocales(res.data))
-      .catch(() => { });
-  }, []);
-
-  // Debounced search — resets to page 0
-  useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    const key = `${searchField}:${search}`;
+    if (lastSearchKey.current === key) return;
+    lastSearchKey.current = key;
     setPage(0);
     const timer = setTimeout(
       () => refresh({ page: 0, ...buildApiFilters(searchField, search.trim()) }),
@@ -147,11 +117,11 @@ export default function PriceUnitsPage() {
   }, [search, searchField]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const priceUnitNames = useMemo(
-    () => Object.fromEntries(priceUnits.map((p) => [p.id, p.locales[0]?.name ?? ""])),
+    () => Object.fromEntries(priceUnits.map((p) => [p.id, p.locale?.name ?? ""])),
     [priceUnits],
   );
 
-  // Client-side OR filter for "all" field
+  // Client-side OR filter only for "all" field (API has no OR-across-fields support)
   const displayPriceUnits = useMemo(() => {
     if (searchField !== ALL_FIELD || !search.trim()) return priceUnits;
     const q = search.trim().toLowerCase();
@@ -169,29 +139,32 @@ export default function PriceUnitsPage() {
     setDialogOpen(true);
   }
 
-  function openDialog(p: PriceUnit) {
-    setMode("view");
-    setActiveId(p.id);
-    setForm({
-      code: p.code,
-      sort_order: p.sort_order,
-      locales: p.locales.map((l) => ({
-        id: l.id,
-        locale_id: l.locale_id,
-        name: l.name,
-        description: l.description ?? "",
-        sort_order: l.sort_order,
-        calculation_method: l.calculation_method ?? "",
-        usage_example: l.usage_example ?? "",
-      })),
-    });
-    setDialogOpen(true);
+  async function openDialog(p: PriceUnit) {
+    try {
+      const res = await priceUnitsService.get(p.id);
+      const full = res.data;
+      setMode("view");
+      setActiveId(full.id);
+      setForm({
+        code: full.code,
+        sort_order: full.sort_order,
+        locale: emptyPriceUnitForm.locale,
+        // Lazily populated by PriceUnitDialog the first time the Translations tab is selected.
+        locales: [],
+        scopes: [],
+        price_scopes: full.price_scopes ?? [],
+      });
+      setDialogOpen(true);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
   }
 
   function handleSortByChange(value: string) {
-    setSortBy(value);
+    const field = value as NonNullable<ListParams["sort_by"]>;
+    setSortBy(field);
     setPage(0);
-    refresh({ sort_by: value, page: 0 });
+    refresh({ sort_by: field, page: 0 });
   }
 
   function handleSortDirChange(dir: "ASC" | "DESC") {
@@ -209,7 +182,7 @@ export default function PriceUnitsPage() {
     if (!deleteTarget) return;
     try {
       await priceUnitsService.remove(deleteTarget.id);
-      toast.success(t("priceUnit.deleted"));
+      toast.success(`${t("delete.priceUnit.title")}: ${deleteTarget.code}`);
       setDeleteTarget(null);
       await refresh({ page: 0 });
       setPage(0);
@@ -285,16 +258,15 @@ export default function PriceUnitsPage() {
         priceUnitId={activeId}
         form={form}
         onFormChange={setForm}
-        availableLocales={availableLocales}
         onSaved={() => refresh()}
       />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("priceUnit.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>{t("delete.priceUnit.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("priceUnit.deleteDesc", { code: deleteTarget?.code })}
+              {t("delete.priceUnit.desc", { code: deleteTarget?.code })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
