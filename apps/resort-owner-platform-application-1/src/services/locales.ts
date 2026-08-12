@@ -37,6 +37,11 @@ export interface LocaleMutationResponse {
   id: number;
 }
 
+export interface LocaleCount {
+  count: number;
+  codes: string[];
+}
+
 export interface ListLocalesParams {
   page?: number;
   size?: number;
@@ -62,6 +67,10 @@ export const localesService = {
 
   async get(id: number): Promise<{ locale: Locale }> {
     return api.get<{ locale: Locale }>(`/locales/${id}`);
+  },
+
+  async count(): Promise<LocaleCount> {
+    return api.get<LocaleCount>("/locales/count");
   },
 
   async create(body: CreateLocaleRequest): Promise<LocaleMutationResponse> {

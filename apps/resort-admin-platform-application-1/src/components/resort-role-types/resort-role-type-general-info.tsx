@@ -5,31 +5,33 @@ import { Button } from "@resort/shadcn-ui";
 import { Card, CardContent } from "@resort/shadcn-ui";
 import { Input } from "@resort/shadcn-ui";
 import { Label } from "@resort/shadcn-ui";
-import { resortAccessTypesService } from "@/services/resort-access-types";
+import { resortRoleTypesService } from "@/services/resort-role-types";
 import { toast } from "sonner";
-import type { ResortAccessTypeDialogMode, ResortAccessTypeFormState } from "./types";
+import type { ResortRoleTypeDialogMode, ResortRoleTypeFormState } from "./types";
 
-export interface ResortAccessTypeGeneralInfoProps {
-  mode: ResortAccessTypeDialogMode;
-  form: ResortAccessTypeFormState;
-  onFormChange: (patch: Partial<ResortAccessTypeFormState>) => void;
-  accessTypeId?: number;
+const CODE_MAX_LENGTH = 100;
+
+export interface ResortRoleTypeGeneralInfoProps {
+  mode: ResortRoleTypeDialogMode;
+  form: ResortRoleTypeFormState;
+  onFormChange: (patch: Partial<ResortRoleTypeFormState>) => void;
+  roleTypeId?: number;
   onSaved?: () => void | Promise<void>;
   editing: boolean;
   onEditingChange: (v: boolean) => void;
   open: boolean;
 }
 
-export function ResortAccessTypeGeneralInfo({
+export function ResortRoleTypeGeneralInfo({
   mode,
   form,
   onFormChange,
-  accessTypeId,
+  roleTypeId,
   onSaved,
   editing,
   onEditingChange,
   open,
-}: ResortAccessTypeGeneralInfoProps) {
+}: ResortRoleTypeGeneralInfoProps) {
   const { t } = useTranslation();
   const [local, setLocal] = useState({ sort_order: 0 });
   const [submitting, setSubmitting] = useState(false);
@@ -44,13 +46,13 @@ export function ResortAccessTypeGeneralInfo({
   }
 
   async function save() {
-    if (accessTypeId == null) return;
+    if (roleTypeId == null) return;
     setSubmitting(true);
     try {
-      await resortAccessTypesService.update(accessTypeId, {
+      await resortRoleTypesService.update(roleTypeId, {
         sort_order: Number(local.sort_order) || 0,
       });
-      toast.success(t("resortAccessType.updatedToast"));
+      toast.success(t("resortRoleType.updatedToast"));
       onEditingChange(false);
       onFormChange({ sort_order: Number(local.sort_order) || 0 });
       await onSaved?.();
@@ -94,29 +96,30 @@ export function ResortAccessTypeGeneralInfo({
       <Card>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="rat-code" className="text-xs font-medium">{t("common.code")} *</Label>
+            <Label htmlFor="rrt-code" className="text-xs font-medium">{t("common.code")} *</Label>
             <Input
-              id="rat-code"
+              id="rrt-code"
               value={form.code}
-              onChange={(e) => onFormChange({ code: e.target.value })}
-              placeholder="OWNER"
-              required
-              disabled={mode !== "create"}
-              className="font-mono"
+              onChange={(e) => {
+                const value = e.target.value.toUpperCase();
+                if (value.length > CODE_MAX_LENGTH) { toast.error(t("toast.resortRoleTypeCodeMaxLength")); return; }
+                onFormChange({ code: value });
+              }}
+              placeholder="OWNER" required disabled={mode !== "create"} className="font-mono"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="rat-sort" className="text-xs font-medium">{t("field.sort")} *</Label>
+            <Label htmlFor="rrt-sort" className="text-xs font-medium">{t("field.sort")} *</Label>
             <Input
-              id="rat-sort"
+              id="rrt-sort"
               type="number"
               value={sortValue}
-              onChange={(e) => mode === "create"
-                ? onFormChange({ sort_order: Number(e.target.value) })
-                : setLocal((p) => ({ ...p, sort_order: Number(e.target.value) }))
+              onChange={(e) =>
+                mode === "create"
+                  ? onFormChange({ sort_order: Number(e.target.value) })
+                  : setLocal((p) => ({ ...p, sort_order: Number(e.target.value) }))
               }
-              required={mode === "create"}
-              disabled={isReadOnly}
+              required={mode === "create"} disabled={isReadOnly}
             />
           </div>
         </CardContent>

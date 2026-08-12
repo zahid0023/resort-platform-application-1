@@ -16,51 +16,49 @@ import {
 import { PageActions } from "@/components/shared/page-actions";
 import { PageHeader } from "@/components/shared/page-header";
 import { Pagination } from "@/components/shared/pagination";
-import { ResortAccessTypeCard } from "@/components/resort-access-types/resort-access-type-card";
-import { ResortAccessTypeDialog, emptyResortAccessTypeForm } from "@/components/resort-access-types/resort-access-type-dialog";
-import type { ResortAccessTypeDialogMode, ResortAccessTypeFormState } from "@/components/resort-access-types/types";
-import { resortAccessTypesService, type ResortAccessType, type ListParams } from "@/services/resort-access-types";
-import { localesService, type Locale } from "@/services/locales";
+import { ResortRoleTypeCard } from "@/components/resort-role-types/resort-role-type-card";
+import { ResortRoleTypeDialog, emptyResortRoleTypeForm } from "@/components/resort-role-types/resort-role-type-dialog";
+import type { ResortRoleTypeDialogMode, ResortRoleTypeFormState } from "@/components/resort-role-types/types";
+import { resortRoleTypesService, type ResortRoleType, type ListParams } from "@/services/resort-role-types";
 
 const PAGE_SIZE = 20;
+
+// "all" is a frontend-only concept (client-side OR across all fields)
 const ALL_FIELD = "all";
 
-function buildApiFilters(field: string, q: string): Pick<ListParams, "code"> {
+function buildApiFilters(field: string, q: string): Pick<ListParams, "code" | "name"> {
   if (!q || field === ALL_FIELD) return {};
-  return { [field]: q } as Pick<ListParams, "code">;
+  return { [field]: q } as Pick<ListParams, "code" | "name">;
 }
 
-export default function ResortAccessTypesPage() {
+export default function ResortRoleTypesPage() {
   const { t } = useTranslation();
 
-  const [accessTypes, setAccessTypes] = useState<ResortAccessType[]>([]);
+  // List data
+  const [roleTypes, setRoleTypes] = useState<ResortRoleType[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Pagination
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const [hasPrevious, setHasPrevious] = useState(false);
 
+  // Search
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState(ALL_FIELD);
 
-  const [sortBy, setSortBy] = useState("sortOrder");
+  // Sort — "id" is only valid as the implicit default when sortBy is omitted; never send it explicitly.
+  const [sortBy, setSortBy] = useState<NonNullable<ListParams["sort_by"]>>("code");
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC");
 
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
+  // Dialog
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [mode, setMode] = useState<ResortAccessTypeDialogMode>("create");
+  const [mode, setMode] = useState<ResortRoleTypeDialogMode>("create");
   const [activeId, setActiveId] = useState<number | undefined>(undefined);
-  const [form, setForm] = useState<ResortAccessTypeFormState>(emptyResortAccessTypeForm);
-  const [deleteTarget, setDeleteTarget] = useState<ResortAccessType | null>(null);
-
-  const dialogOpenRef = useRef(dialogOpen);
-  const activeIdRef = useRef(activeId);
-  useEffect(() => { dialogOpenRef.current = dialogOpen; }, [dialogOpen]);
-  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
-
-  const isFirstRender = useRef(true);
+  const [form, setForm] = useState<ResortRoleTypeFormState>(emptyResortRoleTypeForm);
+  const [deleteTarget, setDeleteTarget] = useState<ResortRoleType | null>(null);
 
   function toFieldOption(key: string) {
     return { value: key, label: t(`apiFields.${key}`) };
@@ -68,17 +66,18 @@ export default function ResortAccessTypesPage() {
 
   const searchFields = useMemo(() => [
     { value: ALL_FIELD, label: t("common.allFields") },
-    ...["code"].map(toFieldOption),
+    ...["code", "name"].map(toFieldOption),
   ], [t]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // "id" is deliberately excluded — passing sortBy=id throws 400 (it's implicit-default only).
   const sortFields = useMemo(() => [
-    ...["sortOrder", "code", "name", "createdAt"].map(toFieldOption),
+    ...["code", "name", "createdAt"].map(toFieldOption),
   ], [t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function refresh(overrides: Partial<ListParams> = {}) {
     setLoading(true);
     try {
-      const res = await resortAccessTypesService.list({
+      const res = await resortRoleTypesService.list({
         page,
         size: PAGE_SIZE,
         sort_by: sortBy,
@@ -87,27 +86,11 @@ export default function ResortAccessTypesPage() {
         ...overrides,
       });
 
-      setAccessTypes(res.data);
+      setRoleTypes(res.data);
       setTotalPages(res.total_pages);
       setTotalElements(res.total_elements);
       setHasNext(res.has_next);
       setHasPrevious(res.has_previous);
-
-      setForm((prev) => {
-        if (!dialogOpenRef.current || activeIdRef.current == null) return prev;
-        const updated = res.data.find((a) => a.id === activeIdRef.current);
-        if (!updated) return prev;
-        return {
-          ...prev,
-          locales: updated.locales.map((l) => ({
-            id: l.id,
-            locale_id: l.locale_id,
-            name: l.name,
-            description: l.description ?? "",
-            sort_order: l.sort_order,
-          })),
-        };
-      });
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -115,17 +98,16 @@ export default function ResortAccessTypesPage() {
     }
   }
 
+  // Initial load
   useEffect(() => { refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Debounced search — resets to page 0. Guarded by comparing against the last-applied key rather
+  // than a one-shot flag, since a boolean doesn't survive React Strict Mode's dev-only effect replay.
+  const lastSearchKey = useRef(`${searchField}:${search}`);
   useEffect(() => {
-    localesService
-      .list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableLocales(res.data))
-      .catch(() => { });
-  }, []);
-
-  useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    const key = `${searchField}:${search}`;
+    if (lastSearchKey.current === key) return;
+    lastSearchKey.current = key;
     setPage(0);
     const timer = setTimeout(
       () => refresh({ page: 0, ...buildApiFilters(searchField, search.trim()) }),
@@ -134,49 +116,53 @@ export default function ResortAccessTypesPage() {
     return () => clearTimeout(timer);
   }, [search, searchField]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const defaultNames = useMemo(
-    () => Object.fromEntries(accessTypes.map((a) => [a.id, a.locales[0]?.name ?? ""])),
-    [accessTypes],
+  const roleTypeNames = useMemo(
+    () => Object.fromEntries(roleTypes.map((r) => [r.id, r.locale?.name ?? ""])),
+    [roleTypes],
   );
 
-  const displayAccessTypes = useMemo(() => {
-    if (searchField !== ALL_FIELD || !search.trim()) return accessTypes;
+  // Client-side OR filter only for "all" field (API has no OR-across-fields support)
+  const displayRoleTypes = useMemo(() => {
+    if (searchField !== ALL_FIELD || !search.trim()) return roleTypes;
     const q = search.trim().toLowerCase();
-    return accessTypes.filter((a) => {
-      const code = a.code.toLowerCase();
-      const name = (defaultNames[a.id] ?? "").toLowerCase();
+    return roleTypes.filter((r) => {
+      const code = r.code.toLowerCase();
+      const name = (roleTypeNames[r.id] ?? "").toLowerCase();
       return code.includes(q) || name.includes(q);
     });
-  }, [accessTypes, defaultNames, search, searchField]);
+  }, [roleTypes, roleTypeNames, search, searchField]);
 
   function openCreate() {
     setMode("create");
     setActiveId(undefined);
-    setForm(emptyResortAccessTypeForm);
+    setForm(emptyResortRoleTypeForm);
     setDialogOpen(true);
   }
 
-  function openDialog(a: ResortAccessType) {
-    setMode("view");
-    setActiveId(a.id);
-    setForm({
-      code: a.code,
-      sort_order: a.sort_order,
-      locales: a.locales.map((l) => ({
-        id: l.id,
-        locale_id: l.locale_id,
-        name: l.name,
-        description: l.description ?? "",
-        sort_order: l.sort_order,
-      })),
-    });
-    setDialogOpen(true);
+  async function openDialog(r: ResortRoleType) {
+    try {
+      const res = await resortRoleTypesService.get(r.id);
+      const full = res.data;
+      setMode("view");
+      setActiveId(full.id);
+      setForm({
+        code: full.code,
+        sort_order: full.sort_order,
+        locale: emptyResortRoleTypeForm.locale,
+        // Lazily populated by ResortRoleTypeDialog the first time the Translations tab is selected.
+        locales: [],
+      });
+      setDialogOpen(true);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
   }
 
   function handleSortByChange(value: string) {
-    setSortBy(value);
+    const field = value as NonNullable<ListParams["sort_by"]>;
+    setSortBy(field);
     setPage(0);
-    refresh({ sort_by: value, page: 0 });
+    refresh({ sort_by: field, page: 0 });
   }
 
   function handleSortDirChange(dir: "ASC" | "DESC") {
@@ -193,8 +179,8 @@ export default function ResortAccessTypesPage() {
   async function confirmDelete() {
     if (!deleteTarget) return;
     try {
-      await resortAccessTypesService.remove(deleteTarget.id);
-      toast.success(`${t("resortAccessType.deleteTitle")}: ${deleteTarget.code}`);
+      await resortRoleTypesService.remove(deleteTarget.id);
+      toast.success(`${t("delete.resortRoleType.title")}: ${deleteTarget.code}`);
       setDeleteTarget(null);
       await refresh({ page: 0 });
       setPage(0);
@@ -206,11 +192,12 @@ export default function ResortAccessTypesPage() {
   return (
     <div className="max-w-6xl mx-auto flex flex-col gap-6">
 
+      {/* Header */}
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 w-full">
         <PageHeader
           eyebrow={t("common.admin")}
-          title={t("resortAccessType.title")}
-          subtitle={t("resortAccessType.subtitle")}
+          title={t("resortRoleType.title")}
+          subtitle={t("resortRoleType.subtitle")}
         />
         <PageActions
           fields={searchFields}
@@ -225,25 +212,26 @@ export default function ResortAccessTypesPage() {
             sortDir,
             onSortDirChange: handleSortDirChange,
           }}
-          newLabel={t("resortAccessType.new")}
+          newLabel={t("resortRoleType.new")}
           onNew={openCreate}
         />
       </header>
 
+      {/* Main content */}
       <main className="flex flex-col gap-4">
         {loading ? (
-          <div className="text-center py-16 text-muted-foreground">{t("resortAccessType.loading")}</div>
-        ) : displayAccessTypes.length === 0 ? (
+          <div className="text-center py-16 text-muted-foreground">{t("resortRoleType.loading")}</div>
+        ) : displayRoleTypes.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground border rounded-xl border-dashed">
-            {t("resortAccessType.empty")}
+            {t("resortRoleType.empty")}
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {displayAccessTypes.map((a) => (
-              <ResortAccessTypeCard
-                key={a.id}
-                accessType={a}
-                defaultName={defaultNames[a.id]}
+            {displayRoleTypes.map((r) => (
+              <ResortRoleTypeCard
+                key={r.id}
+                roleType={r}
+                defaultName={roleTypeNames[r.id]}
                 onView={openDialog}
                 onDelete={setDeleteTarget}
               />
@@ -261,23 +249,22 @@ export default function ResortAccessTypesPage() {
         />
       </main>
 
-      <ResortAccessTypeDialog
+      <ResortRoleTypeDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         mode={mode}
-        accessTypeId={activeId}
+        roleTypeId={activeId}
         form={form}
         onFormChange={setForm}
-        availableLocales={availableLocales}
         onSaved={() => refresh()}
       />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("resortAccessType.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>{t("delete.resortRoleType.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("resortAccessType.deleteDesc", { code: deleteTarget?.code })}
+              {t("delete.resortRoleType.desc", { code: deleteTarget?.code })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

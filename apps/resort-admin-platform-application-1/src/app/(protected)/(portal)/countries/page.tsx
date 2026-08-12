@@ -49,6 +49,7 @@ export default function CountriesPage() {
 
 	// Search
 	const [search, setSearch] = useState("");
+	
 	const [searchField, setSearchField] = useState(ALL_FIELD);
 
 	// Sort — "id" is only valid as the implicit default when sortBy is omitted; never send it explicitly.

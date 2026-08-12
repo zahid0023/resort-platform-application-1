@@ -30,7 +30,7 @@ import {
   resortFacilityGroupsService,
   type ResortFacilityGroupSummary,
 } from "@/services/resort-facility-groups"
-import { localesService, type Locale } from "@/services/locales"
+import { useLocales } from "@/providers/locales-provider"
 import { pickTranslation } from "@/lib/locale"
 
 const PAGE_SIZE = 20
@@ -63,7 +63,7 @@ export default function ResortFacilitiesPage() {
   const [sortBy, setSortBy] = useState("sortOrder")
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC")
 
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([])
+  const { locales: availableLocales, totalCount: totalLocaleCount, loaded: localesLoaded, refresh: refreshLocales } = useLocales()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [mode, setMode] = useState<ResortFacilityDialogMode>("create")
   const [activeId, setActiveId] = useState<number | undefined>(undefined)
@@ -76,7 +76,6 @@ export default function ResortFacilitiesPage() {
   useEffect(() => { dialogOpenRef.current = dialogOpen }, [dialogOpen])
   useEffect(() => { activeIdRef.current = activeId }, [activeId])
 
-  const localesLoadedRef = useRef(false)
   const isFirstRender = useRef(true)
 
   function toFieldOption(key: string) {
@@ -149,12 +148,8 @@ export default function ResortFacilitiesPage() {
   }, [search, searchField]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function loadLocales() {
-    if (localesLoadedRef.current) return
-    localesLoadedRef.current = true
-    localesService
-      .list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableLocales(res.data))
-      .catch((err) => toast.error((err as Error).message))
+    if (localesLoaded) return
+    refreshLocales().catch((err) => toast.error((err as Error).message))
   }
 
   const defaultNames = useMemo(
@@ -327,6 +322,7 @@ export default function ResortFacilitiesPage() {
         form={form}
         onFormChange={setForm}
         availableLocales={availableLocales}
+        totalLocaleCount={totalLocaleCount}
         onSaved={() => refreshFacilities()}
         lockedGroupName={groupName}
         defaultFacilityMode={group?.facility_group_id ? "platform" : "custom"}

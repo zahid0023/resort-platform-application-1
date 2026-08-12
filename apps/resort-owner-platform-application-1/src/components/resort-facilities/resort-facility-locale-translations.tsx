@@ -10,6 +10,7 @@ import {
 } from "@resort/shadcn-ui"
 import { resortFacilitiesService } from "@/services/resort-facilities"
 import type { Locale } from "@/services/locales"
+import { canAddLocaleTranslation } from "@/lib/locale"
 import { toast } from "sonner"
 import type { ResortFacilityDialogMode, ResortFacilityFormState, LocaleRow } from "./types"
 
@@ -22,6 +23,7 @@ export interface ResortFacilityLocaleTranslationsProps {
   onFormChange: (form: ResortFacilityFormState) => void
   facilityId?: number
   availableLocales: Locale[]
+  totalLocaleCount: number | null
   onSaved?: () => void | Promise<void>
   editing: boolean
   onEditingChange: (v: boolean) => void
@@ -30,7 +32,7 @@ export interface ResortFacilityLocaleTranslationsProps {
 }
 
 export function ResortFacilityLocaleTranslations({
-  resortId, mode, form, onFormChange, facilityId, availableLocales,
+  resortId, mode, form, onFormChange, facilityId, availableLocales, totalLocaleCount,
   onSaved, editing, onEditingChange, open, disabled,
 }: ResortFacilityLocaleTranslationsProps) {
   const { t } = useTranslation()
@@ -186,7 +188,7 @@ export function ResortFacilityLocaleTranslations({
               <X className="h-3.5 w-3.5" /> {t("common.cancel")}
             </Button>
             <Button type="button" size="sm" variant="outline" onClick={addNewLocaleRow}
-              disabled={(form.locales.length + newLocaleRows.length) >= availableLocales.length}
+              disabled={!canAddLocaleTranslation(form.locales.length + newLocaleRows.length, totalLocaleCount)}
               className="h-7 text-xs px-2.5"
             >
               <Plus className="h-3.5 w-3.5 mr-1" /> {t("locale.add")}
@@ -195,7 +197,7 @@ export function ResortFacilityLocaleTranslations({
         )}
         {mode === "create" && !disabled && (
           <Button type="button" size="sm" variant="outline" onClick={addLocaleRow}
-            disabled={form.locales.length >= availableLocales.length}
+            disabled={!canAddLocaleTranslation(form.locales.length, totalLocaleCount)}
             className="h-7 text-xs px-2.5"
           >
             <Plus className="h-3.5 w-3.5 mr-1" /> {t("locale.add")}

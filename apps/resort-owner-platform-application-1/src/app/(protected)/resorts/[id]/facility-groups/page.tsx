@@ -23,7 +23,7 @@ import {
   type ResortFacilityGroupSummary,
   type ListParams,
 } from "@/services/resort-facility-groups"
-import { localesService, type Locale } from "@/services/locales"
+import { useLocales } from "@/providers/locales-provider"
 
 const PAGE_SIZE = 20
 const ALL_FIELD = "all"
@@ -49,7 +49,7 @@ export default function ResortFacilityGroupsPage() {
   const [sortBy, setSortBy] = useState("sortOrder")
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC")
 
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([])
+  const { locales: availableLocales, totalCount: totalLocaleCount, loaded: localesLoaded, refresh: refreshLocales } = useLocales()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [mode, setMode] = useState<ResortFacilityGroupDialogMode>("create")
   const [activeId, setActiveId] = useState<number | undefined>(undefined)
@@ -61,7 +61,6 @@ export default function ResortFacilityGroupsPage() {
   useEffect(() => { dialogOpenRef.current = dialogOpen }, [dialogOpen])
   useEffect(() => { activeIdRef.current = activeId }, [activeId])
 
-  const localesLoadedRef = useRef(false)
   const isFirstRender = useRef(true)
 
   function toFieldOption(key: string) {
@@ -118,12 +117,8 @@ export default function ResortFacilityGroupsPage() {
   }, [search, searchField]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function loadLocales() {
-    if (localesLoadedRef.current) return
-    localesLoadedRef.current = true
-    localesService
-      .list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableLocales(res.data))
-      .catch((err) => toast.error((err as Error).message))
+    if (localesLoaded) return
+    refreshLocales().catch((err) => toast.error((err as Error).message))
   }
 
   const defaultNames = useMemo(
@@ -251,6 +246,7 @@ export default function ResortFacilityGroupsPage() {
         form={form}
         onFormChange={setForm}
         availableLocales={availableLocales}
+        totalLocaleCount={totalLocaleCount}
         onSaved={() => refresh()}
       />
 

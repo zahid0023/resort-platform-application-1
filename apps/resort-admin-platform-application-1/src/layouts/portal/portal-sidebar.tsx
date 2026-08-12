@@ -20,6 +20,7 @@ import {
   RadioIcon,
   SettingsIcon,
   TargetIcon,
+  UserCogIcon,
   ZapIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -78,8 +79,8 @@ const priceNavItems = [
 ];
 
 const resortNavItems = [
-  { title: "Resort Access Types", url: "/resort-access-types", icon: SettingsIcon },
   { title: "Resort Permission Types", url: "/resort-permission-types", icon: SettingsIcon },
+  { title: "Resort Role Types", url: "/resort-role-types", icon: UserCogIcon },
 ];
 
 const roomNavItems = [

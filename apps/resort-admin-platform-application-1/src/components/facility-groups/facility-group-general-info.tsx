@@ -107,7 +107,7 @@ export function FacilityGroupGeneralInfo({
             <Input
               id="fg-code"
               value={form.code}
-              onChange={(e) => onFormChange({ code: e.target.value })}
+              onChange={(e) => onFormChange({ code: e.target.value.toUpperCase() })}
               placeholder="DINING"
               required
               disabled={mode !== "create"}

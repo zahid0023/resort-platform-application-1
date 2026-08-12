@@ -23,22 +23,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@resort/shadcn-ui";
-import { resortPermissionTypesService } from "@/services/resort-permission-types";
+import { resortRoleTypesService } from "@/services/resort-role-types";
 import type { Locale } from "@/services/locales";
 import { canAddLocaleTranslation } from "@/lib/locale";
 import { toast } from "sonner";
-import type { ResortPermissionTypeDialogMode, ResortPermissionTypeFormState, LocaleRow } from "./types";
+import type { ResortRoleTypeDialogMode, ResortRoleTypeFormState, LocaleRow } from "./types";
 
 type NewLocaleRow = LocaleRow & { _rkey: string };
 
 // Create only ever submits the "en" translation — keep what's typed limited to English/ASCII text.
 const NON_ASCII = /[^\x00-\x7F]/g;
 
-export interface ResortPermissionTypeLocaleTranslationsProps {
-  mode: ResortPermissionTypeDialogMode;
-  form: ResortPermissionTypeFormState;
-  onFormChange: (form: ResortPermissionTypeFormState) => void;
-  permissionTypeId?: number;
+export interface ResortRoleTypeLocaleTranslationsProps {
+  mode: ResortRoleTypeDialogMode;
+  form: ResortRoleTypeFormState;
+  onFormChange: (form: ResortRoleTypeFormState) => void;
+  roleTypeId?: number;
   onSaved?: () => void | Promise<void>;
   /** True while any single translation row has an in-progress edit (existing or newly added). */
   editing: boolean;
@@ -59,11 +59,11 @@ export interface ResortPermissionTypeLocaleTranslationsProps {
   totalLocaleCount: number | null;
 }
 
-export function ResortPermissionTypeLocaleTranslations({
+export function ResortRoleTypeLocaleTranslations({
   mode,
   form,
   onFormChange,
-  permissionTypeId,
+  roleTypeId,
   onSaved,
   editing,
   onEditingChange,
@@ -73,7 +73,7 @@ export function ResortPermissionTypeLocaleTranslations({
   open,
   availableLocales,
   totalLocaleCount,
-}: ResortPermissionTypeLocaleTranslationsProps) {
+}: ResortRoleTypeLocaleTranslationsProps) {
   const { t } = useTranslation();
   const [newLocaleRows, setNewLocaleRows] = useState<NewLocaleRow[]>([]);
   const [rowEditData, setRowEditData] = useState<Record<string, LocaleRow>>({});
@@ -81,11 +81,11 @@ export function ResortPermissionTypeLocaleTranslations({
   const [pendingDeleteRow, setPendingDeleteRow] = useState<LocaleRow | null>(null);
   const rKeyCounter = useRef(0);
 
-  // GET /resort-permission-types/{id} and the list endpoint only ever carry the single
-  // Accept-Language-matched translation — the full set is only available via this sub-resource.
+  // GET /resort-role-types/{id} and the list endpoint only ever carry the single Accept-Language-matched
+  // translation — the full set is only available via this dedicated sub-resource.
   function refreshLocales(localeCode?: string) {
-    if (permissionTypeId == null) return;
-    resortPermissionTypesService.listLocales(permissionTypeId, { size: 10, localeCode: localeCode || undefined })
+    if (roleTypeId == null) return;
+    resortRoleTypesService.listLocales(roleTypeId, { size: 10, localeCode: localeCode || undefined })
       .then((res) => {
         onFormChange({
           ...form,
@@ -144,7 +144,7 @@ export function ResortPermissionTypeLocaleTranslations({
   }
 
   async function saveRow(key: string, row: LocaleRow, isNew: boolean) {
-    if (permissionTypeId == null) return;
+    if (roleTypeId == null) return;
     const data = rowEditData[key];
     if (!data) return;
     if (isNew && !data.locale_id) { toast.error(t("toast.localeSelectLang", { n: 1 })); return; }
@@ -152,7 +152,7 @@ export function ResortPermissionTypeLocaleTranslations({
     setBusy(key, true);
     try {
       if (isNew) {
-        await resortPermissionTypesService.addLocale(permissionTypeId, {
+        await resortRoleTypesService.addLocale(roleTypeId, {
           locale_id: Number(data.locale_id),
           name: data.name.trim(),
           description: data.description?.trim() || undefined,
@@ -160,7 +160,7 @@ export function ResortPermissionTypeLocaleTranslations({
         });
         setNewLocaleRows((prev) => prev.filter((r) => r._rkey !== key));
       } else {
-        await resortPermissionTypesService.updateLocale(permissionTypeId, row.id!, {
+        await resortRoleTypesService.updateLocale(roleTypeId, row.id!, {
           name: data.name.trim(),
           description: data.description?.trim() || undefined,
           sort_order: Number(data.sort_order) || 0,
@@ -178,13 +178,13 @@ export function ResortPermissionTypeLocaleTranslations({
   }
 
   async function confirmDelete() {
-    if (!pendingDeleteRow || permissionTypeId == null || !pendingDeleteRow.id) return;
+    if (!pendingDeleteRow || roleTypeId == null || !pendingDeleteRow.id) return;
     const row = pendingDeleteRow;
     const key = rowKey(row);
     setPendingDeleteRow(null);
     setBusy(key, true);
     try {
-      await resortPermissionTypesService.removeLocale(permissionTypeId, row.id!);
+      await resortRoleTypesService.removeLocale(roleTypeId, row.id!);
       toast.success(t("locale.removedToast"));
       refreshLocales();
       await onSaved?.();
@@ -195,8 +195,9 @@ export function ResortPermissionTypeLocaleTranslations({
     }
   }
 
-  // Resort permission types have no `/locales/count` endpoint (unlike contact types etc.), so used-
-  // locale checks always derive from `form.locales`, which only ever holds one page (size 10) of the
+  // Resort role types have no `/locales/count` endpoint (unlike contact types etc.), so unlike that
+  // sibling component this has no authoritative unpaginated code list to fall back to — used-locale
+  // checks always derive from `form.locales`, which only ever holds one page (size 10) of the
   // paginated sub-resource and can undercount past that.
   function usedLocaleIds(excludeKey?: string): Set<number> {
     const added = newLocaleRows
@@ -294,7 +295,7 @@ export function ResortPermissionTypeLocaleTranslations({
               <Label className="text-xs text-muted-foreground">{t("common.name")} *</Label>
               <Input value={form.locale.name}
                 onChange={(e) => onFormChange({ ...form, locale: { ...form.locale, name: e.target.value.replace(NON_ASCII, "") } })}
-                placeholder={t("placeholder.resortPermissionTypeName")}
+                placeholder={t("placeholder.resortRoleTypeName")}
                 className="h-9 text-sm"
               />
             </div>
@@ -302,7 +303,7 @@ export function ResortPermissionTypeLocaleTranslations({
               <Label className="text-xs text-muted-foreground">{t("common.description")} *</Label>
               <Textarea value={form.locale.description}
                 onChange={(e) => onFormChange({ ...form, locale: { ...form.locale, description: e.target.value.replace(NON_ASCII, "") } })}
-                placeholder={t("placeholder.resortPermissionTypeDescription")}
+                placeholder={t("placeholder.resortRoleTypeDescription")}
                 rows={2}
                 className="text-sm resize-none"
               />
@@ -330,7 +331,7 @@ export function ResortPermissionTypeLocaleTranslations({
               ) : (
                 <>
                   <Languages className="h-4 w-4 mr-2 opacity-40" />
-                  {t("locale.empty.resortPermissionType")}
+                  {t("locale.empty.resortRoleType")}
                 </>
               )}
             </div>
@@ -427,7 +428,7 @@ export function ResortPermissionTypeLocaleTranslations({
                       <Input
                         value={editData.name}
                         onChange={(e) => patchRowEdit(key, { name: e.target.value })}
-                        placeholder={t("placeholder.resortPermissionTypeName")}
+                        placeholder={t("placeholder.resortRoleTypeName")}
                         disabled={!rowEditing}
                         className="h-9 text-sm"
                       />
@@ -438,7 +439,7 @@ export function ResortPermissionTypeLocaleTranslations({
                       <Textarea
                         value={editData.description}
                         onChange={(e) => patchRowEdit(key, { description: e.target.value })}
-                        placeholder={t("placeholder.resortPermissionTypeDescription")}
+                        placeholder={t("placeholder.resortRoleTypeDescription")}
                         disabled={!rowEditing}
                         rows={2}
                         className="text-sm resize-none"

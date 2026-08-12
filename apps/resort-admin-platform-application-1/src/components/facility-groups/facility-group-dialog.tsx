@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
-import { ArrowRight, Check, Layers, Loader2, Pencil, Plus, RefreshCw, X } from "lucide-react"
+import { ArrowRight, Check, Layers, Loader2, Pencil, Plus, RefreshCw, Save, X } from "lucide-react"
 import { Sheet, SheetContent } from "@resort/shadcn-ui"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@resort/shadcn-ui"
 import {
@@ -51,6 +51,30 @@ export const emptyFacilityGroupForm: FacilityGroupFormState = {
 
 // Create only ever submits the "en" translation — keep it English/ASCII.
 const ENGLISH_TEXT_PATTERN = /^[\x00-\x7F]*$/
+
+// Local autosave for the create form — never sent to the backend, just a browser-local checkpoint.
+const DRAFT_STORAGE_KEY = "facility-group-dialog-draft"
+const DRAFT_SAVE_DEBOUNCE_MS = 500
+
+function hasDraftContent(f: FacilityGroupFormState): boolean {
+  return f.code.trim() !== "" || f.scopes.length > 0
+    || f.icon.type !== "" || f.locale.name.trim() !== "" || f.locale.description.trim() !== ""
+}
+
+function readDraft(): FacilityGroupFormState | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as FacilityGroupFormState
+    return hasDraftContent(parsed) ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function clearDraft() {
+  localStorage.removeItem(DRAFT_STORAGE_KEY)
+}
 
 export interface FacilityGroupDialogProps {
   open: boolean
@@ -105,6 +129,9 @@ export function FacilityGroupDialog({
   // is the fallback in prepareAddLocale below, fired the first time the +Add picker actually needs
   // the full catalog and finds it still empty.
   const { totalCount: totalLocaleCount, refresh: refreshLocalesCatalog } = useLocales()
+  const [draftPrompt, setDraftPrompt] = useState<FacilityGroupFormState | null>(null)
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null)
+  const [draftSyncing, setDraftSyncing] = useState(false)
 
   useEffect(() => {
     if (!open) {
@@ -123,16 +150,70 @@ export function FacilityGroupDialog({
       setTotalScopeCount(null)
       setBusyScopeIds(new Set())
       setPendingUnassignScope(null)
+      setDraftPrompt(null)
+      setDraftSavedAt(null)
+      setDraftSyncing(false)
     }
   }, [open])
 
-  const isDirty = mode === "create"
-    ? form.code.trim() !== ""
-      || form.icon.type !== ""
-      || form.locale.name.trim() !== ""
-      || form.locale.description.trim() !== ""
-      || form.scopes.length > 0
-    : generalEditing || iconEditing || translationsEditing
+  // On opening a fresh create form, offer to resume a locally-saved draft.
+  useEffect(() => {
+    if (open && mode === "create") {
+      setDraftPrompt(readDraft())
+    }
+  }, [open, mode])
+
+  // Debounced local autosave of the create form — skipped while the restore prompt is pending,
+  // otherwise the still-empty parent form would immediately overwrite the draft we're offering.
+  useEffect(() => {
+    if (!open || mode !== "create" || draftPrompt) return
+    if (hasDraftContent(form)) setDraftSyncing(true)
+    const timer = setTimeout(() => {
+      if (hasDraftContent(form)) {
+        localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(form))
+        setDraftSavedAt(new Date())
+      } else {
+        clearDraft()
+        setDraftSavedAt(null)
+      }
+      setDraftSyncing(false)
+    }, DRAFT_SAVE_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [form, open, mode, draftPrompt])
+
+  function restoreDraft() {
+    if (draftPrompt) {
+      onFormChange(draftPrompt)
+      setDraftSavedAt(new Date())
+    }
+    setDraftPrompt(null)
+  }
+
+  function discardDraft() {
+    clearDraft()
+    setDraftSavedAt(null)
+    setDraftSyncing(false)
+    setDraftPrompt(null)
+  }
+
+  const draftIndicator = mode === "create" && (draftSyncing || draftSavedAt) ? (
+    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      {draftSyncing ? (
+        <>
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" /> {t("dialog.draftSyncing")}
+        </>
+      ) : (
+        <>
+          <Save className="h-3.5 w-3.5" />
+          {t("dialog.draftSaved", { time: draftSavedAt!.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" }) })}
+        </>
+      )}
+    </span>
+  ) : undefined
+
+  // Edit/view only — in-progress section edits still warn before discarding, since those aren't
+  // autosaved. Create is covered by the local draft (see draftIndicator above).
+  const isDirty = generalEditing || iconEditing || translationsEditing
 
   // Every active facility scope is already picked/assigned — the picker would have nothing left to
   // offer, so the "Assign Facility Scope" tile is disabled rather than opening onto an empty list.
@@ -142,6 +223,7 @@ export function FacilityGroupDialog({
     && (mode === "create" ? form.scopes.length : form.facility_scopes.length) >= totalScopeCount
 
   function requestClose() {
+    if (mode === "create") { onOpenChange(false); return }
     if (isDirty) setConfirmClose(true)
     else onOpenChange(false)
   }
@@ -204,6 +286,13 @@ export function FacilityGroupDialog({
   function addScope(scope: FacilityScope) {
     if (form.scopes.some((s) => s.id === scope.id)) return
     onFormChange({ ...form, scopes: [...form.scopes, scope] })
+  }
+
+  function addScopes(scopes: FacilityScope[]) {
+    const existing = new Set(form.scopes.map((s) => s.id))
+    const additions = scopes.filter((s) => !existing.has(s.id))
+    if (additions.length === 0) return
+    onFormChange({ ...form, scopes: [...form.scopes, ...additions] })
   }
 
   function removeScope(scopeId: number) {
@@ -313,6 +402,12 @@ export function FacilityGroupDialog({
     }
   }
 
+  // Fires one assignment call per picked scope in parallel — each tracks its own busy state and
+  // reports its own success/failure toast, same as a single assignment would.
+  function handleAssignScopes(scopes: FacilityScope[]) {
+    scopes.forEach((s) => { void handleAssignScope(s) })
+  }
+
   // Edit/view mode only — `DELETE /facility-groups/{id}/scope-assignments/{facility-scope-id}`,
   // identified by the scope's own id (a facility group can only ever have one active assignment to a
   // given scope).
@@ -406,6 +501,7 @@ export function FacilityGroupDialog({
           sort_order: Number(form.locale.sort_order) || 0,
         },
       })
+      clearDraft()
       toast.success(t("facilityGroup.created"))
       onOpenChange(false)
       await onSaved?.()
@@ -688,40 +784,49 @@ export function FacilityGroupDialog({
             </Tabs>
 
             {mode === "create" && activeTab === "general" && (
-              <div className="shrink-0 px-6 py-4 border-t bg-muted/40 flex items-center justify-end gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={requestClose} className="gap-1.5">
-                  <X className="h-3.5 w-3.5" /> {t("common.cancel")}
-                </Button>
-                <Button type="button" size="sm" onClick={handleNextFromGeneral} disabled={!isCodeValid()} className="gap-1.5">
-                  {t("common.next")} <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
+              <div className={`shrink-0 px-6 py-4 border-t bg-muted/40 flex items-center gap-2 ${draftIndicator ? "justify-between" : "justify-end"}`}>
+                {draftIndicator}
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={requestClose} className="gap-1.5">
+                    <X className="h-3.5 w-3.5" /> {t("common.cancel")}
+                  </Button>
+                  <Button type="button" size="sm" onClick={handleNextFromGeneral} disabled={!isCodeValid()} className="gap-1.5">
+                    {t("common.next")} <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             )}
 
             {mode === "create" && activeTab === "icon" && (
-              <div className="shrink-0 px-6 py-4 border-t bg-muted/40 flex items-center justify-end gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={requestClose} className="gap-1.5">
-                  <X className="h-3.5 w-3.5" /> {t("common.cancel")}
-                </Button>
-                <Button type="button" size="sm" onClick={handleNextFromIcon} disabled={!isIconValid()} className="gap-1.5">
-                  {t("common.next")} <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
+              <div className={`shrink-0 px-6 py-4 border-t bg-muted/40 flex items-center gap-2 ${draftIndicator ? "justify-between" : "justify-end"}`}>
+                {draftIndicator}
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={requestClose} className="gap-1.5">
+                    <X className="h-3.5 w-3.5" /> {t("common.cancel")}
+                  </Button>
+                  <Button type="button" size="sm" onClick={handleNextFromIcon} disabled={!isIconValid()} className="gap-1.5">
+                    {t("common.next")} <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             )}
 
             {mode === "create" && activeTab === "locales" && (
-              <div className="shrink-0 px-6 py-4 border-t bg-muted/40 flex items-center justify-end gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={requestClose} className="gap-1.5">
-                  <X className="h-3.5 w-3.5" /> {t("common.cancel")}
-                </Button>
-                <Button type="button" size="sm" onClick={handleNextFromLocales} disabled={!isLocaleValid()} className="gap-1.5">
-                  {t("common.next")} <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
+              <div className={`shrink-0 px-6 py-4 border-t bg-muted/40 flex items-center gap-2 ${draftIndicator ? "justify-between" : "justify-end"}`}>
+                {draftIndicator}
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={requestClose} className="gap-1.5">
+                    <X className="h-3.5 w-3.5" /> {t("common.cancel")}
+                  </Button>
+                  <Button type="button" size="sm" onClick={handleNextFromLocales} disabled={!isLocaleValid()} className="gap-1.5">
+                    {t("common.next")} <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </div>
               </div>
             )}
 
             {mode === "create" && activeTab === "scopes" && (
-              <DialogCreateFooter submitting={submitting} onCancel={requestClose} disabled={!isScopesValid()} />
+              <DialogCreateFooter submitting={submitting} onCancel={requestClose} disabled={!isScopesValid()} indicator={draftIndicator} />
             )}
 
           </form>
@@ -732,7 +837,7 @@ export function FacilityGroupDialog({
         open={scopePickerOpen}
         onOpenChange={setScopePickerOpen}
         excludeIds={(mode === "create" ? form.scopes : form.facility_scopes).map((s) => s.id)}
-        onSelect={mode === "create" ? addScope : handleAssignScope}
+        onSelect={mode === "create" ? addScopes : handleAssignScopes}
       />
 
       <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
@@ -744,6 +849,19 @@ export function FacilityGroupDialog({
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => onOpenChange(false)}>{t("dialog.discardChanges.confirm")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!draftPrompt} onOpenChange={(v) => { if (!v) discardDraft() }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("dialog.restoreDraft.title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("dialog.restoreDraft.descFacilityGroup")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={discardDraft}>{t("dialog.restoreDraft.discard")}</AlertDialogCancel>
+            <AlertDialogAction onClick={restoreDraft}>{t("dialog.restoreDraft.restore")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -41,16 +41,16 @@ export function ResortCard({ data, index, onOpen }: ResortCardProps) {
         className="absolute inset-0 h-full w-full object-cover transition-transform duration-[1200ms] ease-luxe group-hover:scale-110"
       />
       <div className="absolute inset-0 bg-gradient-overlay" />
-      <div className="relative h-full flex flex-col justify-end p-6 text-primary-foreground">
+      <div className="relative h-full flex flex-col justify-end p-6 text-primary-foreground lg:p-8">
         {address && (
           <div className="flex items-center gap-1.5 text-xs uppercase tracking-[0.2em] text-primary-foreground/80 mb-2">
             <MapPin className="h-3 w-3" />
             {address}
           </div>
         )}
-        <h3 className="font-display text-3xl leading-tight text-primary-foreground">{name}</h3>
+        <h3 className="font-display text-3xl leading-tight text-primary-foreground lg:text-4xl">{name}</h3>
         {description && (
-          <p className="mt-2 text-sm text-primary-foreground/80 line-clamp-2">{description}</p>
+          <p className="mt-2 text-sm text-primary-foreground/80 line-clamp-2 lg:text-base">{description}</p>
         )}
       </div>
     </button>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { getToken } from "@/services/api"
+import { LocalesProvider } from "@/providers/locales-provider"
 
 export default function ProtectedLayout({
   children,
@@ -22,5 +23,5 @@ export default function ProtectedLayout({
 
   if (!ready) return null
 
-  return <>{children}</>
+  return <LocalesProvider>{children}</LocalesProvider>
 }

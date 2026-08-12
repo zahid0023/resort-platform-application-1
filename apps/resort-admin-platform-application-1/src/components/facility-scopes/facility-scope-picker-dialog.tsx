@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Layers, Loader2, Search } from "lucide-react";
+import { Check, Layers, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
-import { Badge, Dialog, DialogContent, DialogTitle, Input } from "@resort/shadcn-ui";
+import { Badge, Button, Dialog, DialogContent, DialogTitle, Input } from "@resort/shadcn-ui";
 import { facilityScopesService, type FacilityScope } from "@/services/facility-scopes";
 import { Pagination } from "@/components/shared/pagination";
 
@@ -15,7 +15,8 @@ export interface FacilityScopePickerDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Already-picked scope ids — excluded from the pickable list so the same scope can't be added twice. */
   excludeIds?: number[];
-  onSelect: (scope: FacilityScope) => void;
+  /** Called once with every scope picked in this session, when the user confirms the selection. */
+  onSelect: (scopes: FacilityScope[]) => void;
 }
 
 export function FacilityScopePickerDialog({ open, onOpenChange, excludeIds, onSelect }: FacilityScopePickerDialogProps) {
@@ -29,15 +30,19 @@ export function FacilityScopePickerDialog({ open, onOpenChange, excludeIds, onSe
   const [hasNext, setHasNext] = useState(false);
   const [hasPrevious, setHasPrevious] = useState(false);
   const lastSearchKey = useRef("");
+  // Selected-so-far, keyed by id so a pick made on one page survives navigating to another.
+  const [selected, setSelected] = useState<Map<number, FacilityScope>>(new Map());
 
   useEffect(() => {
     if (open) {
       setSearch("");
       setPage(0);
       lastSearchKey.current = "";
+      setSelected(new Map());
       load(0, "");
     } else {
       setScopes([]);
+      setSelected(new Map());
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -72,8 +77,18 @@ export function FacilityScopePickerDialog({ open, onOpenChange, excludeIds, onSe
     }
   }
 
-  function handleSelect(scope: FacilityScope) {
-    onSelect(scope);
+  function toggleSelect(scope: FacilityScope) {
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (next.has(scope.id)) next.delete(scope.id);
+      else next.set(scope.id, scope);
+      return next;
+    });
+  }
+
+  function handleConfirm() {
+    if (selected.size === 0) return;
+    onSelect(Array.from(selected.values()));
     onOpenChange(false);
   }
 
@@ -122,28 +137,39 @@ export function FacilityScopePickerDialog({ open, onOpenChange, excludeIds, onSe
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {selectable.map((s) => (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => handleSelect(s)}
-                  className="text-left rounded-xl border p-4 transition-all hover:shadow-md hover:-translate-y-0.5 bg-card hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0 bg-muted text-muted-foreground">
-                      <Layers className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-semibold text-sm leading-tight truncate">{s.locale?.name ?? s.code}</p>
-                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 h-4">
-                          {s.code}
-                        </Badge>
+              {selectable.map((s) => {
+                const isSelected = selected.has(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => toggleSelect(s)}
+                    aria-pressed={isSelected}
+                    className={`relative text-left rounded-xl border p-4 transition-all hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "bg-card hover:border-primary/40"
+                    }`}
+                  >
+                    {isSelected && (
+                      <div className="absolute top-2.5 right-2.5 h-4 w-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                        <Check className="h-3 w-3" />
+                      </div>
+                    )}
+                    <div className="flex items-start gap-3">
+                      <div className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 ${isSelected ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
+                        <Layers className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm leading-tight truncate">{s.locale?.name ?? s.code}</p>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <Badge variant="outline" className="font-mono text-[10px] px-1.5 py-0 h-4">
+                            {s.code}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>
@@ -161,6 +187,16 @@ export function FacilityScopePickerDialog({ open, onOpenChange, excludeIds, onSe
             />
           </div>
         )}
+
+        {/* Confirm footer */}
+        <div className="border-t px-5 py-3 shrink-0 flex items-center justify-between gap-3 bg-muted/40">
+          <p className="text-xs text-muted-foreground">
+            {selected.size > 0 ? t("facilityScopePicker.selectedCount", { n: selected.size }) : t("facilityScopePicker.selectHint")}
+          </p>
+          <Button type="button" size="sm" onClick={handleConfirm} disabled={selected.size === 0} className="gap-1.5">
+            <Check className="h-3.5 w-3.5" /> {t("facilityScopePicker.confirm")}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

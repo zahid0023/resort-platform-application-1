@@ -17,6 +17,7 @@ import {
 } from "@resort/shadcn-ui"
 import { resortBasicInfoService } from "@/services/resort-basic-info"
 import type { Locale } from "@/services/locales"
+import { canAddLocaleTranslation } from "@/lib/locale"
 import { toast } from "sonner"
 import type { ResortBasicInfoFormState, ResortLocaleRow } from "./types"
 
@@ -26,6 +27,7 @@ export interface ResortLocaleTranslationsProps {
   resortId: number
   form: ResortBasicInfoFormState
   availableLocales: Locale[]
+  totalLocaleCount: number | null
   onSaved?: () => void | Promise<void>
   editing: boolean
   onEditingChange: (v: boolean) => void
@@ -35,6 +37,7 @@ export function ResortLocaleTranslations({
   resortId,
   form,
   availableLocales,
+  totalLocaleCount,
   onSaved,
   editing,
   onEditingChange,
@@ -187,7 +190,7 @@ export function ResortLocaleTranslations({
               size="sm"
               variant="outline"
               onClick={addNewLocaleRow}
-              disabled={(form.locales.length + newLocaleRows.length) >= availableLocales.length}
+              disabled={!canAddLocaleTranslation(form.locales.length + newLocaleRows.length, totalLocaleCount)}
               className="h-7 text-xs px-2.5"
             >
               <Plus className="h-3.5 w-3.5 mr-1" /> {t("locale.add")}

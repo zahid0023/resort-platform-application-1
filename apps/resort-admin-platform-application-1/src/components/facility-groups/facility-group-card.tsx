@@ -97,7 +97,7 @@ export function FacilityGroupCard({ group, defaultName, onNavigate, onView, onDe
         <CardContent>
           <div className="flex flex-wrap gap-1">
             {scopes.map((s) => (
-              <Badge key={s.id} variant="outline" className="font-mono text-[10px] px-1.5 py-0 h-5">
+              <Badge key={s.id} variant="outline" className="font-mono text-xs px-2.5 py-1 h-6">
                 {s.locale?.name ?? s.code}
               </Badge>
             ))}

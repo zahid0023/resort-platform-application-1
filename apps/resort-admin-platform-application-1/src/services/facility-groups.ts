@@ -108,6 +108,8 @@ export interface ListParams {
   sort_dir?: "ASC" | "DESC";
   code?: string;
   scope_code?: "RESORT" | "ROOM_CATEGORY" | "ROOM";
+  /** Restrict to groups assigned to any of these facility scopes (union/OR — a group needs only one match). */
+  facility_scope_ids?: number[];
 }
 
 export interface ListLocalesParams {
@@ -124,6 +126,9 @@ export const listFacilityGroups = (params: ListParams = {}): Promise<FacilityGro
   if (params.sort_dir) query.set("sort_dir", params.sort_dir);
   if (params.code) query.set("code", params.code);
   if (params.scope_code) query.set("scope-code", params.scope_code);
+  if (params.facility_scope_ids && params.facility_scope_ids.length > 0) {
+    query.set("facilityScopeIds", params.facility_scope_ids.join(","));
+  }
   return api.get<FacilityGroupListResponse>(`/facility-groups?${query.toString()}`);
 };
 

@@ -110,7 +110,7 @@ export function FacilityGeneralInfo({
             <Input
               id="f-code"
               value={form.code}
-              onChange={(e) => onFormChange({ code: e.target.value })}
+              onChange={(e) => onFormChange({ code: e.target.value.toUpperCase() })}
               placeholder="POOL_OUTDOOR"
               required
               disabled={mode !== "create"}

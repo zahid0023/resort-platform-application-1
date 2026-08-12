@@ -118,7 +118,7 @@ export function CityPickerDialog({ open, onOpenChange, selectedId, countryId, on
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {cities.map((city) => {
                 const isSelected = city.id === selectedId
-                const name = city.locales[0]?.name ?? city.code ?? String(city.id)
+                const name = city.locale?.name ?? city.code ?? String(city.id)
                 return (
                   <button
                     key={city.id}

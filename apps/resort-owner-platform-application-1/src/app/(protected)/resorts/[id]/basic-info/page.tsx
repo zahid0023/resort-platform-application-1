@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 import { Spinner } from "@resort/shadcn-ui"
 import { resortBasicInfoService, type ResortBasicInfo } from "@/services/resort-basic-info"
-import { localesService, type Locale } from "@/services/locales"
+import { useLocales } from "@/providers/locales-provider"
 import { ResortLogoSection } from "@/components/resort-basic-info/resort-logo-section"
 import { ResortGeneralInfo } from "@/components/resort-basic-info/resort-general-info"
 import { ResortLocaleTranslations } from "@/components/resort-basic-info/resort-locale-translations"
@@ -56,7 +56,7 @@ export default function ResortBasicInfoPage() {
 
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState<ResortBasicInfoFormState | null>(null)
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([])
+  const { locales: availableLocales, totalCount: totalLocaleCount, loaded: localesLoaded, refresh: refreshLocales } = useLocales()
   const [generalEditing, setGeneralEditing] = useState(false)
   const [translationsEditing, setTranslationsEditing] = useState(false)
 
@@ -73,10 +73,7 @@ export default function ResortBasicInfoPage() {
 
   useEffect(() => {
     refresh()
-    localesService
-      .list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableLocales(res.data))
-      .catch(() => {})
+    if (!localesLoaded) refreshLocales().catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -107,6 +104,7 @@ export default function ResortBasicInfoPage() {
             resortId={resortId}
             form={form}
             availableLocales={availableLocales}
+            totalLocaleCount={totalLocaleCount}
             onSaved={refresh}
             editing={translationsEditing}
             onEditingChange={setTranslationsEditing}

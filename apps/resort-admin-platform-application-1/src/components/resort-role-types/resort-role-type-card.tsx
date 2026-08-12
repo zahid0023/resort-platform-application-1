@@ -1,40 +1,40 @@
-import { Eye, ShieldCheck, Trash2 } from "lucide-react";
+import { Eye, Trash2, UserCog } from "lucide-react";
 import { Card, CardHeader, CardAction } from "@resort/shadcn-ui";
 import { Button } from "@resort/shadcn-ui";
-import type { ResortPermissionType } from "@/services/resort-permission-types";
+import type { ResortRoleType } from "@/services/resort-role-types";
 
-export interface ResortPermissionTypeCardProps {
-  permissionType: ResortPermissionType;
+export interface ResortRoleTypeCardProps {
+  roleType: ResortRoleType;
   defaultName?: string;
-  onView?: (permissionType: ResortPermissionType) => void;
-  onDelete?: (permissionType: ResortPermissionType) => void;
+  onView?: (roleType: ResortRoleType) => void;
+  onDelete?: (roleType: ResortRoleType) => void;
 }
 
-export function ResortPermissionTypeCard({ permissionType, defaultName, onView, onDelete }: ResortPermissionTypeCardProps) {
-  const title = defaultName?.trim() || permissionType.code;
+export function ResortRoleTypeCard({ roleType, defaultName, onView, onDelete }: ResortRoleTypeCardProps) {
+  const title = defaultName?.trim() || roleType.code;
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
-    onDelete?.(permissionType);
+    onDelete?.(roleType);
   };
 
   return (
     <Card
       role="button"
       tabIndex={0}
-      onClick={() => onView?.(permissionType)}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onView?.(permissionType); } }}
+      onClick={() => onView?.(roleType)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onView?.(roleType); } }}
       className="group hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
     >
       <CardHeader>
         <div className="flex items-center gap-3 min-w-0">
           <div className="h-11 w-11 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-semibold shrink-0">
-            <ShieldCheck className="h-4 w-4" />
+            <UserCog className="h-4 w-4" />
           </div>
           <div className="min-w-0">
             <h3 className="font-semibold truncate">{title}</h3>
-            <p className="text-xs text-muted-foreground truncate font-mono">{permissionType.code}</p>
+            <p className="text-xs text-muted-foreground truncate font-mono">{roleType.code}</p>
           </div>
         </div>
         {(onView || onDelete) && (
@@ -45,7 +45,7 @@ export function ResortPermissionTypeCard({ permissionType, defaultName, onView, 
           >
             {onView && (
               <Button size="icon" variant="ghost" className="h-8 w-8"
-                onClick={(e) => { e.stopPropagation(); onView(permissionType); }}
+                onClick={(e) => { e.stopPropagation(); onView(roleType); }}
                 title="View details"
               >
                 <Eye className="h-3.5 w-3.5" />

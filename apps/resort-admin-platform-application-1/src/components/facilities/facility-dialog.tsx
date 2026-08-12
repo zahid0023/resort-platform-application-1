@@ -29,7 +29,7 @@ import {
   assignFacilityGroup,
   unassignFacilityGroup,
 } from "@/services/facilities"
-import { listFacilityGroups, type FacilityGroupSummary } from "@/services/facility-groups"
+import type { FacilityGroupSummary } from "@/services/facility-groups"
 import { toIconValue as groupToIconValue } from "@/components/facility-groups/types"
 import { facilityScopesService, type FacilityScope } from "@/services/facility-scopes"
 import { FacilityScopePickerDialog } from "@/components/facility-scopes/facility-scope-picker-dialog"
@@ -128,13 +128,6 @@ export function FacilityDialog({
   // affected card can show a spinner and the rest of the tab stays interactive.
   const [busyScopeIds, setBusyScopeIds] = useState<Set<number>>(new Set())
   const [pendingUnassignScope, setPendingUnassignScope] = useState<FacilityScope | null>(null)
-  const [groupsLoaded, setGroupsLoaded] = useState(false)
-  // Platform-wide total of active facility groups, from a size-1 `GET /facility-groups` list call (no
-  // dedicated count endpoint exists for facility groups) — compared against `form.facility_groups.length`
-  // (edit/view mode only) to know whether every group is already assigned, in which case the "Assign to
-  // Facility Group" tile is disabled since the picker would have nothing to offer. `null` until the
-  // first fetch resolves.
-  const [totalGroupCount, setTotalGroupCount] = useState<number | null>(null)
   // Edit/view mode only — ids of facility groups currently mid-assign or mid-unassign, so the
   // affected card can show a spinner and the rest of the tab stays interactive.
   const [busyGroupIds, setBusyGroupIds] = useState<Set<number>>(new Set())
@@ -168,8 +161,6 @@ export function FacilityDialog({
       setTotalScopeCount(null)
       setBusyScopeIds(new Set())
       setPendingUnassignScope(null)
-      setGroupsLoaded(false)
-      setTotalGroupCount(null)
       setBusyGroupIds(new Set())
       setPendingUnassignGroup(null)
       setLocalesLoaded(false)
@@ -191,41 +182,31 @@ export function FacilityDialog({
 
   // Create mode always needs at least one group — pre-fill from the fixed one as soon as the dialog
   // opens, so the picker never has to be touched when creating from within a group's own detail page.
+  // The facility's scopes are pre-filled and locked to exactly the fixed group's own scopes too —
+  // the server only allows a group assignment when the facility's scopes are all within the group's
+  // scopes, so letting them diverge here would just produce a 409 CONFLICT down the line.
   useEffect(() => {
     if (open && mode === "create" && fixedFacilityGroup && form.facility_groups.length === 0) {
-      onFormChange({ ...form, facility_groups: [fixedFacilityGroup] })
+      onFormChange({ ...form, facility_groups: [fixedFacilityGroup], facility_scopes: fixedFacilityGroup.facility_scopes })
     }
   }, [open, mode, fixedFacilityGroup]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // View/edit mode can always manage groups (no lock concept there); create mode only when not
   // pre-fixed to a single group.
   const canManageGroups = mode !== "create" || !fixedFacilityGroup
+  // Same lock — pre-fixing to a group forces the facility's scopes to match that group's own scopes.
+  const canManageScopes = mode !== "create" || !fixedFacilityGroup
 
-  function addGroup(group: FacilityGroupSummary) {
-    if (form.facility_groups.some((g) => g.id === group.id)) return
-    onFormChange({ ...form, facility_groups: [...form.facility_groups, group] })
+  function addGroups(groups: FacilityGroupSummary[]) {
+    const existing = new Set(form.facility_groups.map((g) => g.id))
+    const additions = groups.filter((g) => !existing.has(g.id))
+    if (additions.length === 0) return
+    onFormChange({ ...form, facility_groups: [...form.facility_groups, ...additions] })
   }
 
   function removeGroup(groupId: number) {
     onFormChange({ ...form, facility_groups: form.facility_groups.filter((g) => g.id !== groupId) })
   }
-
-  // Platform-wide active-group total, from a size-1 `GET /facility-groups` list call (no dedicated
-  // count endpoint exists for facility groups) — compared against `form.facility_groups.length` to
-  // know whether the "Assign to Facility Group" tile should be disabled because every group is already
-  // assigned. `form.facility_groups` itself needs no fetch here — it's already as fresh as the card
-  // click that opened this dialog (GET /facilities/{id} embeds it).
-  async function fetchGroupCount(): Promise<void> {
-    const res = await listFacilityGroups({ page: 0, size: 1 })
-    setTotalGroupCount(res.total_elements)
-  }
-
-  // Same lazy-once-per-tab-selection pattern as the scopes tab.
-  useEffect(() => {
-    if (!open || mode === "create" || activeTab !== "groups" || groupsLoaded) return
-    setGroupsLoaded(true)
-    fetchGroupCount().catch((err) => toast.error((err as Error).message))
-  }, [open, mode, activeTab, groupsLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function setGroupBusy(groupId: number, busy: boolean) {
     setBusyGroupIds((prev) => {
@@ -253,6 +234,12 @@ export function FacilityDialog({
     } finally {
       setGroupBusy(group.id, false)
     }
+  }
+
+  // Fires one assignment call per picked group in parallel — each tracks its own busy state and
+  // reports its own success/failure toast, same as a single assignment would.
+  function handleAssignGroups(groups: FacilityGroupSummary[]) {
+    groups.forEach((g) => { void handleAssignGroup(g) })
   }
 
   // Edit/view mode only — `DELETE /facilities/{id}/group-assignments/{facility-group-id}`, identified
@@ -329,10 +316,6 @@ export function FacilityDialog({
   // left to offer, so the "Assign to Facility Scope" tile is disabled rather than opening onto an
   // empty list. Create mode only ever adds from the shared picker's own catalog, so this doesn't apply.
   const allScopesAssigned = totalScopeCount !== null && form.facility_scopes.length >= totalScopeCount
-
-  // Same idea for facility groups — disables the "Assign to Facility Group" tile once every group is
-  // already assigned to this facility.
-  const allGroupsAssigned = totalGroupCount !== null && form.facility_groups.length >= totalGroupCount
 
   function requestClose() {
     if (mode === "create") { onOpenChange(false); return }
@@ -415,9 +398,11 @@ export function FacilityDialog({
     return true
   }
 
-  function addScope(scope: FacilityScope) {
-    if (form.facility_scopes.some((s) => s.id === scope.id)) return
-    onFormChange({ ...form, facility_scopes: [...form.facility_scopes, scope] })
+  function addScopes(scopes: FacilityScope[]) {
+    const existing = new Set(form.facility_scopes.map((s) => s.id))
+    const additions = scopes.filter((s) => !existing.has(s.id))
+    if (additions.length === 0) return
+    onFormChange({ ...form, facility_scopes: [...form.facility_scopes, ...additions] })
   }
 
   function removeScope(scopeId: number) {
@@ -465,6 +450,12 @@ export function FacilityDialog({
     } finally {
       setScopeBusy(scope.id, false)
     }
+  }
+
+  // Fires one assignment call per picked scope in parallel — each tracks its own busy state and
+  // reports its own success/failure toast, same as a single assignment would.
+  function handleAssignScopes(scopes: FacilityScope[]) {
+    scopes.forEach((s) => { void handleAssignScope(s) })
   }
 
   // Edit/view mode only — `DELETE /facilities/{id}/scope-assignments/{facility-scope-id}`, identified
@@ -597,9 +588,8 @@ export function FacilityDialog({
         setScopesLoaded(true)
       }
       if (activeTab === "groups") {
-        const [res] = await Promise.all([getFacility(facilityId), fetchGroupCount()])
+        const res = await getFacility(facilityId)
         onFormChange({ ...form, facility_groups: res.data.facility_groups })
-        setGroupsLoaded(true)
       }
       toast.success(t("common.refreshed"))
     } catch (err) {
@@ -795,31 +785,35 @@ export function FacilityDialog({
                                 {s.code}
                               </Badge>
                             </div>
-                            <Button
-                              type="button"
-                              size="icon"
-                              variant="ghost"
-                              className="h-8 w-8 shrink-0"
-                              disabled={busy}
-                              onClick={() => (mode === "create" ? removeScope(s.id) : setPendingUnassignScope(s))}
-                            >
-                              {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
-                            </Button>
+                            {canManageScopes && (
+                              <Button
+                                type="button"
+                                size="icon"
+                                variant="ghost"
+                                className="h-8 w-8 shrink-0"
+                                disabled={busy}
+                                onClick={() => (mode === "create" ? removeScope(s.id) : setPendingUnassignScope(s))}
+                              >
+                                {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <X className="h-3.5 w-3.5" />}
+                              </Button>
+                            )}
                           </CardContent>
                         </Card>
                       )
                     })}
                     <Card
                       role="button"
-                      aria-disabled={mode !== "create" && allScopesAssigned}
-                      tabIndex={mode !== "create" && allScopesAssigned ? -1 : 0}
-                      onClick={() => { if (mode === "create" || !allScopesAssigned) setScopePickerOpen(true) }}
+                      aria-disabled={!canManageScopes || (mode !== "create" && allScopesAssigned)}
+                      tabIndex={!canManageScopes || (mode !== "create" && allScopesAssigned) ? -1 : 0}
+                      onClick={() => {
+                        if (canManageScopes && (mode === "create" || !allScopesAssigned)) setScopePickerOpen(true)
+                      }}
                       onKeyDown={(e) => {
-                        if (mode !== "create" && allScopesAssigned) return
+                        if (!canManageScopes || (mode !== "create" && allScopesAssigned)) return
                         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setScopePickerOpen(true) }
                       }}
                       className={
-                        mode !== "create" && allScopesAssigned
+                        !canManageScopes || (mode !== "create" && allScopesAssigned)
                           ? "cursor-not-allowed border-2 border-dashed border-muted-foreground/20 bg-muted/20 shadow-none ring-0 opacity-60"
                           : "group/assign cursor-pointer border-2 border-dashed border-primary/25 bg-primary/3 shadow-none ring-0 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary hover:bg-primary/5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       }
@@ -827,7 +821,7 @@ export function FacilityDialog({
                       <CardContent className="flex items-center gap-3 py-3">
                         <div
                           className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 ${
-                            mode !== "create" && allScopesAssigned
+                            !canManageScopes || (mode !== "create" && allScopesAssigned)
                               ? "bg-muted text-muted-foreground"
                               : "bg-primary/10 text-primary group-hover/assign:scale-110 group-hover/assign:rotate-90"
                           }`}
@@ -835,11 +829,15 @@ export function FacilityDialog({
                           <Plus className="h-4 w-4" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className={`font-semibold text-sm truncate ${mode !== "create" && allScopesAssigned ? "text-muted-foreground" : "text-primary"}`}>
+                          <p className={`font-semibold text-sm truncate ${!canManageScopes || (mode !== "create" && allScopesAssigned) ? "text-muted-foreground" : "text-primary"}`}>
                             {t("facility.assignScope")}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">
-                            {mode !== "create" && allScopesAssigned ? t("facility.assignScopeAllAssigned") : t("facility.assignScopeHint")}
+                            {!canManageScopes
+                              ? t("facility.scopeLockedToGroup")
+                              : mode !== "create" && allScopesAssigned
+                                ? t("facility.assignScopeAllAssigned")
+                                : t("facility.assignScopeHint")}
                           </p>
                         </div>
                       </CardContent>
@@ -908,17 +906,17 @@ export function FacilityDialog({
                     })}
                     <Card
                       role="button"
-                      aria-disabled={!canManageGroups || (mode !== "create" && allGroupsAssigned)}
-                      tabIndex={!canManageGroups || (mode !== "create" && allGroupsAssigned) ? -1 : 0}
+                      aria-disabled={!canManageGroups}
+                      tabIndex={!canManageGroups ? -1 : 0}
                       onClick={() => {
-                        if (canManageGroups && (mode === "create" || !allGroupsAssigned)) setGroupPickerOpen(true)
+                        if (canManageGroups) setGroupPickerOpen(true)
                       }}
                       onKeyDown={(e) => {
-                        if (!canManageGroups || (mode !== "create" && allGroupsAssigned)) return
+                        if (!canManageGroups) return
                         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setGroupPickerOpen(true) }
                       }}
                       className={
-                        !canManageGroups || (mode !== "create" && allGroupsAssigned)
+                        !canManageGroups
                           ? "cursor-not-allowed border-2 border-dashed border-muted-foreground/20 bg-muted/20 shadow-none ring-0 opacity-60"
                           : "group/assign cursor-pointer border-2 border-dashed border-primary/25 bg-primary/3 shadow-none ring-0 transition-all duration-200 hover:-translate-y-0.5 hover:border-primary hover:bg-primary/5 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       }
@@ -926,7 +924,7 @@ export function FacilityDialog({
                       <CardContent className="flex items-center gap-3 py-3">
                         <div
                           className={`h-9 w-9 rounded-lg flex items-center justify-center shrink-0 transition-transform duration-200 ${
-                            !canManageGroups || (mode !== "create" && allGroupsAssigned)
+                            !canManageGroups
                               ? "bg-muted text-muted-foreground"
                               : "bg-primary/10 text-primary group-hover/assign:scale-110 group-hover/assign:rotate-90"
                           }`}
@@ -934,11 +932,11 @@ export function FacilityDialog({
                           <Plus className="h-4 w-4" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className={`font-semibold text-sm truncate ${!canManageGroups || (mode !== "create" && allGroupsAssigned) ? "text-muted-foreground" : "text-primary"}`}>
+                          <p className={`font-semibold text-sm truncate ${!canManageGroups ? "text-muted-foreground" : "text-primary"}`}>
                             {t("facility.assignGroup")}
                           </p>
                           <p className="text-xs text-muted-foreground truncate">
-                            {mode !== "create" && allGroupsAssigned ? t("facility.assignGroupAllAssigned") : t("facility.assignGroupHint")}
+                            {t("facility.assignGroupHint")}
                           </p>
                         </div>
                       </CardContent>
@@ -1016,14 +1014,15 @@ export function FacilityDialog({
         open={scopePickerOpen}
         onOpenChange={setScopePickerOpen}
         excludeIds={form.facility_scopes.map((s) => s.id)}
-        onSelect={mode === "create" ? addScope : handleAssignScope}
+        onSelect={mode === "create" ? addScopes : handleAssignScopes}
       />
 
       <FacilityGroupPickerDialog
         open={groupPickerOpen}
         onOpenChange={setGroupPickerOpen}
         excludeIds={form.facility_groups.map((g) => g.id)}
-        onSelect={mode === "create" ? addGroup : handleAssignGroup}
+        facilityScopeIds={form.facility_scopes.map((s) => s.id)}
+        onSelect={mode === "create" ? addGroups : handleAssignGroups}
       />
 
       <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>

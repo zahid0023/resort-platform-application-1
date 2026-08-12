@@ -1,7 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cd C:/Users/User/Downloads/resort-platform-application-1 && pnpm --filter @resort/config add tw-animate-css 2>&1)"
+      "Bash(cd C:/Users/User/Downloads/resort-platform-application-1 && pnpm --filter @resort/config add tw-animate-css 2>&1)",
+      "Bash(rm -f tsconfig.tsbuildinfo)",
+      "Bash(npx tsc *)"
     ]
   }
 }

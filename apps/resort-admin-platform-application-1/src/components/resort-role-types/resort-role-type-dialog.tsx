@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { ArrowRight, RefreshCw, Save, ShieldCheck, X } from "lucide-react";
+import { ArrowRight, RefreshCw, Save, UserCog, X } from "lucide-react";
 import { Button, Sheet, SheetContent } from "@resort/shadcn-ui";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@resort/shadcn-ui";
 import {
@@ -15,15 +15,15 @@ import {
 } from "@resort/shadcn-ui";
 import { DialogEntityHeader } from "@/components/shared/dialog-entity-header";
 import { DialogCreateFooter } from "@/components/shared/dialog-create-footer";
-import { resortPermissionTypesService } from "@/services/resort-permission-types";
+import { resortRoleTypesService } from "@/services/resort-role-types";
 import type { Locale } from "@/services/locales";
 import { useLocales } from "@/providers/locales-provider";
 import { toast } from "sonner";
-import type { ResortPermissionTypeDialogMode, ResortPermissionTypeFormState } from "./types";
-import { ResortPermissionTypeGeneralInfo } from "./resort-permission-type-general-info";
-import { ResortPermissionTypeLocaleTranslations } from "./resort-permission-type-locale-translations";
+import type { ResortRoleTypeDialogMode, ResortRoleTypeFormState } from "./types";
+import { ResortRoleTypeGeneralInfo } from "./resort-role-type-general-info";
+import { ResortRoleTypeLocaleTranslations } from "./resort-role-type-locale-translations";
 
-export const emptyResortPermissionTypeForm: ResortPermissionTypeFormState = {
+export const emptyResortRoleTypeForm: ResortRoleTypeFormState = {
   code: "",
   sort_order: 0,
   locale: { name: "", description: "", sort_order: 0 },
@@ -35,18 +35,18 @@ const ENGLISH_TEXT_PATTERN = /^[\x00-\x7F]*$/;
 const CODE_MAX_LENGTH = 100;
 
 // Local autosave for the create form — never sent to the backend, just a browser-local checkpoint.
-const DRAFT_STORAGE_KEY = "resort-permission-type-dialog-draft";
+const DRAFT_STORAGE_KEY = "resort-role-type-dialog-draft";
 const DRAFT_SAVE_DEBOUNCE_MS = 500;
 
-function hasDraftContent(f: ResortPermissionTypeFormState): boolean {
+function hasDraftContent(f: ResortRoleTypeFormState): boolean {
   return f.code.trim() !== "" || f.locale.name.trim() !== "" || f.locale.description.trim() !== "";
 }
 
-function readDraft(): ResortPermissionTypeFormState | null {
+function readDraft(): ResortRoleTypeFormState | null {
   try {
     const raw = localStorage.getItem(DRAFT_STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as ResortPermissionTypeFormState;
+    const parsed = JSON.parse(raw) as ResortRoleTypeFormState;
     return hasDraftContent(parsed) ? parsed : null;
   } catch {
     return null;
@@ -57,25 +57,25 @@ function clearDraft() {
   localStorage.removeItem(DRAFT_STORAGE_KEY);
 }
 
-export interface ResortPermissionTypeDialogProps {
+export interface ResortRoleTypeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  mode: ResortPermissionTypeDialogMode;
-  permissionTypeId?: number;
-  form: ResortPermissionTypeFormState;
-  onFormChange: (form: ResortPermissionTypeFormState) => void;
+  mode: ResortRoleTypeDialogMode;
+  roleTypeId?: number;
+  form: ResortRoleTypeFormState;
+  onFormChange: (form: ResortRoleTypeFormState) => void;
   onSaved?: () => void | Promise<void>;
 }
 
-export function ResortPermissionTypeDialog({
+export function ResortRoleTypeDialog({
   open,
   onOpenChange,
   mode,
-  permissionTypeId,
+  roleTypeId,
   form,
   onFormChange,
   onSaved,
-}: ResortPermissionTypeDialogProps) {
+}: ResortRoleTypeDialogProps) {
   const { t } = useTranslation();
   const [submitting, setSubmitting] = useState(false);
   const [generalEditing, setGeneralEditing] = useState(false);
@@ -91,11 +91,11 @@ export function ResortPermissionTypeDialog({
   // button only needs `refreshLocalesCount` (GET /locales/count) — the full paginated catalog
   // (GET /locales) is only ever needed by the +Add language picker.
   const { locales: availableLocales, totalCount: totalLocaleCount, refresh: refreshLocalesCatalog, refreshCount: refreshLocalesCount } = useLocales();
-  // Owned here so it survives ResortPermissionTypeLocaleTranslations-style unmount on tab switch —
-  // see [[feedback_tab_content_state]].
+  // Owned here so it survives ResortRoleTypeLocaleTranslations-style unmount on tab switch — see
+  // [[feedback_tab_content_state]].
   const [localeSearch, setLocaleSearch] = useState("");
   const lastLocaleSearchKey = useRef("");
-  const [draftPrompt, setDraftPrompt] = useState<ResortPermissionTypeFormState | null>(null);
+  const [draftPrompt, setDraftPrompt] = useState<ResortRoleTypeFormState | null>(null);
   const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null);
   const [draftSyncing, setDraftSyncing] = useState(false);
 
@@ -189,7 +189,7 @@ export function ResortPermissionTypeDialog({
   function validateGeneralInfo(): boolean {
     const code = form.code.trim();
     if (!code) { toast.error(t("toast.codeRequired")); return false; }
-    if (code.length > CODE_MAX_LENGTH) { toast.error(t("toast.resortPermissionTypeCodeMaxLength")); return false; }
+    if (code.length > CODE_MAX_LENGTH) { toast.error(t("toast.resortRoleTypeCodeMaxLength")); return false; }
     return true;
   }
 
@@ -200,8 +200,8 @@ export function ResortPermissionTypeDialog({
 
   // Shared by the lazy first-load, the search box, and the manual refresh button.
   async function fetchLocales(localeCode?: string): Promise<void> {
-    if (permissionTypeId == null) return;
-    const res = await resortPermissionTypesService.listLocales(permissionTypeId, { size: 10, localeCode: localeCode || undefined });
+    if (roleTypeId == null) return;
+    const res = await resortRoleTypesService.listLocales(roleTypeId, { size: 10, localeCode: localeCode || undefined });
     onFormChange({
       ...form,
       locales: res.data.map((l) => ({
@@ -214,8 +214,8 @@ export function ResortPermissionTypeDialog({
     });
   }
 
-  // Translations are only fetched once the tab is actually selected — not when the resort permission
-  // type card is opened — and only the first time per dialog session; re-selecting the tab afterward
+  // Translations are only fetched once the tab is actually selected — not when the resort role type
+  // card is opened — and only the first time per dialog session; re-selecting the tab afterward
   // reuses what's already loaded. Use the Refresh button for an explicit re-fetch. The language
   // catalog needs no fetch here at all — LocalesProvider already loaded it once for the whole session.
   useEffect(() => {
@@ -225,7 +225,7 @@ export function ResortPermissionTypeDialog({
   }, [open, mode, activeTab, localesLoaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Debounced server-side search, view mode only — edit mode always needs the complete,
-  // unfiltered list (see ResortPermissionTypeLocaleTranslations' duplicate-locale checks).
+  // unfiltered list (see ResortRoleTypeLocaleTranslations' duplicate-locale checks).
   useEffect(() => {
     if (!open || mode === "create" || translationsEditing) return;
     if (lastLocaleSearchKey.current === localeSearch) return;
@@ -257,14 +257,14 @@ export function ResortPermissionTypeDialog({
   }
 
   // Manual refresh only — switching tabs never re-fetches on its own otherwise. On the locales tab
-  // this re-syncs just the shared language count (GET /locales/count) and this resort permission
-  // type's own translations — there's no dedicated locales/count sub-resource for this entity too.
+  // this re-syncs just the shared language count (GET /locales/count) and this resort role type's
+  // own translations — there's no dedicated locales/count sub-resource for this entity to also pull.
   async function handleRefresh() {
-    if (permissionTypeId == null) return;
+    if (roleTypeId == null) return;
     setRefreshing(true);
     try {
       if (activeTab === "general") {
-        const res = await resortPermissionTypesService.get(permissionTypeId);
+        const res = await resortRoleTypesService.get(roleTypeId);
         const full = res.data;
         onFormChange({ ...form, sort_order: full.sort_order });
       } else {
@@ -295,7 +295,7 @@ export function ResortPermissionTypeDialog({
     if (!ENGLISH_TEXT_PATTERN.test(form.locale.description)) { toast.error(t("toast.localeDescriptionEnglishOnly")); return; }
     setSubmitting(true);
     try {
-      await resortPermissionTypesService.create({
+      await resortRoleTypesService.create({
         code: form.code.trim().toUpperCase(),
         sort_order: Number(form.sort_order) || 0,
         locale: {
@@ -305,7 +305,7 @@ export function ResortPermissionTypeDialog({
         },
       });
       clearDraft();
-      toast.success(t("resortPermissionType.createdToast"));
+      toast.success(t("resortRoleType.createdToast"));
       onOpenChange(false);
       await onSaved?.();
     } catch (err) {
@@ -316,8 +316,8 @@ export function ResortPermissionTypeDialog({
   }
 
   const isEditing = generalEditing || translationsEditing;
-  const headerTitle = mode === "create" ? t("dialog.resortPermissionType.new") : (isEditing ? t("dialog.resortPermissionType.edit") : t("dialog.resortPermissionType.view"));
-  const headerDesc = mode === "create" ? t("dialog.resortPermissionType.desc.create") : (isEditing ? t("dialog.resortPermissionType.desc.edit") : t("dialog.resortPermissionType.desc.view"));
+  const headerTitle = mode === "create" ? t("dialog.resortRoleType.new") : (isEditing ? t("dialog.resortRoleType.edit") : t("dialog.resortRoleType.view"));
+  const headerDesc = mode === "create" ? t("dialog.resortRoleType.desc.create") : (isEditing ? t("dialog.resortRoleType.desc.edit") : t("dialog.resortRoleType.desc.view"));
 
   return (
     <>
@@ -330,7 +330,7 @@ export function ResortPermissionTypeDialog({
         >
           <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
 
-            <DialogEntityHeader icon={<ShieldCheck className="h-4 w-4" />} title={headerTitle} description={headerDesc} />
+            <DialogEntityHeader icon={<UserCog className="h-4 w-4" />} title={headerTitle} description={headerDesc} />
 
             <Tabs
               value={activeTab}
@@ -360,11 +360,11 @@ export function ResortPermissionTypeDialog({
               </div>
 
               <TabsContent value="general" className="min-h-0 overflow-y-auto px-6 py-5">
-                <ResortPermissionTypeGeneralInfo
+                <ResortRoleTypeGeneralInfo
                   mode={mode}
                   form={form}
                   onFormChange={(patch) => onFormChange({ ...form, ...patch })}
-                  permissionTypeId={permissionTypeId}
+                  roleTypeId={roleTypeId}
                   onSaved={onSaved}
                   editing={generalEditing}
                   onEditingChange={setGeneralEditing}
@@ -373,11 +373,11 @@ export function ResortPermissionTypeDialog({
               </TabsContent>
 
               <TabsContent value="locales" className="min-h-0 overflow-y-auto px-6 py-5">
-                <ResortPermissionTypeLocaleTranslations
+                <ResortRoleTypeLocaleTranslations
                   mode={mode}
                   form={form}
                   onFormChange={onFormChange}
-                  permissionTypeId={permissionTypeId}
+                  roleTypeId={roleTypeId}
                   onSaved={onSaved}
                   editing={translationsEditing}
                   onEditingChange={setTranslationsEditing}
@@ -432,7 +432,7 @@ export function ResortPermissionTypeDialog({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("dialog.restoreDraft.title")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("dialog.restoreDraft.descResortPermissionType")}</AlertDialogDescription>
+            <AlertDialogDescription>{t("dialog.restoreDraft.descResortRoleType")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={discardDraft}>{t("dialog.restoreDraft.discard")}</AlertDialogCancel>

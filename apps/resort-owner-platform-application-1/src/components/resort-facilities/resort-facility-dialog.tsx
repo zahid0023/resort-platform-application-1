@@ -265,6 +265,7 @@ export interface ResortFacilityDialogProps {
   form: ResortFacilityFormState
   onFormChange: (form: ResortFacilityFormState) => void
   availableLocales: Locale[]
+  totalLocaleCount: number | null
   onSaved?: () => void | Promise<void>
   lockedGroupName?: string
   defaultFacilityMode?: FacilityMode
@@ -280,6 +281,7 @@ export function ResortFacilityDialog({
   form,
   onFormChange,
   availableLocales,
+  totalLocaleCount,
   onSaved,
   lockedGroupName,
   defaultFacilityMode = "platform",
@@ -521,6 +523,7 @@ export function ResortFacilityDialog({
                 onFormChange={onFormChange}
                 facilityId={facilityId}
                 availableLocales={availableLocales}
+                totalLocaleCount={totalLocaleCount}
                 onSaved={onSaved}
                 editing={translationsEditing}
                 onEditingChange={setTranslationsEditing}

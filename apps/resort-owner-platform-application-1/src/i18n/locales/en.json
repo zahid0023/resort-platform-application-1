@@ -9,7 +9,8 @@
       "submit": "Login",
       "submitting": "Logging in...",
       "successToast": "Logged in successfully!",
-      "failToast": "Login failed. Please try again."
+      "failToast": "Login failed. Please try again.",
+      "invalidCredentialsToast": "The email or password you entered is incorrect."
     },
     "register": {
       "title": "Create an account",

@@ -102,6 +102,8 @@
     "providerCodeMaxLength": "Code can only be 50 characters.",
     "facilityScopeCodeMaxLength": "Code can only be 50 characters.",
     "contactTypeCodeMaxLength": "Code can only be 50 characters.",
+    "resortRoleTypeCodeMaxLength": "Code can only be 100 characters.",
+    "resortPermissionTypeCodeMaxLength": "Code can only be 100 characters.",
     "bedTypeCodeMaxLength": "Code can only be 50 characters.",
     "commChannelCodeMaxLength": "Code can only be 50 characters.",
     "roomCategoryCodeMaxLength": "Code can only be 50 characters.",
@@ -148,14 +150,20 @@
     "count": "{{n}} facility groups",
     "searchPlaceholder": "Search by code…",
     "empty": "No facility groups found.",
-    "loadFailed": "Failed to load facility groups."
+    "loadFailed": "Failed to load facility groups.",
+    "selectHint": "Select one or more facility groups.",
+    "selectedCount": "{{n}} selected",
+    "confirm": "Add Selected"
   },
   "facilityScopePicker": {
     "title": "Select Facility Scope",
     "count": "{{n}} facility scopes",
     "searchPlaceholder": "Search by code…",
     "empty": "No facility scopes found.",
-    "loadFailed": "Failed to load facility scopes."
+    "loadFailed": "Failed to load facility scopes.",
+    "selectHint": "Select one or more facility scopes.",
+    "selectedCount": "{{n}} selected",
+    "confirm": "Add Selected"
   },
   "priceScopePicker": {
     "title": "Select Price Scope",
@@ -228,9 +236,9 @@
       "priceUnit": "No locale translations for this price unit.",
       "pageType": "No locale translations for this page type.",
       "uiBlockSection": "No locale translations for this UI block section.",
-      "resortAccessType": "No locale translations for this resort access type.",
       "resortPermissionType": "No locale translations for this resort permission type.",
       "contactType": "No locale translations for this contact type.",
+      "resortRoleType": "No locale translations for this resort role type.",
       "priceScope": "No locale translations for this price scope.",
       "commChannel": "No locale translations for this communication channel.",
       "facilityScope": "No locale translations for this facility scope.",
@@ -260,14 +268,14 @@
     "cityName": "City name in this language",
     "cityDescription": "Optional description...",
     "cityCode": "DHK",
-    "resortAccessTypeName": "Access type name in this language",
-    "resortAccessTypeDescription": "Optional description...",
     "resortPermissionTypeName": "Permission type name in this language",
     "resortPermissionTypeDescription": "Optional description...",
     "facilityScopeName": "Scope name in this language",
     "facilityScopeDescription": "Optional description...",
     "contactTypeName": "Contact type name in this language",
     "contactTypeDescription": "Optional description...",
+    "resortRoleTypeName": "Role name in this language",
+    "resortRoleTypeDescription": "Optional description...",
     "dayOfWeekName": "Day name in this language",
     "dayOfWeekShortName": "Mon",
     "dayOfWeekDescription": "Optional description...",
@@ -361,6 +369,26 @@
         "view": "Contact type details and locale translations."
       }
     },
+    "resortRoleType": {
+      "new": "New Resort Role Type",
+      "edit": "Edit Resort Role Type",
+      "view": "Resort Role Type Details",
+      "desc": {
+        "create": "Add a new resort role type with locale translations.",
+        "edit": "Update resort role type details and locale translations.",
+        "view": "Resort role type details and locale translations."
+      }
+    },
+    "resortPermissionType": {
+      "new": "New Resort Permission Type",
+      "edit": "Edit Resort Permission Type",
+      "view": "Resort Permission Type Details",
+      "desc": {
+        "create": "Add a new resort permission type with locale translations.",
+        "edit": "Update resort permission type details and locale translations.",
+        "view": "Resort permission type details and locale translations."
+      }
+    },
     "priceType": {
       "new": "New Price Type",
       "edit": "Edit Price Type",
@@ -422,7 +450,10 @@
       "descCurrency": "You have an unsaved draft for a new currency. Would you like to restore it or start fresh?",
       "descFacilityScope": "You have an unsaved draft for a new facility scope. Would you like to restore it or start fresh?",
       "descFacility": "You have an unsaved draft for a new facility. Would you like to restore it or start fresh?",
+      "descFacilityGroup": "You have an unsaved draft for a new facility group. Would you like to restore it or start fresh?",
       "descContactType": "You have an unsaved draft for a new contact type. Would you like to restore it or start fresh?",
+      "descResortRoleType": "You have an unsaved draft for a new resort role type. Would you like to restore it or start fresh?",
+      "descResortPermissionType": "You have an unsaved draft for a new resort permission type. Would you like to restore it or start fresh?",
       "descPriceType": "You have an unsaved draft for a new price type. Would you like to restore it or start fresh?",
       "descPriceScope": "You have an unsaved draft for a new price scope. Would you like to restore it or start fresh?",
       "descPriceUnit": "You have an unsaved draft for a new price unit. Would you like to restore it or start fresh?",
@@ -546,6 +577,14 @@
     },
     "contactType": {
       "title": "Delete Contact Type",
+      "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+    },
+    "resortRoleType": {
+      "title": "Delete Resort Role Type",
+      "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
+    },
+    "resortPermissionType": {
+      "title": "Delete Resort Permission Type",
       "desc": "Are you sure you want to delete {{code}}? This action cannot be undone."
     },
     "bedType": {
@@ -682,6 +721,7 @@
     "assignScope": "Assign to Facility Scope",
     "assignScopeHint": "Pick from the scope catalog",
     "assignScopeAllAssigned": "All facility scopes are already assigned",
+    "scopeLockedToGroup": "Matches the facility group's own scopes",
     "scopeAssigned": "Scope assigned.",
     "scopeUnassigned": "Scope unassigned.",
     "scopeUnassignTitle": "Remove scope assignment?",
@@ -867,17 +907,6 @@
     "descView": "Page type details and locale translations.",
     "namePlaceholder": "Page type name in this language"
   },
-  "resortAccessType": {
-    "title": "Resort Access Types",
-    "subtitle": "Define roles users can hold in relation to a specific resort.",
-    "new": "New Access Type",
-    "loading": "Loading resort access types…",
-    "empty": "No resort access types found.",
-    "createdToast": "Resort access type created successfully!",
-    "updatedToast": "Resort access type updated successfully.",
-    "deleteTitle": "Delete Resort Access Type",
-    "deleteDesc": "Are you sure you want to delete {{code}}? This action cannot be undone."
-  },
   "resortPermissionType": {
     "title": "Resort Permission Types",
     "subtitle": "Define granular actions users can perform within a specific resort.",
@@ -885,29 +914,7 @@
     "loading": "Loading resort permission types…",
     "empty": "No resort permission types found.",
     "createdToast": "Resort permission type created successfully!",
-    "updatedToast": "Resort permission type updated successfully.",
-    "deleteTitle": "Delete Resort Permission Type",
-    "deleteDesc": "Are you sure you want to delete {{code}}? This action cannot be undone."
-  },
-  "resortPermissionTypeDialog": {
-    "new": "New Resort Permission Type",
-    "edit": "Edit Resort Permission Type",
-    "view": "Resort Permission Type Details",
-    "desc": {
-      "create": "Add a new resort permission type with locale translations.",
-      "edit": "Update resort permission type details and locale translations.",
-      "view": "Resort permission type details and locale translations."
-    }
-  },
-  "resortAccessTypeDialog": {
-    "new": "New Resort Access Type",
-    "edit": "Edit Resort Access Type",
-    "view": "Resort Access Type Details",
-    "desc": {
-      "create": "Add a new resort access type with locale translations.",
-      "edit": "Update resort access type details and locale translations.",
-      "view": "Resort access type details and locale translations."
-    }
+    "updatedToast": "Resort permission type updated successfully."
   },
   "commChannel": {
     "title": "Communication Channels",
@@ -948,6 +955,15 @@
     "empty": "No contact types found.",
     "createdToast": "Contact type created successfully!",
     "updatedToast": "Contact type updated successfully."
+  },
+  "resortRoleType": {
+    "title": "Resort Role Types",
+    "subtitle": "Manage the roles a user can hold with respect to a resort.",
+    "new": "New Resort Role Type",
+    "loading": "Loading resort role types…",
+    "empty": "No resort role types found.",
+    "createdToast": "Resort role type created successfully!",
+    "updatedToast": "Resort role type updated successfully."
   },
   "dayOfWeek": {
     "title": "Days of Week",

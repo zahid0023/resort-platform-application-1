@@ -101,7 +101,7 @@ export function FacilityScopeGeneralInfo({
               id="fs-code"
               value={form.code}
               onChange={(e) => {
-                const value = e.target.value;
+                const value = e.target.value.toUpperCase();
                 if (value.length > CODE_MAX_LENGTH) { toast.error(t("toast.facilityScopeCodeMaxLength")); return; }
                 onFormChange({ code: value });
               }}

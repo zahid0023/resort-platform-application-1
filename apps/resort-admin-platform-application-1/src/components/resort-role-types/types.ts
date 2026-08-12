@@ -1,6 +1,6 @@
 import type { Locale } from "@/services/locales";
 
-export type ResortPermissionTypeDialogMode = "create" | "view";
+export type ResortRoleTypeDialogMode = "create" | "view";
 
 export interface LocaleRow {
   id?: number;
@@ -14,10 +14,10 @@ export interface LocaleRow {
   _new?: boolean;
 }
 
-export interface ResortPermissionTypeFormState {
+export interface ResortRoleTypeFormState {
   code: string;
   sort_order: number;
-  /** Create mode only — the single "en" translation created alongside the resort permission type */
+  /** Create mode only — the single "en" translation created alongside the resort role type */
   locale: { name: string; description: string; sort_order: number };
   /** View mode only — every existing translation, populated after creation */
   locales: LocaleRow[];

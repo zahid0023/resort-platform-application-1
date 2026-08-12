@@ -20,47 +20,45 @@ import { ResortPermissionTypeCard } from "@/components/resort-permission-types/r
 import { ResortPermissionTypeDialog, emptyResortPermissionTypeForm } from "@/components/resort-permission-types/resort-permission-type-dialog";
 import type { ResortPermissionTypeDialogMode, ResortPermissionTypeFormState } from "@/components/resort-permission-types/types";
 import { resortPermissionTypesService, type ResortPermissionType, type ListParams } from "@/services/resort-permission-types";
-import { localesService, type Locale } from "@/services/locales";
 
 const PAGE_SIZE = 20;
+
+// "all" is a frontend-only concept (client-side OR across all fields)
 const ALL_FIELD = "all";
 
-function buildApiFilters(field: string, q: string): Pick<ListParams, "code"> {
+function buildApiFilters(field: string, q: string): Pick<ListParams, "code" | "name"> {
   if (!q || field === ALL_FIELD) return {};
-  return { [field]: q } as Pick<ListParams, "code">;
+  return { [field]: q } as Pick<ListParams, "code" | "name">;
 }
 
 export default function ResortPermissionTypesPage() {
   const { t } = useTranslation();
 
+  // List data
   const [permissionTypes, setPermissionTypes] = useState<ResortPermissionType[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Pagination
   const [page, setPage] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [totalElements, setTotalElements] = useState(0);
   const [hasNext, setHasNext] = useState(false);
   const [hasPrevious, setHasPrevious] = useState(false);
 
+  // Search
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState(ALL_FIELD);
 
-  const [sortBy, setSortBy] = useState("sortOrder");
+  // Sort — "id" is only valid as the implicit default when sortBy is omitted; never send it explicitly.
+  const [sortBy, setSortBy] = useState<NonNullable<ListParams["sort_by"]>>("code");
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC");
 
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([]);
+  // Dialog
   const [dialogOpen, setDialogOpen] = useState(false);
   const [mode, setMode] = useState<ResortPermissionTypeDialogMode>("create");
   const [activeId, setActiveId] = useState<number | undefined>(undefined);
   const [form, setForm] = useState<ResortPermissionTypeFormState>(emptyResortPermissionTypeForm);
   const [deleteTarget, setDeleteTarget] = useState<ResortPermissionType | null>(null);
-
-  const dialogOpenRef = useRef(dialogOpen);
-  const activeIdRef = useRef(activeId);
-  useEffect(() => { dialogOpenRef.current = dialogOpen; }, [dialogOpen]);
-  useEffect(() => { activeIdRef.current = activeId; }, [activeId]);
-
-  const isFirstRender = useRef(true);
 
   function toFieldOption(key: string) {
     return { value: key, label: t(`apiFields.${key}`) };
@@ -68,11 +66,12 @@ export default function ResortPermissionTypesPage() {
 
   const searchFields = useMemo(() => [
     { value: ALL_FIELD, label: t("common.allFields") },
-    ...["code"].map(toFieldOption),
+    ...["code", "name"].map(toFieldOption),
   ], [t]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // "id" is deliberately excluded — passing sortBy=id throws 400 (it's implicit-default only).
   const sortFields = useMemo(() => [
-    ...["sortOrder", "code", "name", "createdAt"].map(toFieldOption),
+    ...["code", "name", "createdAt"].map(toFieldOption),
   ], [t]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function refresh(overrides: Partial<ListParams> = {}) {
@@ -92,22 +91,6 @@ export default function ResortPermissionTypesPage() {
       setTotalElements(res.total_elements);
       setHasNext(res.has_next);
       setHasPrevious(res.has_previous);
-
-      setForm((prev) => {
-        if (!dialogOpenRef.current || activeIdRef.current == null) return prev;
-        const updated = res.data.find((p) => p.id === activeIdRef.current);
-        if (!updated) return prev;
-        return {
-          ...prev,
-          locales: updated.locales.map((l) => ({
-            id: l.id,
-            locale_id: l.locale_id,
-            name: l.name,
-            description: l.description ?? "",
-            sort_order: l.sort_order,
-          })),
-        };
-      });
     } catch (err) {
       toast.error((err as Error).message);
     } finally {
@@ -115,17 +98,16 @@ export default function ResortPermissionTypesPage() {
     }
   }
 
+  // Initial load
   useEffect(() => { refresh(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Debounced search — resets to page 0. Guarded by comparing against the last-applied key rather
+  // than a one-shot flag, since a boolean doesn't survive React Strict Mode's dev-only effect replay.
+  const lastSearchKey = useRef(`${searchField}:${search}`);
   useEffect(() => {
-    localesService
-      .list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableLocales(res.data))
-      .catch(() => { });
-  }, []);
-
-  useEffect(() => {
-    if (isFirstRender.current) { isFirstRender.current = false; return; }
+    const key = `${searchField}:${search}`;
+    if (lastSearchKey.current === key) return;
+    lastSearchKey.current = key;
     setPage(0);
     const timer = setTimeout(
       () => refresh({ page: 0, ...buildApiFilters(searchField, search.trim()) }),
@@ -134,20 +116,21 @@ export default function ResortPermissionTypesPage() {
     return () => clearTimeout(timer);
   }, [search, searchField]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const defaultNames = useMemo(
-    () => Object.fromEntries(permissionTypes.map((p) => [p.id, p.locales[0]?.name ?? ""])),
+  const permissionTypeNames = useMemo(
+    () => Object.fromEntries(permissionTypes.map((p) => [p.id, p.locale?.name ?? ""])),
     [permissionTypes],
   );
 
+  // Client-side OR filter only for "all" field (API has no OR-across-fields support)
   const displayPermissionTypes = useMemo(() => {
     if (searchField !== ALL_FIELD || !search.trim()) return permissionTypes;
     const q = search.trim().toLowerCase();
     return permissionTypes.filter((p) => {
       const code = p.code.toLowerCase();
-      const name = (defaultNames[p.id] ?? "").toLowerCase();
+      const name = (permissionTypeNames[p.id] ?? "").toLowerCase();
       return code.includes(q) || name.includes(q);
     });
-  }, [permissionTypes, defaultNames, search, searchField]);
+  }, [permissionTypes, permissionTypeNames, search, searchField]);
 
   function openCreate() {
     setMode("create");
@@ -156,27 +139,30 @@ export default function ResortPermissionTypesPage() {
     setDialogOpen(true);
   }
 
-  function openDialog(p: ResortPermissionType) {
-    setMode("view");
-    setActiveId(p.id);
-    setForm({
-      code: p.code,
-      sort_order: p.sort_order,
-      locales: p.locales.map((l) => ({
-        id: l.id,
-        locale_id: l.locale_id,
-        name: l.name,
-        description: l.description ?? "",
-        sort_order: l.sort_order,
-      })),
-    });
-    setDialogOpen(true);
+  async function openDialog(p: ResortPermissionType) {
+    try {
+      const res = await resortPermissionTypesService.get(p.id);
+      const full = res.data;
+      setMode("view");
+      setActiveId(full.id);
+      setForm({
+        code: full.code,
+        sort_order: full.sort_order,
+        locale: emptyResortPermissionTypeForm.locale,
+        // Lazily populated by ResortPermissionTypeDialog the first time the Translations tab is selected.
+        locales: [],
+      });
+      setDialogOpen(true);
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
   }
 
   function handleSortByChange(value: string) {
-    setSortBy(value);
+    const field = value as NonNullable<ListParams["sort_by"]>;
+    setSortBy(field);
     setPage(0);
-    refresh({ sort_by: value, page: 0 });
+    refresh({ sort_by: field, page: 0 });
   }
 
   function handleSortDirChange(dir: "ASC" | "DESC") {
@@ -194,7 +180,7 @@ export default function ResortPermissionTypesPage() {
     if (!deleteTarget) return;
     try {
       await resortPermissionTypesService.remove(deleteTarget.id);
-      toast.success(`${t("resortPermissionType.deleteTitle")}: ${deleteTarget.code}`);
+      toast.success(`${t("delete.resortPermissionType.title")}: ${deleteTarget.code}`);
       setDeleteTarget(null);
       await refresh({ page: 0 });
       setPage(0);
@@ -206,6 +192,7 @@ export default function ResortPermissionTypesPage() {
   return (
     <div className="max-w-6xl mx-auto flex flex-col gap-6">
 
+      {/* Header */}
       <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 w-full">
         <PageHeader
           eyebrow={t("common.admin")}
@@ -230,6 +217,7 @@ export default function ResortPermissionTypesPage() {
         />
       </header>
 
+      {/* Main content */}
       <main className="flex flex-col gap-4">
         {loading ? (
           <div className="text-center py-16 text-muted-foreground">{t("resortPermissionType.loading")}</div>
@@ -243,7 +231,7 @@ export default function ResortPermissionTypesPage() {
               <ResortPermissionTypeCard
                 key={p.id}
                 permissionType={p}
-                defaultName={defaultNames[p.id]}
+                defaultName={permissionTypeNames[p.id]}
                 onView={openDialog}
                 onDelete={setDeleteTarget}
               />
@@ -268,16 +256,15 @@ export default function ResortPermissionTypesPage() {
         permissionTypeId={activeId}
         form={form}
         onFormChange={setForm}
-        availableLocales={availableLocales}
         onSaved={() => refresh()}
       />
 
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("resortPermissionType.deleteTitle")}</AlertDialogTitle>
+            <AlertDialogTitle>{t("delete.resortPermissionType.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              {t("resortPermissionType.deleteDesc", { code: deleteTarget?.code })}
+              {t("delete.resortPermissionType.desc", { code: deleteTarget?.code })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

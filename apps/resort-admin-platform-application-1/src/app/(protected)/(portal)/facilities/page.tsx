@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "sonner";
-import { LayoutGrid, Layers } from "lucide-react";
+import { LayoutGrid, Layers, Plus } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +36,9 @@ import { useLocales } from "@/providers/locales-provider";
 
 const PAGE_SIZE = 20;
 const GROUPS_PER_PAGE = 4;
+// Each group section previews only this many facilities — beyond that, "View More" reveals the
+// section's own Pagination (still paging at this same size) instead of dumping everything at once.
+const GROUP_FACILITY_PREVIEW_SIZE = 4;
 const ALL_FIELD = "all";
 
 type ViewMode = "all" | "by-group";
@@ -49,6 +52,8 @@ interface GroupSection {
   hasNext: boolean;
   hasPrevious: boolean;
   loading: boolean;
+  // Once true, the section shows its full Pagination controls instead of a "View More" button.
+  expanded: boolean;
 }
 
 function buildApiFilters(field: string, q: string): Pick<ListParams, "code"> {
@@ -96,6 +101,9 @@ export default function FacilitiesPage() {
   const [activeId, setActiveId] = useState<number | undefined>(undefined);
   const [form, setForm] = useState<FacilityFormState>(emptyFacilityForm);
   const [deleteTarget, setDeleteTarget] = useState<FacilitySummary | null>(null);
+  // Set only when creating from within a group section's own "+ New Facility" trigger — pre-fixes
+  // the new facility to that group and hides the group picker in the dialog.
+  const [fixedGroup, setFixedGroup] = useState<FacilityGroupSummary | undefined>(undefined);
 
   const isFirstRender = useRef(true);
 
@@ -174,12 +182,13 @@ export default function FacilitiesPage() {
         hasNext: false,
         hasPrevious: false,
         loading: true,
+        expanded: false,
       })));
 
       // Fetch each group's facilities in parallel
       const facilityResults = await Promise.all(
         groupRes.data.map((g) =>
-          listFacilities({ page: 0, size: PAGE_SIZE, sort_by: "sortOrder", facilityGroupId: g.id }),
+          listFacilities({ page: 0, size: GROUP_FACILITY_PREVIEW_SIZE, sort_by: "sortOrder", facilityGroupId: g.id }),
         ),
       );
 
@@ -192,6 +201,7 @@ export default function FacilitiesPage() {
         hasNext: facilityResults[i].has_next,
         hasPrevious: facilityResults[i].has_previous,
         loading: false,
+        expanded: false,
       })));
     } catch (err) {
       toast.error((err as Error).message);
@@ -207,7 +217,7 @@ export default function FacilitiesPage() {
     try {
       const res = await listFacilities({
         page: p,
-        size: PAGE_SIZE,
+        size: GROUP_FACILITY_PREVIEW_SIZE,
         sort_by: "sortOrder",
         facilityGroupId: groupId,
       });
@@ -230,6 +240,14 @@ export default function FacilitiesPage() {
     } catch (err) {
       toast.error((err as Error).message);
     }
+  }
+
+  // Reveals the section's Pagination controls in place of the "View More" button — no refetch
+  // needed since page 0 (the preview) is already loaded.
+  function expandGroup(groupId: number) {
+    setGroupSections((prev) =>
+      prev.map((s) => s.group.id === groupId ? { ...s, expanded: true } : s),
+    );
   }
 
   // ── Effects ────────────────────────────────────────────────────────────────
@@ -259,10 +277,11 @@ export default function FacilitiesPage() {
   }, [viewMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Handlers ───────────────────────────────────────────────────────────────
-  function openCreate() {
+  function openCreate(group?: FacilityGroupSummary) {
     setMode("create");
     setActiveId(undefined);
     setForm(emptyFacilityForm);
+    setFixedGroup(group);
     setDialogOpen(true);
   }
 
@@ -272,6 +291,7 @@ export default function FacilitiesPage() {
       const full = res.data;
       setMode("view");
       setActiveId(full.id);
+      setFixedGroup(undefined);
       setForm({
         facility_groups: full.facility_groups,
         facility_scopes: full.facility_scopes,
@@ -391,12 +411,6 @@ export default function FacilitiesPage() {
               onNew={openCreate}
             />
           )}
-
-          {viewMode === "by-group" && (
-            <Button type="button" onClick={openCreate}>
-              {t("facility.new")}
-            </Button>
-          )}
         </div>
       </header>
 
@@ -455,33 +469,45 @@ export default function FacilitiesPage() {
               return (
                 <section key={section.group.id} className="flex flex-col gap-4">
                   {/* Group section header */}
-                  <div className="flex items-center gap-3 pb-2 border-b">
-                    <div
-                      className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shrink-0"
-                      style={{
-                        background: accentColor
-                          ? `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`
-                          : undefined,
-                        boxShadow: accentColor ? `0 4px 14px -4px ${accentColor}80` : undefined,
-                      }}
+                  <div className="flex items-center justify-between gap-3 pb-2 border-b">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shrink-0"
+                        style={{
+                          background: accentColor
+                            ? `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)`
+                            : undefined,
+                          boxShadow: accentColor ? `0 4px 14px -4px ${accentColor}80` : undefined,
+                        }}
+                      >
+                        <IconRenderer
+                          icon={groupIcon}
+                          className="h-4.5 w-4.5"
+                          style={{ color: "white" }}
+                          fallback={
+                            <span className="font-mono text-xs font-semibold text-white">
+                              {section.group.code[0] ?? "?"}
+                            </span>
+                          }
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <h2 className="font-semibold text-base leading-tight">{groupName}</h2>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {section.group.code} · {section.totalElements} facilit{section.totalElements !== 1 ? "ies" : "y"}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="h-7 px-2.5 gap-1.5 text-xs shrink-0"
+                      onClick={() => openCreate(section.group)}
                     >
-                      <IconRenderer
-                        icon={groupIcon}
-                        className="h-4.5 w-4.5"
-                        style={{ color: "white" }}
-                        fallback={
-                          <span className="font-mono text-xs font-semibold text-white">
-                            {section.group.code[0] ?? "?"}
-                          </span>
-                        }
-                      />
-                    </div>
-                    <div className="min-w-0">
-                      <h2 className="font-semibold text-base leading-tight">{groupName}</h2>
-                      <p className="text-xs text-muted-foreground font-mono">
-                        {section.group.code} · {section.totalElements} facilit{section.totalElements !== 1 ? "ies" : "y"}
-                      </p>
-                    </div>
+                      <Plus className="h-3.5 w-3.5" />
+                      {t("facility.new")}
+                    </Button>
                   </div>
 
                   {/* Facilities grid */}
@@ -508,15 +534,30 @@ export default function FacilitiesPage() {
                     </div>
                   )}
 
-                  {/* Per-group pagination */}
-                  <Pagination
-                    currentPage={section.page}
-                    totalPages={section.totalPages}
-                    totalElements={section.totalElements}
-                    hasNext={section.hasNext}
-                    hasPrevious={section.hasPrevious}
-                    onPageChange={(p) => loadFacilitiesForGroup(section.group.id, p)}
-                  />
+                  {/* Per-group pagination — a collapsed section previewing more than
+                      GROUP_FACILITY_PREVIEW_SIZE facilities shows a single "View More" instead,
+                      until expanded reveals the real prev/next controls. */}
+                  {!section.expanded && section.totalElements > GROUP_FACILITY_PREVIEW_SIZE ? (
+                    <div className="flex justify-center">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => expandGroup(section.group.id)}
+                      >
+                        {t("common.loadMore")}
+                      </Button>
+                    </div>
+                  ) : (
+                    <Pagination
+                      currentPage={section.page}
+                      totalPages={section.totalPages}
+                      totalElements={section.totalElements}
+                      hasNext={section.hasNext}
+                      hasPrevious={section.hasPrevious}
+                      onPageChange={(p) => loadFacilitiesForGroup(section.group.id, p)}
+                    />
+                  )}
                 </section>
               );
             })
@@ -547,6 +588,7 @@ export default function FacilitiesPage() {
         form={form}
         onFormChange={setForm}
         availableLocales={availableLocales}
+        fixedFacilityGroup={fixedGroup}
         onSaved={handleSaved}
       />
 

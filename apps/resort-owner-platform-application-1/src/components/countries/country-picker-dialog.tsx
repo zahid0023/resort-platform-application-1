@@ -51,8 +51,8 @@ export function CountryPickerDialog({ open, onOpenChange, selectedId, onSelect }
       const res = await countriesService.list({
         page: p,
         size: PAGE_SIZE,
-        sort_by: "sortOrder",
-        code: q.trim() || undefined,
+        sort_by: "name",
+        name: q.trim() || undefined,
       })
       setCountries(res.data)
       setPage(p)
@@ -95,7 +95,7 @@ export function CountryPickerDialog({ open, onOpenChange, selectedId, onSelect }
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by code…"
+              placeholder="Search by name…"
               className="pl-8 h-8 text-sm w-full"
               autoFocus
             />
@@ -116,7 +116,7 @@ export function CountryPickerDialog({ open, onOpenChange, selectedId, onSelect }
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {countries.map((c) => {
                 const isSelected = c.id === selectedId
-                const name = c.locales[0]?.name ?? c.code
+                const name = c.locale?.name ?? c.code
                 return (
                   <button
                     key={c.id}

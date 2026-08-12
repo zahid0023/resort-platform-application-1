@@ -24,6 +24,18 @@ function getAcceptLanguage(): string {
     return i18n.resolvedLanguage ?? i18n.language ?? "en";
 }
 
+export class ApiError extends Error {
+    status: number;
+    code?: string;
+
+    constructor(message: string, status: number, code?: string) {
+        super(message);
+        this.name = "ApiError";
+        this.status = status;
+        this.code = code;
+    }
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = getToken();
 
@@ -40,13 +52,15 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     if (!res.ok) {
         const text = await res.text().catch(() => "");
         let message = res.statusText;
+        let code: string | undefined;
         try {
             const json = JSON.parse(text);
             message = json.message || json.error || text || res.statusText;
+            code = json.error;
         } catch {
             message = text || res.statusText;
         }
-        throw new Error(message || `Request failed: ${res.status}`);
+        throw new ApiError(message || `Request failed: ${res.status}`, res.status, code);
     }
 
     if (res.status === 204) return undefined as T;
@@ -82,29 +96,35 @@ export const api = {
     delete: <T>(path: string, options?: RequestInit) =>
         apiFetch<T>(path, { ...options, method: "DELETE" }),
 
-    postForm: <T>(path: string, body: FormData): Promise<T> => {
+    // Multipart form uploads never set Content-Type manually — the browser must set it (with the
+    // boundary) itself, so this bypasses apiFetch's JSON-only header defaults entirely.
+    postForm: async <T>(path: string, body: FormData): Promise<T> => {
         const token = getToken();
-        return fetch(`${BASE_URL}${path}`, {
+        const res = await fetch(`${BASE_URL}${path}`, {
             method: "POST",
             body,
             headers: {
                 "Accept-Language": getAcceptLanguage(),
                 ...(token ? { Authorization: `Bearer ${token}` } : {}),
             },
-        }).then(async (res) => {
-            if (!res.ok) {
-                const text = await res.text().catch(() => "");
-                let message = res.statusText;
-                try {
-                    const json = JSON.parse(text);
-                    message = json.message || json.error || text || res.statusText;
-                } catch {
-                    message = text || res.statusText;
-                }
-                throw new Error(message || `Request failed: ${res.status}`);
-            }
-            if (res.status === 204) return undefined as T;
-            return res.json();
         });
+
+        if (!res.ok) {
+            const text = await res.text().catch(() => "");
+            let message = res.statusText;
+            let code: string | undefined;
+            try {
+                const json = JSON.parse(text);
+                message = json.message || json.error || text || res.statusText;
+                code = json.error;
+            } catch {
+                message = text || res.statusText;
+            }
+            throw new ApiError(message || `Request failed: ${res.status}`, res.status, code);
+        }
+
+        if (res.status === 204) return undefined as T;
+
+        return res.json();
     },
 };

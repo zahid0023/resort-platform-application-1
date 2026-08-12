@@ -579,6 +579,7 @@ export interface ResortFacilityGroupDialogProps {
   form: ResortFacilityGroupFormState
   onFormChange: (form: ResortFacilityGroupFormState) => void
   availableLocales: Locale[]
+  totalLocaleCount: number | null
   onSaved?: () => void | Promise<void>
 }
 
@@ -591,6 +592,7 @@ export function ResortFacilityGroupDialog({
   form,
   onFormChange,
   availableLocales,
+  totalLocaleCount,
   onSaved,
 }: ResortFacilityGroupDialogProps) {
   const { t } = useTranslation()
@@ -928,6 +930,7 @@ export function ResortFacilityGroupDialog({
                   onFormChange={onFormChange}
                   groupId={groupId}
                   availableLocales={availableLocales}
+                  totalLocaleCount={totalLocaleCount}
                   onSaved={onSaved}
                   editing={translationsEditing}
                   onEditingChange={setTranslationsEditing}

@@ -2,9 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Layers, Loader2, Search } from "lucide-react";
+import { Check, Layers, Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
-import { Badge, Dialog, DialogContent, DialogTitle, Input } from "@resort/shadcn-ui";
+import { Badge, Button, Dialog, DialogContent, DialogTitle, Input } from "@resort/shadcn-ui";
 import { IconRenderer } from "@/components/shared/icon-picker";
 import { listFacilityGroups, type FacilityGroupSummary } from "@/services/facility-groups";
 import { toIconValue } from "@/components/facility-groups/types";
@@ -17,10 +17,15 @@ export interface FacilityGroupPickerDialogProps {
   onOpenChange: (open: boolean) => void;
   /** Already-picked group ids — excluded from the pickable list so the same group can't be added twice. */
   excludeIds?: number[];
-  onSelect: (group: FacilityGroupSummary) => void;
+  /** The facility's own facility-scope ids — only groups assigned to at least one of these scopes are
+   * fetched (e.g. a facility scoped to RESORT, ROOM_CATEGORY only ever sees groups scoped to RESORT
+   * and/or ROOM_CATEGORY), matching the server's own assignment rule (409 CONFLICT otherwise). */
+  facilityScopeIds: number[];
+  /** Called once with every group picked in this session, when the user confirms the selection. */
+  onSelect: (groups: FacilityGroupSummary[]) => void;
 }
 
-export function FacilityGroupPickerDialog({ open, onOpenChange, excludeIds, onSelect }: FacilityGroupPickerDialogProps) {
+export function FacilityGroupPickerDialog({ open, onOpenChange, excludeIds, facilityScopeIds, onSelect }: FacilityGroupPickerDialogProps) {
   const { t } = useTranslation();
   const [groups, setGroups] = useState<FacilityGroupSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -31,17 +36,21 @@ export function FacilityGroupPickerDialog({ open, onOpenChange, excludeIds, onSe
   const [hasNext, setHasNext] = useState(false);
   const [hasPrevious, setHasPrevious] = useState(false);
   const lastSearchKey = useRef("");
+  // Selected-so-far, keyed by id so a pick made on one page survives navigating to another.
+  const [selected, setSelected] = useState<Map<number, FacilityGroupSummary>>(new Map());
 
   useEffect(() => {
     if (open) {
       setSearch("");
       setPage(0);
       lastSearchKey.current = "";
+      setSelected(new Map());
       load(0, "");
     } else {
       setGroups([]);
+      setSelected(new Map());
     }
-  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, facilityScopeIds.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!open) return;
@@ -60,6 +69,7 @@ export function FacilityGroupPickerDialog({ open, onOpenChange, excludeIds, onSe
         size: PAGE_SIZE,
         sort_by: "sortOrder",
         code: q.trim() || undefined,
+        facility_scope_ids: facilityScopeIds,
       });
       setGroups(res.data);
       setPage(p);
@@ -74,8 +84,18 @@ export function FacilityGroupPickerDialog({ open, onOpenChange, excludeIds, onSe
     }
   }
 
-  function handleSelect(group: FacilityGroupSummary) {
-    onSelect(group);
+  function toggleSelect(group: FacilityGroupSummary) {
+    setSelected((prev) => {
+      const next = new Map(prev);
+      if (next.has(group.id)) next.delete(group.id);
+      else next.set(group.id, group);
+      return next;
+    });
+  }
+
+  function handleConfirm() {
+    if (selected.size === 0) return;
+    onSelect(Array.from(selected.values()));
     onOpenChange(false);
   }
 
@@ -128,13 +148,22 @@ export function FacilityGroupPickerDialog({ open, onOpenChange, excludeIds, onSe
                 const icon = toIconValue(g);
                 const accentColor = icon.meta?.color || undefined;
                 const name = g.locale?.name ?? g.code;
+                const isSelected = selected.has(g.id);
                 return (
                   <button
                     key={g.id}
                     type="button"
-                    onClick={() => handleSelect(g)}
-                    className="text-left rounded-xl border p-4 transition-all hover:shadow-md hover:-translate-y-0.5 bg-card hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => toggleSelect(g)}
+                    aria-pressed={isSelected}
+                    className={`relative text-left rounded-xl border p-4 transition-all hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      isSelected ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "bg-card hover:border-primary/40"
+                    }`}
                   >
+                    {isSelected && (
+                      <div className="absolute top-2.5 right-2.5 h-4 w-4 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
+                        <Check className="h-3 w-3" />
+                      </div>
+                    )}
                     <div className="flex items-start gap-3">
                       <div
                         className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0"
@@ -181,6 +210,16 @@ export function FacilityGroupPickerDialog({ open, onOpenChange, excludeIds, onSe
             />
           </div>
         )}
+
+        {/* Confirm footer */}
+        <div className="border-t px-5 py-3 shrink-0 flex items-center justify-between gap-3 bg-muted/40">
+          <p className="text-xs text-muted-foreground">
+            {selected.size > 0 ? t("facilityGroupPicker.selectedCount", { n: selected.size }) : t("facilityGroupPicker.selectHint")}
+          </p>
+          <Button type="button" size="sm" onClick={handleConfirm} disabled={selected.size === 0} className="gap-1.5">
+            <Check className="h-3.5 w-3.5" /> {t("facilityGroupPicker.confirm")}
+          </Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

@@ -31,7 +31,7 @@ import {
   resortFacilityGroupsService,
   type ResortFacilityGroupSummary,
 } from "@/services/resort-facility-groups"
-import { localesService, type Locale } from "@/services/locales"
+import { useLocales } from "@/providers/locales-provider"
 
 const PAGE_SIZE = 20
 const GROUPS_PAGE_SIZE = 6
@@ -83,8 +83,7 @@ export default function ResortFacilitiesOverviewPage() {
   const byGroupInitialized = useRef(false)
 
   // ── Dialog / locales ────────────────────────────────────────────────────────
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([])
-  const localesLoadedRef = useRef(false)
+  const { locales: availableLocales, totalCount: totalLocaleCount, loaded: localesLoaded, refresh: refreshLocales } = useLocales()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [dialogGroupId, setDialogGroupId] = useState(0)
   const [mode, setMode] = useState<ResortFacilityDialogMode>("create")
@@ -262,12 +261,8 @@ export default function ResortFacilitiesOverviewPage() {
 
   // ── Helpers ─────────────────────────────────────────────────────────────────
   function loadLocales() {
-    if (localesLoadedRef.current) return
-    localesLoadedRef.current = true
-    localesService
-      .list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableLocales(res.data))
-      .catch(() => {})
+    if (localesLoaded) return
+    refreshLocales().catch(() => {})
   }
 
   function handleSaved() {
@@ -577,6 +572,7 @@ export default function ResortFacilitiesOverviewPage() {
         form={form}
         onFormChange={setForm}
         availableLocales={availableLocales}
+        totalLocaleCount={totalLocaleCount}
         onSaved={handleSaved}
       />
 

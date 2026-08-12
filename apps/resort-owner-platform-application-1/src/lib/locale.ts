@@ -28,3 +28,18 @@ export function pickTranslation<T extends TranslatableRow>(
     rows[0]
   );
 }
+
+/**
+ * Whether a new locale translation can still be added to an entity — a decision kept deliberately
+ * separate from the row-level create/edit/delete logic of `*LocaleTranslations` components.
+ *
+ * `totalLocaleCount` is the true system-wide locale count from `GET /locales/count`, not the
+ * length of whatever page of `GET /locales` happened to be fetched for the dropdown (that list is
+ * capped at 50 per page and can undercount). `null`/non-positive means the count hasn't loaded
+ * yet — treated as "assume there's room" so the Add button never wrongly disables before the
+ * count is known.
+ */
+export function canAddLocaleTranslation(usedLocaleCount: number, totalLocaleCount: number | null): boolean {
+  if (totalLocaleCount == null || totalLocaleCount <= 0) return true;
+  return usedLocaleCount < totalLocaleCount;
+}

@@ -98,7 +98,7 @@ export function FacilityCard({ facility, defaultName, groupName, onView, onDelet
           {facility.facility_scopes.length > 0 && (
             <div className={`flex flex-wrap gap-1.5 ${facility.facility_groups.length > 0 ? "pb-2.5 mb-2.5 border-b" : ""}`}>
               {facility.facility_scopes.map((s) => (
-                <Badge key={s.id} variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                <Badge key={s.id} variant="outline" className="text-xs px-2.5 py-1 h-6">
                   {s.locale?.name ?? s.code}
                 </Badge>
               ))}
@@ -107,7 +107,7 @@ export function FacilityCard({ facility, defaultName, groupName, onView, onDelet
           {facility.facility_groups.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {facility.facility_groups.map((g) => (
-                <Badge key={g.id} variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                <Badge key={g.id} variant="secondary" className="text-xs px-2.5 py-1 h-6">
                   {g.locale?.name ?? g.code}
                 </Badge>
               ))}

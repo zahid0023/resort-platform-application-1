@@ -28,6 +28,7 @@ export interface ResortRoomCategoryDialogProps {
   form: ResortRoomCategoryFormState
   onFormChange: (form: ResortRoomCategoryFormState) => void
   availableLocales: Locale[]
+  totalLocaleCount: number | null
   onSaved?: () => void | Promise<void>
   meta?: ResortRoomCategoryMeta
   beds?: ResortRoomCategoryBed[]
@@ -42,6 +43,7 @@ export function ResortRoomCategoryDialog({
   form,
   onFormChange,
   availableLocales,
+  totalLocaleCount,
   onSaved,
   meta,
   beds,
@@ -183,6 +185,7 @@ export function ResortRoomCategoryDialog({
                 onFormChange={onFormChange}
                 resortRoomCategoryId={resortRoomCategoryId}
                 availableLocales={availableLocales}
+                totalLocaleCount={totalLocaleCount}
                 onSaved={onSaved}
                 editing={translationsEditing}
                 onEditingChange={setTranslationsEditing}

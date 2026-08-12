@@ -28,7 +28,7 @@ import {
   type ResortRoomCategoryBed,
   type ListParams,
 } from "@/services/resort-room-categories"
-import { localesService, type Locale } from "@/services/locales"
+import { useLocales } from "@/providers/locales-provider"
 
 const PAGE_SIZE = 20
 
@@ -49,8 +49,7 @@ export default function ResortRoomCategoriesPage() {
   const [sortBy, setSortBy] = useState("sortOrder")
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC")
 
-  const [availableLocales, setAvailableLocales] = useState<Locale[]>([])
-  const localesLoadedRef = useRef(false)
+  const { locales: availableLocales, totalCount: totalLocaleCount, loaded: localesLoaded, refresh: refreshLocales } = useLocales()
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [mode, setMode] = useState<ResortRoomCategoryDialogMode>("create")
@@ -119,12 +118,8 @@ export default function ResortRoomCategoriesPage() {
   }, [search]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function loadLocales() {
-    if (localesLoadedRef.current) return
-    localesLoadedRef.current = true
-    localesService
-      .list({ size: 50, sort_by: "sortOrder" })
-      .then((res) => setAvailableLocales(res.data))
-      .catch(() => {})
+    if (localesLoaded) return
+    refreshLocales().catch(() => {})
   }
 
   function openCreate() {
@@ -246,6 +241,7 @@ export default function ResortRoomCategoriesPage() {
         form={form}
         onFormChange={setForm}
         availableLocales={availableLocales}
+        totalLocaleCount={totalLocaleCount}
         onSaved={() => refresh()}
         meta={activeMeta}
         beds={activeBeds}
