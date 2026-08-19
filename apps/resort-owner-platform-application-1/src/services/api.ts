@@ -36,6 +36,31 @@ export class ApiError extends Error {
     }
 }
 
+// A 401 from /auth/login itself just means "wrong credentials" — that must surface as a
+// form error, not bounce the user off the login page they're already on.
+function redirectToLoginOn401(path: string, status: number): void {
+    if (status !== 401 || path.startsWith("/auth/")) return;
+    if (typeof window === "undefined") return;
+    clearToken();
+    if (window.location.pathname !== "/login") {
+        window.location.href = "/login";
+    }
+}
+
+async function parseErrorResponse(res: Response): Promise<ApiError> {
+    const text = await res.text().catch(() => "");
+    let message = res.statusText;
+    let code: string | undefined;
+    try {
+        const json = JSON.parse(text);
+        message = json.message || json.error || text || res.statusText;
+        code = json.error;
+    } catch {
+        message = text || res.statusText;
+    }
+    return new ApiError(message || `Request failed: ${res.status}`, res.status, code);
+}
+
 async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = getToken();
 
@@ -50,17 +75,8 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     });
 
     if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        let message = res.statusText;
-        let code: string | undefined;
-        try {
-            const json = JSON.parse(text);
-            message = json.message || json.error || text || res.statusText;
-            code = json.error;
-        } catch {
-            message = text || res.statusText;
-        }
-        throw new ApiError(message || `Request failed: ${res.status}`, res.status, code);
+        redirectToLoginOn401(path, res.status);
+        throw await parseErrorResponse(res);
     }
 
     if (res.status === 204) return undefined as T;
@@ -110,17 +126,8 @@ export const api = {
         });
 
         if (!res.ok) {
-            const text = await res.text().catch(() => "");
-            let message = res.statusText;
-            let code: string | undefined;
-            try {
-                const json = JSON.parse(text);
-                message = json.message || json.error || text || res.statusText;
-                code = json.error;
-            } catch {
-                message = text || res.statusText;
-            }
-            throw new ApiError(message || `Request failed: ${res.status}`, res.status, code);
+            redirectToLoginOn401(path, res.status);
+            throw await parseErrorResponse(res);
         }
 
         if (res.status === 204) return undefined as T;

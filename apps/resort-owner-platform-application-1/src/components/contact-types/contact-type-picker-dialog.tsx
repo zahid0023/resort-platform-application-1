@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Loader2, Phone, Search } from "lucide-react"
 import { Badge, Dialog, DialogContent, DialogTitle, Input } from "@resort/shadcn-ui"
 import { contactTypesService, type ContactType } from "@/services/contact-types"
@@ -16,6 +17,7 @@ export interface ContactTypePickerDialogProps {
 }
 
 export function ContactTypePickerDialog({ open, onOpenChange, selectedId, onSelect }: ContactTypePickerDialogProps) {
+  const { t } = useTranslation()
   const [contactTypes, setContactTypes] = useState<ContactType[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState("")
@@ -75,7 +77,7 @@ export function ContactTypePickerDialog({ open, onOpenChange, selectedId, onSele
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden flex flex-col max-h-[85vh]">
-        <DialogTitle className="sr-only">Select Contact Type</DialogTitle>
+        <DialogTitle className="sr-only">{t("contactTypePicker.title")}</DialogTitle>
 
         {/* Header */}
         <div className="flex flex-col gap-3 px-5 pt-4 pb-4 pr-12 border-b shrink-0">
@@ -84,9 +86,9 @@ export function ContactTypePickerDialog({ open, onOpenChange, selectedId, onSele
               <Phone className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold">Select Contact Type</p>
+              <p className="text-sm font-semibold">{t("contactTypePicker.title")}</p>
               {totalElements > 0 && (
-                <p className="text-xs text-muted-foreground">{totalElements} contact types</p>
+                <p className="text-xs text-muted-foreground">{t("contactTypePicker.count", { count: totalElements })}</p>
               )}
             </div>
           </div>
@@ -95,7 +97,7 @@ export function ContactTypePickerDialog({ open, onOpenChange, selectedId, onSele
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by code…"
+              placeholder={t("contactTypePicker.searchPlaceholder")}
               className="pl-8 h-8 text-sm w-full"
               autoFocus
             />
@@ -110,14 +112,14 @@ export function ContactTypePickerDialog({ open, onOpenChange, selectedId, onSele
             </div>
           ) : contactTypes.length === 0 ? (
             <div className="text-center py-16 text-sm text-muted-foreground border rounded-xl border-dashed">
-              No contact types found.
+              {t("contactTypePicker.empty")}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {contactTypes.map((ct) => {
                 const isSelected = ct.id === selectedId
-                const name = ct.locales[0]?.name ?? ct.code
-                const description = ct.locales[0]?.description
+                const name = ct.locale?.name ?? ct.code
+                const description = ct.locale?.description
                 return (
                   <button
                     key={ct.id}

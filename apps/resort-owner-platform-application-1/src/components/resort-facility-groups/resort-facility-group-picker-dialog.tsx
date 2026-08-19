@@ -61,14 +61,10 @@ export function ResortFacilityGroupPickerDialog({
       const res = await resortFacilityGroupsService.list(resortId, {
         page: p,
         size: PAGE_SIZE,
-        sort_by: "sortOrder",
+        sort_by: "createdAt",
+        name: search.trim() || undefined,
       })
-      const filtered = search.trim()
-        ? res.data.filter((g) =>
-            (g.locales[0]?.name ?? "").toLowerCase().includes(search.toLowerCase())
-          )
-        : res.data
-      setGroups(filtered)
+      setGroups(res.data)
       setPage(p)
       setTotalPages(res.total_pages)
       setTotalElements(res.total_elements)
@@ -129,8 +125,8 @@ export function ResortFacilityGroupPickerDialog({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {groups.map((g) => {
                 const isSelected = g.id === selectedId
-                const name = g.locales[0]?.name ?? `Group #${g.id}`
-                const description = g.locales[0]?.description
+                const name = g.locale?.name ?? `Group #${g.id}`
+                const description = g.locale?.description
                 const accentColor = String(g.icon_meta?.color ?? "") || undefined
                 return (
                   <button

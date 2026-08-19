@@ -5,13 +5,13 @@ import { useParams, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { BuildingIcon, PhoneIcon, ImageIcon, SettingsIcon } from "lucide-react"
 import { Spinner } from "@resort/shadcn-ui"
-import { getResort, type ResortSummary } from "@/services/resorts"
+import { getResort, type Resort } from "@/services/resorts"
 import { useTranslation } from "react-i18next"
 
 const NAV_ITEMS = [
   {
     key: "basicInfo",
-    href: (id: string) => `/resorts/${id}/basic-info`,
+    href: (id: string) => `/resorts/${id}/overview`,
     icon: BuildingIcon,
   },
   {
@@ -37,7 +37,7 @@ export default function ResortDashboardPage() {
   const { t } = useTranslation()
   const id = String(params.id)
 
-  const [resort, setResort] = useState<ResortSummary | null>(null)
+  const [resort, setResort] = useState<Resort | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {

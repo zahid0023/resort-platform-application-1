@@ -1,35 +1,50 @@
 import { api } from "./api"
+import type { Locale } from "./locales"
 
 export interface ContactTypeLocale {
-  language_code: string
+  id: number
+  locale: Locale
   name: string
+  description?: string
+  sort_order: number
 }
 
 export interface ContactType {
   id: number
   code: string
   sort_order: number
-  locales: ContactTypeLocale[]
+  /** The single translation matching Accept-Language (falls back to en, then null). */
+  locale: ContactTypeLocale | null
 }
 
 export interface CommunicationChannelLocale {
-  language_code: string
+  id: number
+  locale: Locale
   name: string
+  description?: string
+  sort_order: number
 }
 
 export interface CommunicationChannel {
   id: number
   code: string
+  sort_order: number
   is_url: boolean
   is_phone: boolean
   is_email: boolean
   is_clickable: boolean
-  locales: CommunicationChannelLocale[]
+  /** The single translation matching Accept-Language (falls back to en, then null). */
+  locale: CommunicationChannelLocale | null
+}
+
+export interface ResortSummary {
+  id: number
+  code: string
 }
 
 export interface ResortContact {
   id: number
-  resort_id: number
+  resort: ResortSummary
   contact_type: ContactType
   communication_channel: CommunicationChannel
   contact_value: string
@@ -66,11 +81,31 @@ export interface MutationResponse {
   id: number
 }
 
+export interface ListResortContactsParams {
+  page?: number
+  size?: number
+  contactTypeId?: number
+  communicationChannelId?: number
+  contactValue?: string
+  isPrimary?: boolean
+}
+
+// Query params bind onto ResortContactFilterRequest's Java field names via Spring's DataBinder —
+// camelCase, not the snake_case used in JSON request/response bodies. `id` is not a selectable
+// sortBy value, so it's left as the implicit default rather than sent explicitly.
+function buildQuery(params: ListResortContactsParams): URLSearchParams {
+  const { page = 0, size = 50, contactTypeId, communicationChannelId, contactValue, isPrimary } = params
+  const q = new URLSearchParams({ page: String(page), size: String(size) })
+  if (contactTypeId != null) q.set("contactTypeId", String(contactTypeId))
+  if (communicationChannelId != null) q.set("communicationChannelId", String(communicationChannelId))
+  if (contactValue) q.set("contactValue", contactValue)
+  if (isPrimary != null) q.set("isPrimary", String(isPrimary))
+  return q
+}
+
 export const resortContactsService = {
-  list(resortId: number, params: { page?: number; size?: number } = {}): Promise<ResortContactListResponse> {
-    const { page = 0, size = 50 } = params
-    const q = new URLSearchParams({ page: String(page), size: String(size), sort_by: "id", sort_dir: "ASC" })
-    return api.get<ResortContactListResponse>(`/resorts/${resortId}/contacts?${q}`)
+  list(resortId: number, params: ListResortContactsParams = {}): Promise<ResortContactListResponse> {
+    return api.get<ResortContactListResponse>(`/resorts/${resortId}/contacts?${buildQuery(params)}`)
   },
 
   get(resortId: number, id: number): Promise<{ data: ResortContact }> {

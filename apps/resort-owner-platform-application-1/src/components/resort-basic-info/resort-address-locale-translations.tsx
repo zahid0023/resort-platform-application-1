@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { Check, Languages, Pencil, Plus, Quote, Trash2, X } from "lucide-react"
+import { Check, Languages, Pencil, Plus, Trash2, X } from "lucide-react"
 import {
   Button,
   Card,
@@ -19,7 +19,7 @@ import {
   Spinner,
   Textarea,
 } from "@resort/shadcn-ui"
-import { resortBasicInfoService, type ResortBasicInfoLocale } from "@/services/resort-basic-info"
+import { resortAddressService, type ResortAddressLocale } from "@/services/resort-address"
 import { TypographyLabel } from "@/components/shared/typography"
 import type { Locale } from "@/services/locales"
 import { canAddLocaleTranslation } from "@/lib/locale"
@@ -28,39 +28,35 @@ import { toast } from "sonner"
 interface RowState {
   id?: number
   locale_id: number | ""
-  name: string
-  tagline: string
-  short_description: string
+  address: string
   sort_order: number
   _new?: boolean
 }
 
 type RowWithKey = RowState & { _rkey: string }
 
-export interface ResortLocaleTranslationsProps {
+export interface ResortAddressLocaleTranslationsProps {
   resortId: number
   availableLocales: Locale[]
   totalLocaleCount: number | null
   reloadToken?: number
 }
 
-function toRow(l: ResortBasicInfoLocale): RowState {
+function toRow(l: ResortAddressLocale): RowState {
   return {
     id: l.id,
     locale_id: l.locale.id,
-    name: l.name,
-    tagline: l.tagline,
-    short_description: l.short_description ?? "",
+    address: l.address,
     sort_order: l.sort_order,
   }
 }
 
-export function ResortLocaleTranslations({
+export function ResortAddressLocaleTranslations({
   resortId,
   availableLocales,
   totalLocaleCount,
   reloadToken,
-}: ResortLocaleTranslationsProps) {
+}: ResortAddressLocaleTranslationsProps) {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(true)
   const [rows, setRows] = useState<RowState[]>([])
@@ -72,7 +68,7 @@ export function ResortLocaleTranslations({
   async function load() {
     setLoading(true)
     try {
-      const res = await resortBasicInfoService.listLocales(resortId, { size: 50 })
+      const res = await resortAddressService.listLocales(resortId, { size: 50 })
       setRows(res.data.map(toRow))
     } catch (err) {
       toast.error((err as Error).message)
@@ -124,25 +120,20 @@ export function ResortLocaleTranslations({
     if (!data) return
     const n = allRows.findIndex((r) => r._rkey === key) + 1
     if (!data.locale_id) { toast.error(t("locale.errLang", { n })); return }
-    if (!data.name.trim()) { toast.error(t("locale.errName", { n })); return }
-    if (!data.tagline.trim()) { toast.error(t("locale.errTagline", { n })); return }
+    if (!data.address.trim()) { toast.error(t("locale.errAddress", { n })); return }
     setBusy(key, true)
     try {
       if (isNew) {
-        await resortBasicInfoService.addLocale(resortId, {
+        await resortAddressService.addLocale(resortId, {
           locale_id: Number(data.locale_id),
-          name: data.name.trim(),
-          tagline: data.tagline.trim(),
+          address: data.address.trim(),
           sort_order: Number(data.sort_order) || 0,
-          short_description: data.short_description.trim() || undefined,
         })
         setNewRows((prev) => prev.filter((r) => r._rkey !== key))
       } else {
-        await resortBasicInfoService.updateLocale(resortId, row.id!, {
-          name: data.name.trim(),
-          tagline: data.tagline.trim(),
+        await resortAddressService.updateLocale(resortId, row.id!, {
+          address: data.address.trim(),
           sort_order: Number(data.sort_order) || 0,
-          short_description: data.short_description.trim() || undefined,
         })
       }
       setRowEditData((prev) => { const n = { ...prev }; delete n[key]; return n })
@@ -160,7 +151,7 @@ export function ResortLocaleTranslations({
     const key = `e_${row.id}`
     setBusy(key, true)
     try {
-      await resortBasicInfoService.removeLocale(resortId, row.id)
+      await resortAddressService.removeLocale(resortId, row.id)
       toast.success(t("locale.removedToast"))
       await load()
     } catch (err) {
@@ -181,9 +172,7 @@ export function ResortLocaleTranslations({
     const newRow: RowWithKey = {
       _rkey,
       locale_id: nextLocale?.id ?? "",
-      name: "",
-      tagline: "",
-      short_description: "",
+      address: "",
       sort_order: rows.length + newRows.length + 1,
       _new: true,
     }
@@ -222,7 +211,7 @@ export function ResortLocaleTranslations({
             <div className="flex size-11 items-center justify-center rounded-full bg-muted">
               <Languages className="h-5 w-5 text-muted-foreground/60" />
             </div>
-            <p className="text-sm text-muted-foreground max-w-56">{t("locale.empty.basicInfo")}</p>
+            <p className="text-sm text-muted-foreground max-w-56">{t("locale.empty.address")}</p>
             <Button type="button" size="sm" onClick={addNewRow} disabled={addDisabled} className="h-7 text-xs px-2.5 gap-1.5">
               <Plus className="h-3.5 w-3.5" /> {t("locale.addShort")}
             </Button>
@@ -327,20 +316,13 @@ export function ResortLocaleTranslations({
                   </div>
 
                   {!rowEditing ? (
-                    <div className="mt-3 space-y-1.5">
-                      <p className="text-2xl font-semibold leading-tight tracking-tight">{row.name}</p>
-                      <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
-                        <Quote className="mt-0.5 size-3 shrink-0 opacity-50" />
-                        {row.tagline}
-                      </p>
-                      {row.short_description && (
-                        <p className="text-xs text-muted-foreground/80 line-clamp-2">{row.short_description}</p>
-                      )}
-                    </div>
+                    <p className="mt-3 text-base font-medium leading-snug">{row.address}</p>
                   ) : (
                     <div className="mt-3 grid gap-3 sm:grid-cols-2">
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t("field.language")} *</Label>
+                        <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          {t("field.language")} *
+                        </Label>
                         <Select
                           value={editData.locale_id ? String(editData.locale_id) : ""}
                           onValueChange={(v) => patchRowEdit(key, { locale_id: Number(v) })}
@@ -363,7 +345,9 @@ export function ResortLocaleTranslations({
                         </Select>
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t("field.sort")} *</Label>
+                        <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          {t("field.sort")} *
+                        </Label>
                         <Input
                           type="number"
                           value={editData.sort_order}
@@ -372,31 +356,15 @@ export function ResortLocaleTranslations({
                         />
                       </div>
                       <div className="space-y-1.5 sm:col-span-2">
-                        <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t("common.name")} *</Label>
-                        <Input
-                          value={editData.name}
-                          onChange={(e) => patchRowEdit(key, { name: e.target.value })}
-                          className="h-9 text-sm"
-                          placeholder="The Grand Resort"
-                        />
-                      </div>
-                      <div className="space-y-1.5 sm:col-span-2">
-                        <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t("resort.taglineLabel")} *</Label>
-                        <Input
-                          value={editData.tagline}
-                          onChange={(e) => patchRowEdit(key, { tagline: e.target.value })}
-                          className="h-9 text-sm"
-                          placeholder="Where the sea meets serenity"
-                        />
-                      </div>
-                      <div className="space-y-1.5 sm:col-span-2">
-                        <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{t("resort.shortDescLabel")}</Label>
+                        <Label className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          {t("resort.address")} *
+                        </Label>
                         <Textarea
-                          value={editData.short_description}
-                          onChange={(e) => patchRowEdit(key, { short_description: e.target.value })}
+                          value={editData.address}
+                          onChange={(e) => patchRowEdit(key, { address: e.target.value })}
                           rows={2}
                           className="text-sm resize-none"
-                          placeholder="A luxury resort nestled by the ocean."
+                          placeholder={t("resort.addressPlaceholder")}
                         />
                       </div>
                     </div>

@@ -7,7 +7,6 @@ import { Dialog, DialogContent, DialogTitle } from "@resort/shadcn-ui"
 import { createResort } from "@/services/resorts"
 import type { Country } from "@/services/countries"
 import type { City } from "@/services/cities"
-import { localesService } from "@/services/locales"
 import { useTranslation } from "react-i18next"
 import hero from "@/assets/hero-resort.jpg"
 import { WelcomeStep } from "./welcome-step"
@@ -32,34 +31,13 @@ export interface StepTwoForm {
   country_name: string
   city_id: number | null
   city_name: string
+  postal_code: string
   address: string
   latitude: string
   longitude: string
 }
 
-export interface ContactRow {
-  uid: string
-  contact_type_id: number | null
-  contact_type_name: string
-  communication_channel_id: number | null
-  communication_channel_name: string
-  contact_value: string
-  is_primary: boolean
-}
-
-function newContactRow(): ContactRow {
-  return {
-    uid: Math.random().toString(36).slice(2),
-    contact_type_id: null,
-    contact_type_name: "",
-    communication_channel_id: null,
-    communication_channel_name: "",
-    contact_value: "",
-    is_primary: false,
-  }
-}
-
-const TOTAL_STEPS = 3
+const TOTAL_STEPS = 2
 
 const EMPTY_STEP1: StepOneForm = { name: "", tagline: "", short_description: "", code: "", estd: "" }
 const EMPTY_STEP2: StepTwoForm = {
@@ -67,6 +45,7 @@ const EMPTY_STEP2: StepTwoForm = {
   country_name: "",
   city_id: null,
   city_name: "",
+  postal_code: "",
   address: "",
   latitude: "",
   longitude: "",
@@ -95,12 +74,6 @@ export function CreateResortDialog({ open, onOpenChange, onSuccess }: CreateReso
 
   const [countryPickerOpen, setCountryPickerOpen] = useState(false)
   const [cityPickerOpen, setCityPickerOpen] = useState(false)
-  const [contactTypePickerForUid, setContactTypePickerForUid] = useState<string | null>(null)
-  const [channelPickerForUid, setChannelPickerForUid] = useState<string | null>(null)
-
-  const [contacts, setContacts] = useState<ContactRow[]>([])
-
-  const [enLocaleId, setEnLocaleId] = useState<number | null>(null)
 
   useEffect(() => {
     if (open) {
@@ -110,16 +83,8 @@ export function CreateResortDialog({ open, onOpenChange, onSuccess }: CreateReso
       setCodeUserEdited(false)
       setStep1(EMPTY_STEP1)
       setStep2(EMPTY_STEP2)
-      setContacts([])
       setCountryPickerOpen(false)
       setCityPickerOpen(false)
-      setContactTypePickerForUid(null)
-      setChannelPickerForUid(null)
-      localesService.list({ code: "en", size: 1 }).then((res) => {
-        setEnLocaleId(res.data[0]?.id ?? null)
-      }).catch(() => {
-        // locale fetch failure is non-blocking; basic_info will be created without locale rows
-      })
     }
   }, [open])
 
@@ -161,21 +126,12 @@ export function CreateResortDialog({ open, onOpenChange, onSuccess }: CreateReso
     }))
   }
 
-  const addContact = () => setContacts((prev) => [...prev, newContactRow()])
-  const removeContact = (uid: string) => setContacts((prev) => prev.filter((r) => r.uid !== uid))
-  const updateContact = (uid: string, field: keyof Omit<ContactRow, "uid">, value: unknown) =>
-    setContacts((prev) => prev.map((r) => (r.uid === uid ? { ...r, [field]: value } : r)))
-
   const step1Valid = !!step1.name.trim() && !!step1.tagline.trim() && !!step1.code.trim() && !!step1.estd.trim()
-  const step2Valid = !!step2.country_id && !!step2.city_id
-  const step3Valid = contacts.every(
-    (c) => !!c.contact_type_id && !!c.communication_channel_id && !!c.contact_value.trim()
-  )
+  const step2Valid = !!step2.country_id && !!step2.city_id && !!step2.address.trim()
 
   const handleNext = (e: React.FormEvent) => {
     e.preventDefault()
     if (step === 1 && step1Valid) setStep(2)
-    else if (step === 2 && step2Valid) setStep(3)
   }
 
   const handleBack = () => {
@@ -184,41 +140,31 @@ export function CreateResortDialog({ open, onOpenChange, onSuccess }: CreateReso
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!step3Valid || submitting) return
+    if (!step2Valid || submitting) return
     setSubmitting(true)
     try {
-      const localeRows = enLocaleId
-        ? [{
-            locale_id: enLocaleId,
+      const result = await createResort({
+        code: step1.code.trim(),
+        basic_info: {
+          estd: Number(step1.estd),
+          locale: {
             sort_order: 1,
             name: step1.name.trim(),
             tagline: step1.tagline.trim(),
             short_description: step1.short_description.trim() || undefined,
-            address: step2.address.trim() || undefined,
-          }]
-        : undefined
-
-      const result = await createResort({
-        code: step1.code.trim(),
-        basic_info: {
-          code: step1.code.trim().slice(0, 50),
-          sort_order: 1,
-          estd: Number(step1.estd),
+          },
+        },
+        address: {
           country_id: step2.country_id!,
           city_id: step2.city_id!,
+          postal_code: step2.postal_code.trim() || undefined,
           lat: step2.latitude ? Number(step2.latitude) : undefined,
           lon: step2.longitude ? Number(step2.longitude) : undefined,
-          locales: localeRows,
+          locale: {
+            address: step2.address.trim(),
+            sort_order: 1,
+          },
         },
-        contacts: contacts
-          .filter((c) => c.contact_type_id && c.communication_channel_id && c.contact_value.trim())
-          .map((c, i) => ({
-            contact_type_id: c.contact_type_id!,
-            communication_channel_id: c.communication_channel_id!,
-            contact_value: c.contact_value.trim(),
-            is_primary: c.is_primary,
-            sort_order: i,
-          })),
       })
 
       toast.success(t("resort.successToast"))
@@ -285,17 +231,6 @@ export function CreateResortDialog({ open, onOpenChange, onSuccess }: CreateReso
                 cityPickerOpen,
                 onCityPickerOpenChange: setCityPickerOpen,
               }}
-              contactProps={{
-                contacts,
-                submitting,
-                onAdd: addContact,
-                onRemove: removeContact,
-                onUpdate: updateContact,
-                contactTypePickerForUid,
-                onContactTypePickerChange: setContactTypePickerForUid,
-                channelPickerForUid,
-                onChannelPickerChange: setChannelPickerForUid,
-              }}
               footerProps={{
                 backLabel: t("resort.back"),
                 cancelLabel: t("resort.cancel"),
@@ -303,8 +238,8 @@ export function CreateResortDialog({ open, onOpenChange, onSuccess }: CreateReso
                 submitLabel: t("resort.submit"),
                 onBack: handleBack,
                 onCancel: () => onOpenChange(false),
-                nextDisabled: step === 1 ? !step1Valid : !step2Valid,
-                submitDisabled: !step3Valid || submitting,
+                nextDisabled: !step1Valid,
+                submitDisabled: !step2Valid || submitting,
                 submitting,
               }}
             />

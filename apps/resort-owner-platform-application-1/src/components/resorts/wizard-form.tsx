@@ -3,7 +3,6 @@
 import { WizardFooter, type WizardFooterProps } from "./step-dialog"
 import { StepBasicInfo, type StepBasicInfoProps } from "./step-basic-info"
 import { StepLocation, type StepLocationProps } from "./step-location"
-import { StepContact, type StepContactProps } from "./step-contact"
 
 export interface WizardFormProps {
   step: number
@@ -11,7 +10,6 @@ export interface WizardFormProps {
   onSubmit: (e: React.FormEvent) => void
   basicInfoProps: StepBasicInfoProps
   locationProps: StepLocationProps
-  contactProps: StepContactProps
   footerProps: Omit<WizardFooterProps, "isFirstStep" | "isLastStep">
 }
 
@@ -21,7 +19,6 @@ export function WizardForm({
   onSubmit,
   basicInfoProps,
   locationProps,
-  contactProps,
   footerProps,
 }: WizardFormProps) {
   return (
@@ -41,7 +38,6 @@ export function WizardForm({
 
         {step === 1 && <StepBasicInfo {...basicInfoProps} />}
         {step === 2 && <StepLocation {...locationProps} />}
-        {step === 3 && <StepContact {...contactProps} />}
 
       </div>
 

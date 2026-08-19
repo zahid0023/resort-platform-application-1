@@ -62,13 +62,13 @@ export function PlatformFacilityPickerDialog({
         page: p,
         size: PAGE_SIZE,
         sort_by: "sortOrder",
-        scope_code: "RESORT",
+        facilityScopeCodes: ["RESORT"],
         ...(facilityGroupId !== undefined ? { facilityGroupId } : {}),
       })
       const filtered = q.trim()
         ? res.data.filter((f) =>
             f.code.toLowerCase().includes(q.toLowerCase()) ||
-            (f.locales[0]?.name ?? "").toLowerCase().includes(q.toLowerCase())
+            (f.locale?.name ?? "").toLowerCase().includes(q.toLowerCase())
           )
         : res.data
       setFacilities(filtered)
@@ -132,14 +132,14 @@ export function PlatformFacilityPickerDialog({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {facilities.map((f) => {
                 const isSelected = f.id === selectedId
-                const name = f.locales[0]?.name ?? f.code
+                const name = f.locale?.name ?? f.code
                 const accentColor = String(f.icon_meta?.color ?? "") || undefined
                 return (
                   <button
                     key={f.id}
                     type="button"
                     onClick={() => handleSelect(f)}
-                    className={`text-left rounded-xl border p-4 transition-all hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    className={`text-left rounded-xl border p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                       isSelected
                         ? "border-primary bg-primary/5 ring-1 ring-primary/30"
                         : "bg-card hover:border-primary/40"

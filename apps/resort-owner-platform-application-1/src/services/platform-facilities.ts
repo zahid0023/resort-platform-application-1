@@ -1,9 +1,11 @@
 import { api } from "./api"
+import type { Locale } from "./locales"
 
 export interface PlatformFacilityLocale {
   id: number
-  locale_id: number
+  locale: Locale
   name: string
+  description?: string
   sort_order: number
 }
 
@@ -15,7 +17,8 @@ export interface PlatformFacilitySummary {
   icon_type?: string
   icon_value?: string
   icon_meta?: Record<string, unknown>
-  locales: PlatformFacilityLocale[]
+  /** The single translation matching Accept-Language (falls back to en, then null). */
+  locale: PlatformFacilityLocale | null
 }
 
 export interface PlatformFacilityListResponse {
@@ -27,13 +30,15 @@ export interface PlatformFacilityListResponse {
 }
 
 export const platformFacilitiesService = {
-  list(params: { page?: number; size?: number; sort_by?: string; scope_code?: "RESORT" | "ROOM_CATEGORY" | "ROOM"; facilityGroupId?: number } = {}): Promise<PlatformFacilityListResponse> {
+  // Query params bind onto FacilityFilterRequest's Java field names via Spring's DataBinder —
+  // camelCase, not the kebab/snake-case previously used here (which the server silently ignored).
+  list(params: { page?: number; size?: number; sort_by?: string; facilityScopeCodes?: ("RESORT" | "ROOM_CATEGORY" | "ROOM")[]; facilityGroupId?: number } = {}): Promise<PlatformFacilityListResponse> {
     const q = new URLSearchParams()
     if (params.page !== undefined) q.set("page", String(params.page))
     if (params.size !== undefined) q.set("size", String(params.size))
-    if (params.sort_by) q.set("sort_by", params.sort_by)
-    if (params.scope_code) q.set("scope-code", params.scope_code)
-    if (params.facilityGroupId !== undefined) q.set("facility-group-id", String(params.facilityGroupId))
+    if (params.sort_by) q.set("sortBy", params.sort_by)
+    if (params.facilityGroupId !== undefined) q.set("facilityGroupId", String(params.facilityGroupId))
+    params.facilityScopeCodes?.forEach((code) => q.append("facilityScopeCodes", code))
     return api.get<PlatformFacilityListResponse>(`/facilities?${q}`)
   },
 }

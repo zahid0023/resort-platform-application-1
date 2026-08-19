@@ -1,14 +1,20 @@
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Layers, Loader2, Search } from "lucide-react"
 import { Badge, Dialog, DialogContent, DialogTitle, Input } from "@resort/shadcn-ui"
 import { LucideIconRenderer } from "ui-blocks"
+import { toast } from "sonner"
 import { platformFacilityGroupsService, type PlatformFacilityGroupSummary } from "@/services/platform-facility-groups"
+import { getResortFacilityScopeId } from "@/services/facility-scopes"
 import { Pagination } from "@/components/shared/pagination"
 
 const PAGE_SIZE = 20
+// The platform facility-groups endpoint has no server-side name search — the full reference
+// set is fetched once per dialog-open (same ceiling used elsewhere for "fetch it all" reference
+// lists, e.g. useLocales) and search/pagination are both done client-side against it.
+const FETCH_SIZE = 50
 
 export interface PlatformFacilityGroupPickerDialogProps {
   open: boolean
@@ -24,62 +30,57 @@ export function PlatformFacilityGroupPickerDialog({
   onSelect,
 }: PlatformFacilityGroupPickerDialogProps) {
   const { t } = useTranslation()
-  const [groups, setGroups] = useState<PlatformFacilityGroupSummary[]>([])
+  const [allGroups, setAllGroups] = useState<PlatformFacilityGroupSummary[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(0)
-  const [totalPages, setTotalPages] = useState(0)
-  const [totalElements, setTotalElements] = useState(0)
-  const [hasNext, setHasNext] = useState(false)
-  const [hasPrevious, setHasPrevious] = useState(false)
-  const isFirstSearchRender = useRef(true)
 
   useEffect(() => {
     if (open) {
       setSearch("")
       setPage(0)
-      isFirstSearchRender.current = true
-      load(0, "")
+      load()
     } else {
-      setGroups([])
+      setAllGroups([])
     }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (isFirstSearchRender.current) { isFirstSearchRender.current = false; return }
-    if (!open) return
     setPage(0)
-    const timer = setTimeout(() => load(0, search), 350)
-    return () => clearTimeout(timer)
-  }, [search]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [search])
 
-  async function load(p: number, q: string) {
+  async function load() {
     setLoading(true)
     try {
+      const resortScopeId = await getResortFacilityScopeId()
       const res = await platformFacilityGroupsService.list({
-        page: p,
-        size: PAGE_SIZE,
-        sort_by: "sortOrder",
-        scope_code: "RESORT",
+        page: 0,
+        size: FETCH_SIZE,
+        sort_by: "name",
+        facilityScopeIds: resortScopeId != null ? [resortScopeId] : undefined,
       })
-      const filtered = q.trim()
-        ? res.data.filter((g) =>
-            g.code.toLowerCase().includes(q.toLowerCase()) ||
-            (g.locales[0]?.name ?? "").toLowerCase().includes(q.toLowerCase())
-          )
-        : res.data
-      setGroups(filtered)
-      setPage(p)
-      setTotalPages(res.total_pages)
-      setTotalElements(res.total_elements)
-      setHasNext(res.has_next)
-      setHasPrevious(res.has_previous)
-    } catch {
-      // silent
+      setAllGroups(res.data)
+    } catch (err) {
+      toast.error((err as Error).message)
     } finally {
       setLoading(false)
     }
   }
+
+  const filteredGroups = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return allGroups
+    return allGroups.filter((g) =>
+      g.code.toLowerCase().includes(q) ||
+      (g.locale?.name ?? "").toLowerCase().includes(q)
+    )
+  }, [allGroups, search])
+
+  const totalElements = filteredGroups.length
+  const totalPages = Math.max(1, Math.ceil(totalElements / PAGE_SIZE))
+  const groups = filteredGroups.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE)
+  const hasNext = page < totalPages - 1
+  const hasPrevious = page > 0
 
   function handleSelect(group: PlatformFacilityGroupSummary) {
     onSelect(group)
@@ -129,7 +130,7 @@ export function PlatformFacilityGroupPickerDialog({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {groups.map((g) => {
                 const isSelected = g.id === selectedId
-                const name = g.locales[0]?.name ?? g.code
+                const name = g.locale?.name ?? g.code
                 const accentColor = String(g.icon_meta?.color ?? "") || undefined
                 return (
                   <button
@@ -185,7 +186,7 @@ export function PlatformFacilityGroupPickerDialog({
               totalElements={totalElements}
               hasNext={hasNext}
               hasPrevious={hasPrevious}
-              onPageChange={(p) => load(p, search)}
+              onPageChange={setPage}
             />
           </div>
         )}

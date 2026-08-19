@@ -1,574 +1,66 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { useTranslation } from "react-i18next"
-import { Check, ChevronDown, CircleCheck, Layers, ListChecks, Loader2, Pencil, X, Ban } from "lucide-react"
+import { ArrowRight, Check, CircleCheck, Layers, ListChecks, Pencil, Plus, RefreshCw, Save, X } from "lucide-react"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
-  Button, Card, CardContent, Dialog, DialogContent, DialogTitle, Input, Label,
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea,
+  Button, Sheet, SheetContent,
+  Tabs, TabsList, TabsTrigger, TabsContent,
 } from "@resort/shadcn-ui"
-import { LucideIconPicker, LucideIconRenderer } from "ui-blocks"
-import { useRouter } from "next/navigation"
+import { DialogEntityHeader } from "@/components/shared/dialog-entity-header"
+import { DialogCreateFooter } from "@/components/shared/dialog-create-footer"
 import { resortFacilityGroupsService } from "@/services/resort-facility-groups"
-import type { IconType } from "@/services/resort-facility-groups"
-import { resortFacilitiesService } from "@/services/resort-facilities"
-import { platformFacilitiesService, type PlatformFacilitySummary } from "@/services/platform-facilities"
+import type { PlatformFacilityGroupSummary } from "@/services/platform-facility-groups"
+import { resortFacilitiesService, type ResortFacilitySummary } from "@/services/resort-facilities"
+import { ResortFacilityCard } from "@/components/resort-facilities/resort-facility-card"
+import { ResortFacilityDialog, emptyResortFacilityForm } from "@/components/resort-facilities/resort-facility-dialog"
+import type { ResortFacilityFormState } from "@/components/resort-facilities/types"
 import type { Locale } from "@/services/locales"
 import { toast } from "sonner"
 import type { ResortFacilityGroupDialogMode, ResortFacilityGroupFormState } from "./types"
 import { emptyForm, toApiIconPayload } from "./types"
 import { ResortFacilityGroupGeneralInfo, type GroupMode } from "./resort-facility-group-general-info"
 import { ResortFacilityGroupLocaleTranslations } from "./resort-facility-group-locale-translations"
+import { IconSection } from "./resort-facility-group-icon-section"
+import { ResortFacilityGroupAddFacilitiesStep } from "./resort-facility-group-add-facilities-step"
 
-const ICON_TYPES: { value: IconType; label: string }[] = [
-  { value: "LUCIDE", label: "Lucide Icon" },
-  { value: "IMAGE", label: "Image URL" },
-  { value: "EXTERNAL", label: "External URL" },
-  { value: "SVG", label: "SVG Markup" },
-]
+// Local autosave for the create form — never sent to the backend, just a browser-local checkpoint,
+// scoped per-resort so a draft started for one resort never bleeds into another's create dialog.
+const DRAFT_SAVE_DEBOUNCE_MS = 500
+function draftKey(resortId: number) {
+  return `resort-facility-group-dialog-draft-${resortId}`
+}
 
-interface IconSectionProps {
+interface DraftState {
   form: ResortFacilityGroupFormState
-  onFormChange: (patch: Partial<ResortFacilityGroupFormState>) => void
-  readOnly: boolean
-  showAutoFillHint?: boolean
-  disabled?: boolean
-  editingHint?: boolean
-  onEditingHintChange?: (v: boolean) => void
+  /** The picked platform group's own display details — persisted alongside `form.facility_group_id`
+   * so the "Select a platform group" section can render the picked group's name/icon/code again
+   * after a close/reopen/restore-draft round trip, rather than falling back to the empty picker
+   * prompt (there's no `GET /facility-groups/{id}` to re-derive it from just the id). */
+  selectedPlatGroup: PlatformFacilityGroupSummary | null
 }
 
-interface IconSectionInnerProps {
-  form: ResortFacilityGroupFormState
-  onFormChange: (patch: Partial<ResortFacilityGroupFormState>) => void
-  readOnly: boolean
+function hasDraftContent(f: ResortFacilityGroupFormState): boolean {
+  return !!f.facility_group_id || f.code.trim() !== "" || f.sort_order !== 0 || f.icon_type !== ""
+    || f.locale.name.trim() !== "" || f.locale.description.trim() !== ""
 }
 
-function IconFields({ form, onFormChange, readOnly }: IconSectionInnerProps) {
-  const { t } = useTranslation()
-  return (
-    <>
-      <div className="space-y-2">
-        <Label className="text-xs font-medium">{t("resortFacilityGroup.iconType")}</Label>
-        <Select
-          value={form.icon_type || "__none"}
-          onValueChange={(v) => onFormChange({ icon_type: v === "__none" ? "" : v as IconType, icon_value: "", icon_color: "" })}
-          disabled={readOnly}
-        >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder={t("resortFacilityGroup.iconTypePlaceholder")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="__none">{t("resortFacilityGroup.iconNone")}</SelectItem>
-            {ICON_TYPES.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {form.icon_type === "LUCIDE" && (
-        <>
-          <div className="space-y-2">
-            <Label className="text-xs font-medium">{t("resortFacilityGroup.iconValue")} *</Label>
-            {readOnly ? (
-              <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3">
-                {form.icon_value && (
-                  <LucideIconRenderer name={form.icon_value} size={18} style={{ color: form.icon_color || undefined }} />
-                )}
-                <span className="font-mono text-sm">{form.icon_value || "—"}</span>
-              </div>
-            ) : (
-              <LucideIconPicker
-                value={form.icon_value}
-                color={form.icon_color || undefined}
-                onChange={(name) => onFormChange({ icon_value: name })}
-              />
-            )}
-          </div>
-          <div className="space-y-2">
-            <Label className="text-xs font-medium">{t("resortFacilityGroup.iconColor")}</Label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={form.icon_color || "#6366f1"}
-                onChange={(e) => onFormChange({ icon_color: e.target.value })}
-                disabled={readOnly}
-                className="h-9 w-12 rounded border cursor-pointer disabled:opacity-50 disabled:cursor-default"
-              />
-              <Input
-                value={form.icon_color}
-                onChange={(e) => onFormChange({ icon_color: e.target.value })}
-                placeholder="#6366f1"
-                disabled={readOnly}
-                className="font-mono h-9"
-              />
-              {!readOnly && form.icon_color && (
-                <Button type="button" size="sm" variant="ghost" className="h-9 px-2 text-xs"
-                  onClick={() => onFormChange({ icon_color: "" })}>
-                  {t("resortFacilityGroup.clearColor")}
-                </Button>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-
-      {(form.icon_type === "IMAGE" || form.icon_type === "EXTERNAL") && (
-        <div className="space-y-2">
-          <Label className="text-xs font-medium">{t("resortFacilityGroup.iconUrl")} *</Label>
-          <Input
-            value={form.icon_value}
-            onChange={(e) => onFormChange({ icon_value: e.target.value })}
-            placeholder="https://…"
-            disabled={readOnly}
-          />
-          {form.icon_value && (
-            <img src={form.icon_value} alt="preview" className="h-12 w-12 object-contain rounded border" />
-          )}
-        </div>
-      )}
-
-      {form.icon_type === "SVG" && (
-        <>
-          <div className="space-y-2">
-            <Label className="text-xs font-medium">{t("resortFacilityGroup.iconSvg")} *</Label>
-            <Textarea
-              value={form.icon_value}
-              onChange={(e) => onFormChange({ icon_value: e.target.value })}
-              placeholder="<svg …>…</svg>"
-              disabled={readOnly}
-              rows={4}
-              className="font-mono text-xs resize-none"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label className="text-xs font-medium">{t("resortFacilityGroup.iconColor")}</Label>
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={form.icon_color || "#6366f1"}
-                onChange={(e) => onFormChange({ icon_color: e.target.value })}
-                disabled={readOnly}
-                className="h-9 w-12 rounded border cursor-pointer disabled:opacity-50 disabled:cursor-default"
-              />
-              <Input
-                value={form.icon_color}
-                onChange={(e) => onFormChange({ icon_color: e.target.value })}
-                placeholder="#6366f1"
-                disabled={readOnly}
-                className="font-mono h-9"
-              />
-              {!readOnly && form.icon_color && (
-                <Button type="button" size="sm" variant="ghost" className="h-9 px-2 text-xs"
-                  onClick={() => onFormChange({ icon_color: "" })}>
-                  {t("resortFacilityGroup.clearColor")}
-                </Button>
-              )}
-            </div>
-          </div>
-        </>
-      )}
-    </>
-  )
-}
-
-function IconSection({ form, onFormChange, readOnly, showAutoFillHint, disabled, editingHint, onEditingHintChange }: IconSectionProps) {
-  const { t } = useTranslation()
-  const hasIcon = !!form.icon_type && !!form.icon_value
-
-  // Reset edit state whenever the platform group changes (icon_value changes from auto-fill)
-  const prevIconValue = useRef(form.icon_value)
-  useEffect(() => {
-    if (showAutoFillHint && form.icon_value !== prevIconValue.current) {
-      onEditingHintChange?.(false)
-    }
-    prevIconValue.current = form.icon_value
-  }, [form.icon_value, showAutoFillHint])
-
-  if (disabled) {
-    return (
-      <Card>
-        <CardContent className="flex items-center gap-3 py-6 text-muted-foreground">
-          <Ban className="h-4 w-4 shrink-0 opacity-40" />
-          <p className="text-sm">{t("resortFacilityGroup.selectGroupFirst")}</p>
-        </CardContent>
-      </Card>
-    )
-  }
-
-  // Platform mode: preview with hover overlay edit button
-  if (showAutoFillHint) {
-    return (
-      <Card>
-        <CardContent className="space-y-4">
-          <div className="relative group/preview">
-            {hasIcon ? (
-              <div className="flex items-center gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5">
-                {form.icon_type === "LUCIDE" && (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-background">
-                    <LucideIconRenderer name={form.icon_value} size={22} style={{ color: form.icon_color || undefined }} />
-                  </div>
-                )}
-                {(form.icon_type === "IMAGE" || form.icon_type === "EXTERNAL") && (
-                  <img src={form.icon_value} alt="icon preview" className="h-10 w-10 shrink-0 object-contain rounded-md border bg-background" />
-                )}
-                {form.icon_type === "SVG" && (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border bg-background">
-                    <span className="text-xs font-mono font-bold text-muted-foreground">SVG</span>
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <p className="text-xs font-medium truncate">{form.icon_value}</p>
-                  <p className="text-xs text-muted-foreground">{t("resortFacilityGroup.iconAutoFilled")}</p>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed px-3 py-3">
-                <p className="text-xs text-muted-foreground">{t("resortFacilityGroup.iconNoAutoFill")}</p>
-              </div>
-            )}
-            {!readOnly && (
-              <div className={[
-                "absolute inset-0 rounded-lg flex items-center justify-end pr-3 transition-all duration-200",
-                "bg-black/50 backdrop-blur-[2px]",
-                editingHint ? "opacity-100" : "opacity-0 group-hover/preview:opacity-100",
-              ].join(" ")}>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => onEditingHintChange?.(!editingHint)}
-                  className="h-7 text-xs px-3 gap-1.5 shadow-lg"
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                  {editingHint ? t("common.cancel") : t("common.edit")}
-                </Button>
-              </div>
-            )}
-          </div>
-          {editingHint && (
-            <IconFields form={form} onFormChange={onFormChange} readOnly={false} />
-          )}
-        </CardContent>
-      </Card>
-    )
-  }
-
-  return (
-    <Card>
-      <CardContent className="space-y-4">
-        <IconFields form={form} onFormChange={onFormChange} readOnly={readOnly} />
-      </CardContent>
-    </Card>
-  )
-}
-
-// ── Step 3: Platform facility selector with customization ────────────────────
-
-export interface FacilityCustomization {
-  sort_order: number
-  icon_type: IconType | ""
-  icon_value: string
-  icon_color: string
-  locales: Array<{ locale_id: number; name: string; description: string; sort_order: number }>
-}
-
-function initCustomization(f: PlatformFacilitySummary): FacilityCustomization {
-  return {
-    sort_order: f.sort_order ?? 0,
-    icon_type: (f.icon_type ?? "") as IconType | "",
-    icon_value: f.icon_value ?? "",
-    icon_color: String(f.icon_meta?.color ?? ""),
-    locales: f.locales.map((l) => ({
-      locale_id: l.locale_id,
-      name: l.name,
-      description: "",
-      sort_order: l.sort_order,
-    })),
+function readDraft(resortId: number): DraftState | null {
+  try {
+    const raw = localStorage.getItem(draftKey(resortId))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as DraftState
+    return hasDraftContent(parsed.form) ? parsed : null
+  } catch {
+    return null
   }
 }
 
-interface FacilityPickerProps {
-  facilities: PlatformFacilitySummary[]
-  loading: boolean
-  selectedIds: Set<number>
-  onToggle: (id: number) => void
-  onSelectAll: () => void
-  onDeselectAll: () => void
-  customizations: Record<number, FacilityCustomization>
-  onCustomizationChange: (id: number, patch: Partial<FacilityCustomization>) => void
-  onLocaleChange: (id: number, idx: number, patch: Partial<FacilityCustomization["locales"][number]>) => void
-  availableLocales: Locale[]
+function clearDraft(resortId: number) {
+  localStorage.removeItem(draftKey(resortId))
 }
-
-function FacilityPicker({
-  facilities, loading, selectedIds, onToggle, onSelectAll, onDeselectAll,
-  customizations, onCustomizationChange, onLocaleChange, availableLocales,
-}: FacilityPickerProps) {
-  const { t } = useTranslation()
-  const [expandedId, setExpandedId] = useState<number | null>(null)
-
-  function handleToggle(id: number) {
-    const willSelect = !selectedIds.has(id)
-    onToggle(id)
-    if (willSelect) setExpandedId(id)
-    else if (expandedId === id) setExpandedId(null)
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  if (facilities.length === 0) {
-    return (
-      <div className="flex items-center justify-center py-12 text-sm text-muted-foreground border rounded-xl border-dashed">
-        {t("resortFacilityGroup.noFacilitiesInGroup")}
-      </div>
-    )
-  }
-
-  const allSelected = facilities.every((f) => selectedIds.has(f.id))
-
-  return (
-    <div className="space-y-3">
-      {/* Select all / Deselect all */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">
-          {selectedIds.size} / {facilities.length} {t("resortFacilityGroup.facilitiesSelected")}
-        </p>
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          className="h-7 text-xs px-2.5"
-          onClick={allSelected ? onDeselectAll : onSelectAll}
-        >
-          {allSelected ? t("resortFacilityGroup.deselectAll") : t("resortFacilityGroup.selectAll")}
-        </Button>
-      </div>
-
-      {/* Facility list */}
-      <div className="space-y-2">
-        {facilities.map((f) => {
-          const selected = selectedIds.has(f.id)
-          const expanded = selected && expandedId === f.id
-          const name = f.locales[0]?.name ?? f.code
-          const accentColor = String(f.icon_meta?.color ?? "") || undefined
-          const custom = customizations[f.id]
-
-          return (
-            <div
-              key={f.id}
-              className={`rounded-lg border overflow-hidden transition-colors ${selected ? "border-primary" : "border-border"}`}
-            >
-              {/* Row header */}
-              <div
-                className={`flex items-center gap-3 p-3 cursor-pointer transition-colors ${selected ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-accent/40"}`}
-                onClick={() => selected ? setExpandedId(expanded ? null : f.id) : handleToggle(f.id)}
-              >
-                {/* Checkbox */}
-                <div
-                  className={`flex size-4 shrink-0 items-center justify-center rounded border transition-colors ${selected ? "border-primary bg-primary" : "border-muted-foreground/40 bg-background"}`}
-                  onClick={(e) => { e.stopPropagation(); handleToggle(f.id) }}
-                >
-                  {selected && <Check className="h-2.5 w-2.5 text-primary-foreground" />}
-                </div>
-
-                {/* Platform icon */}
-                <div
-                  className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0"
-                  style={{ background: accentColor ? `linear-gradient(135deg, ${accentColor}, ${accentColor}cc)` : undefined }}
-                >
-                  {f.icon_type === "LUCIDE" && f.icon_value ? (
-                    <LucideIconRenderer name={f.icon_value} size={14} style={{ color: accentColor ? "white" : undefined }} />
-                  ) : (f.icon_type === "IMAGE" || f.icon_type === "EXTERNAL") && f.icon_value ? (
-                    <img src={f.icon_value} alt={name} className="h-4 w-4 object-contain" />
-                  ) : (
-                    <span className="text-xs font-mono font-semibold text-muted-foreground">{name[0]?.toUpperCase() ?? "?"}</span>
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium leading-tight truncate">{name}</p>
-                  <p className="text-xs text-muted-foreground font-mono">{f.code}</p>
-                </div>
-
-                {/* Expand chevron (only when selected) */}
-                {selected && (
-                  <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} />
-                )}
-              </div>
-
-              {/* ── Customization panel ──────────────────────────────────── */}
-              {expanded && custom && (
-                <div className="border-t bg-muted/20 p-4 space-y-5">
-
-                  {/* Sort order */}
-                  <div className="space-y-1.5">
-                    <Label className="text-xs font-medium">{t("field.sort")} *</Label>
-                    <Input
-                      type="number"
-                      value={custom.sort_order}
-                      onChange={(e) => onCustomizationChange(f.id, { sort_order: Number(e.target.value) })}
-                      className="h-9"
-                    />
-                  </div>
-
-                  {/* Icon override */}
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1 w-1 rounded-full bg-primary" />
-                      <span className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
-                        {t("resortFacilityGroup.iconSection")}
-                      </span>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs font-medium">{t("resortFacility.iconType")}</Label>
-                      <Select
-                        value={custom.icon_type || "__none"}
-                        onValueChange={(v) => onCustomizationChange(f.id, {
-                          icon_type: v === "__none" ? "" : v as IconType,
-                          icon_value: "",
-                          icon_color: "",
-                        })}
-                      >
-                        <SelectTrigger className="h-9 w-full"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__none">{t("resortFacility.iconNone")}</SelectItem>
-                          {ICON_TYPES.map((opt) => (
-                            <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    {custom.icon_type === "LUCIDE" && (
-                      <>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-medium">{t("resortFacility.iconValue")} *</Label>
-                          <LucideIconPicker
-                            value={custom.icon_value}
-                            color={custom.icon_color || undefined}
-                            onChange={(n) => onCustomizationChange(f.id, { icon_value: n })}
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-medium">{t("resortFacility.iconColor")}</Label>
-                          <div className="flex items-center gap-2">
-                            <input type="color" value={custom.icon_color || "#6366f1"}
-                              onChange={(e) => onCustomizationChange(f.id, { icon_color: e.target.value })}
-                              className="h-9 w-12 rounded border cursor-pointer" />
-                            <Input value={custom.icon_color}
-                              onChange={(e) => onCustomizationChange(f.id, { icon_color: e.target.value })}
-                              placeholder="#6366f1" className="font-mono h-9" />
-                            {custom.icon_color && (
-                              <Button type="button" size="sm" variant="ghost" className="h-9 px-2 text-xs"
-                                onClick={() => onCustomizationChange(f.id, { icon_color: "" })}>
-                                {t("resortFacility.clearColor")}
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                    {(custom.icon_type === "IMAGE" || custom.icon_type === "EXTERNAL") && (
-                      <div className="space-y-1.5">
-                        <Label className="text-xs font-medium">{t("resortFacility.iconUrl")} *</Label>
-                        <Input value={custom.icon_value}
-                          onChange={(e) => onCustomizationChange(f.id, { icon_value: e.target.value })}
-                          placeholder="https://…" className="h-9" />
-                        {custom.icon_value && (
-                          <img src={custom.icon_value} alt="preview" className="h-12 w-12 object-contain rounded border" />
-                        )}
-                      </div>
-                    )}
-                    {custom.icon_type === "SVG" && (
-                      <>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-medium">{t("resortFacility.iconSvg")} *</Label>
-                          <Textarea value={custom.icon_value}
-                            onChange={(e) => onCustomizationChange(f.id, { icon_value: e.target.value })}
-                            placeholder="<svg …>…</svg>" rows={3} className="font-mono text-xs resize-none" />
-                        </div>
-                        <div className="space-y-1.5">
-                          <Label className="text-xs font-medium">{t("resortFacility.iconColor")}</Label>
-                          <div className="flex items-center gap-2">
-                            <input type="color" value={custom.icon_color || "#6366f1"}
-                              onChange={(e) => onCustomizationChange(f.id, { icon_color: e.target.value })}
-                              className="h-9 w-12 rounded border cursor-pointer" />
-                            <Input value={custom.icon_color}
-                              onChange={(e) => onCustomizationChange(f.id, { icon_color: e.target.value })}
-                              placeholder="#6366f1" className="font-mono h-9" />
-                            {custom.icon_color && (
-                              <Button type="button" size="sm" variant="ghost" className="h-9 px-2 text-xs"
-                                onClick={() => onCustomizationChange(f.id, { icon_color: "" })}>
-                                {t("resortFacility.clearColor")}
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Locale translations */}
-                  {custom.locales.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-1 w-1 rounded-full bg-primary" />
-                        <span className="text-xs font-semibold tracking-wide uppercase text-muted-foreground">
-                          {t("locale.translations")}
-                        </span>
-                      </div>
-                      <div className="divide-y border rounded-lg overflow-hidden">
-                        {custom.locales.map((row, idx) => {
-                          const localeMeta = availableLocales.find((l) => l.id === row.locale_id)
-                          return (
-                            <div key={row.locale_id} className="p-3 space-y-2.5">
-                              <p className="text-xs font-medium text-muted-foreground">
-                                {localeMeta ? `${localeMeta.name} (${localeMeta.code})` : `Locale #${row.locale_id}`}
-                              </p>
-                              <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">{t("common.name")} *</Label>
-                                <Input value={row.name}
-                                  onChange={(e) => onLocaleChange(f.id, idx, { name: e.target.value })}
-                                  className="h-8 text-xs" />
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">{t("field.sort")}</Label>
-                                <Input type="number" value={row.sort_order}
-                                  onChange={(e) => onLocaleChange(f.id, idx, { sort_order: Number(e.target.value) })}
-                                  className="h-8 text-xs" />
-                              </div>
-                              <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">{t("resortFacilityGroup.description")}</Label>
-                                <Textarea value={row.description}
-                                  onChange={(e) => onLocaleChange(f.id, idx, { description: e.target.value })}
-                                  rows={2} className="text-xs resize-none" />
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ── Main dialog ──────────────────────────────────────────────────────────────
 
 export interface ResortFacilityGroupDialogProps {
   resortId: number
@@ -596,10 +88,9 @@ export function ResortFacilityGroupDialog({
   onSaved,
 }: ResortFacilityGroupDialogProps) {
   const { t } = useTranslation()
-  const router = useRouter()
 
-  // Step 1 state
   const [submitting, setSubmitting] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [generalEditing, setGeneralEditing] = useState(false)
   const [iconEditing, setIconEditing] = useState(false)
   const [createIconEditing, setCreateIconEditing] = useState(false)
@@ -610,15 +101,40 @@ export function ResortFacilityGroupDialog({
   const [translationsEditing, setTranslationsEditing] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
   const [createGroupMode, setCreateGroupMode] = useState<GroupMode>("platform")
+  const [activeTab, setActiveTab] = useState<"general" | "icon" | "locales" | "facilities">("general")
 
-  // Step 2/3 state
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  // Create mode only — the group is created when the "Locales" tab is submitted, then the
+  // Facilities tab unlocks for the post-creation bulk-add flow.
+  const [groupCreated, setGroupCreated] = useState(false)
   const [newGroupId, setNewGroupId] = useState(0)
-  const [platformFacilities, setPlatformFacilities] = useState<PlatformFacilitySummary[]>([])
-  const [platformFacilitiesLoading, setPlatformFacilitiesLoading] = useState(false)
-  const [selectedFacilityIds, setSelectedFacilityIds] = useState<Set<number>>(new Set())
-  const [facilityCustomizations, setFacilityCustomizations] = useState<Record<number, FacilityCustomization>>({})
-  const [creatingFacilities, setCreatingFacilities] = useState(false)
+  const [addFacStep, setAddFacStep] = useState<2 | 3>(2)
+
+  // View/edit mode only — lazy-loaded once the Facilities tab is first selected.
+  const [groupFacilities, setGroupFacilities] = useState<ResortFacilitySummary[]>([])
+  const [facilitiesLoaded, setFacilitiesLoaded] = useState(false)
+  const [facilitiesLoading, setFacilitiesLoading] = useState(false)
+  const [groupName, setGroupName] = useState("")
+
+  // View/edit mode only — creates a new ResortFacility scoped to this group via the
+  // standalone facility-create dialog, reused rather than duplicating its create flow here.
+  const [facilityCreateOpen, setFacilityCreateOpen] = useState(false)
+  const [facilityCreateForm, setFacilityCreateForm] = useState<ResortFacilityFormState>(emptyResortFacilityForm)
+
+  // View/edit mode only — the Locale Translations section loads/refetches its own data
+  // internally, so a manual refresh signals it by incrementing this counter rather than
+  // calling a fetch function owned by this dialog.
+  const [localesRefreshSignal, setLocalesRefreshSignal] = useState(0)
+
+  // Owned here (not inside the Locales tab content) so it survives that tab unmounting on switch.
+  const [localeSearch, setLocaleSearch] = useState("")
+
+  // Create mode only — the picked platform group's own display details, kept alongside `form` so it
+  // can round-trip through the draft (see DraftState above).
+  const [selectedPlatGroup, setSelectedPlatGroup] = useState<PlatformFacilityGroupSummary | null>(null)
+
+  const [draftPrompt, setDraftPrompt] = useState<DraftState | null>(null)
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null)
+  const [draftSyncing, setDraftSyncing] = useState(false)
 
   const inputsDisabled = mode === "create" && createGroupMode === "platform" && !form.facility_group_id
 
@@ -631,33 +147,93 @@ export function ResortFacilityGroupDialog({
       setTranslationsEditing(false)
       setConfirmClose(false)
       setCreateGroupMode("platform")
-      setStep(1)
+      setActiveTab("general")
+      setGroupCreated(false)
       setNewGroupId(0)
-      setPlatformFacilities([])
-      setSelectedFacilityIds(new Set())
-      setFacilityCustomizations({})
-      setCreatingFacilities(false)
+      setAddFacStep(2)
+      setGroupFacilities([])
+      setFacilitiesLoaded(false)
+      setGroupName("")
+      setFacilityCreateOpen(false)
+      setFacilityCreateForm(emptyResortFacilityForm)
+      setLocalesRefreshSignal(0)
+      setLocaleSearch("")
+      setSelectedPlatGroup(null)
+      setDraftPrompt(null)
+      setDraftSavedAt(null)
+      setDraftSyncing(false)
     }
   }, [open])
 
-  const isDirty = mode === "create"
-    ? form.icon_type !== "" || form.icon_value !== "" || form.sort_order !== 0
-      || form.locales.length > 0
-    : generalEditing || iconEditing || translationsEditing
+  // On opening a fresh create form, offer to resume a locally-saved draft.
+  useEffect(() => {
+    if (open && mode === "create") setDraftPrompt(readDraft(resortId))
+  }, [open, mode, resortId])
 
-  function requestClose() {
-    if (step === 2 || step === 3) {
-      // Group already saved — safe to close, just trigger refresh
-      finishAndClose()
-      return
+  // Debounced local autosave of the create form — skipped while the restore prompt is pending or
+  // once the group has actually been created (further edits then go through the real API instead).
+  useEffect(() => {
+    if (!open || mode !== "create" || draftPrompt || groupCreated) return
+    if (hasDraftContent(form)) setDraftSyncing(true)
+    const timer = setTimeout(() => {
+      if (hasDraftContent(form)) {
+        localStorage.setItem(draftKey(resortId), JSON.stringify({ form, selectedPlatGroup }))
+        setDraftSavedAt(new Date())
+      } else {
+        clearDraft(resortId)
+        setDraftSavedAt(null)
+      }
+      setDraftSyncing(false)
+    }, DRAFT_SAVE_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [form, selectedPlatGroup, open, mode, draftPrompt, groupCreated, resortId])
+
+  function restoreDraft() {
+    if (draftPrompt) {
+      onFormChange(draftPrompt.form)
+      setSelectedPlatGroup(draftPrompt.selectedPlatGroup)
+      setDraftSavedAt(new Date())
     }
-    if (isDirty) setConfirmClose(true)
-    else onOpenChange(false)
+    setDraftPrompt(null)
   }
+
+  function discardDraft() {
+    clearDraft(resortId)
+    setDraftSavedAt(null)
+    setDraftSyncing(false)
+    setDraftPrompt(null)
+  }
+
+  const draftIndicator = mode === "create" && !groupCreated && (draftSyncing || draftSavedAt) ? (
+    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      {draftSyncing ? (
+        <>
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" /> {t("dialog.draftSyncing")}
+        </>
+      ) : (
+        <>
+          <Save className="h-3.5 w-3.5" />
+          {t("dialog.draftSaved", { time: draftSavedAt!.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", second: "2-digit" }) })}
+        </>
+      )}
+    </span>
+  ) : undefined
+
+  const isDirty = generalEditing || iconEditing || translationsEditing
 
   async function finishAndClose() {
     onOpenChange(false)
     await onSaved?.()
+  }
+
+  function requestClose() {
+    if (mode === "create") {
+      if (groupCreated) { finishAndClose(); return }
+      onOpenChange(false)
+      return
+    }
+    if (isDirty) setConfirmClose(true)
+    else onOpenChange(false)
   }
 
   function startIconEdit() {
@@ -675,7 +251,6 @@ export function ResortFacilityGroupDialog({
     try {
       await resortFacilityGroupsService.update(resortId, groupId, {
         sort_order: form.sort_order,
-        facility_group_id: form.facility_group_id ? Number(form.facility_group_id) : null,
         ...toApiIconPayload(localIcon as ResortFacilityGroupFormState),
       })
       toast.success(t("resortFacilityGroup.updated"))
@@ -689,50 +264,144 @@ export function ResortFacilityGroupDialog({
     }
   }
 
-  async function loadPlatformFacilities(platformGroupId: number) {
-    setPlatformFacilitiesLoading(true)
+  // Silent checks — drive the tabs' disabled state without firing toasts on every render.
+  function isGeneralValid(): boolean {
+    if (mode !== "create") return true
+    if (!form.code.trim()) return false
+    if (createGroupMode === "platform") return !!form.facility_group_id
+    return true
+  }
+  function isIconValid(): boolean {
+    if (!form.icon_type) return true
+    return !!form.icon_value
+  }
+  function isLocaleValid(): boolean {
+    return form.locale.name.trim() !== ""
+  }
+
+  // Same checks, but report which field is missing — used by both the Next buttons and submit.
+  function validateGeneral(): boolean {
+    if (mode !== "create") return true
+    if (!form.code.trim()) {
+      toast.error(t("resortFacilityGroup.errCode"))
+      return false
+    }
+    if (createGroupMode === "platform" && !form.facility_group_id) {
+      toast.error(t("resortFacilityGroup.selectGroupFirst"))
+      return false
+    }
+    return true
+  }
+  function validateIcon(): boolean {
+    if (form.icon_type && !form.icon_value) {
+      toast.error(t("resortFacilityGroup.errIconValue"))
+      return false
+    }
+    return true
+  }
+  function validateLocale(): boolean {
+    if (!form.locale.name.trim()) { toast.error(t("locale.errName", { n: 1 })); return false }
+    return true
+  }
+
+  function handleNextFromGeneral() {
+    if (!validateGeneral()) return
+    setActiveTab("icon")
+  }
+
+  function handleNextFromIcon() {
+    if (!validateIcon()) return
+    setActiveTab("locales")
+  }
+
+  async function fetchGroupFacilities(): Promise<void> {
+    if (groupId == null) return
+    setFacilitiesLoading(true)
     try {
-      const res = await platformFacilitiesService.list({
-        facilityGroupId: platformGroupId,
-        size: 50,
-        sort_by: "sortOrder",
-      })
-      setPlatformFacilities(res.data)
-      setSelectedFacilityIds(new Set())
+      const [facRes, groupRes] = await Promise.all([
+        resortFacilitiesService.list(resortId, { resort_facility_group_id: groupId, size: 12, sort_by: "createdAt" }),
+        resortFacilityGroupsService.get(resortId, groupId),
+      ])
+      setGroupFacilities(facRes.data)
+      setGroupName(groupRes.data.locale?.name ?? "")
+      onFormChange({ ...form, facility_group_id: groupRes.data.facility_group_id ?? "" })
     } catch (err) {
       toast.error((err as Error).message)
     } finally {
-      setPlatformFacilitiesLoading(false)
+      setFacilitiesLoading(false)
+    }
+  }
+
+  function openCreateFacility() {
+    if (groupId == null) return
+    setFacilityCreateForm({ ...emptyResortFacilityForm, resort_facility_group_id: groupId })
+    setFacilityCreateOpen(true)
+  }
+
+  // View/edit mode only — lazy-loaded once, the first time the Facilities tab is selected.
+  useEffect(() => {
+    if (!open || mode === "create" || activeTab !== "facilities" || facilitiesLoaded || groupId == null) return
+    setFacilitiesLoaded(true)
+    fetchGroupFacilities()
+  }, [open, mode, activeTab, facilitiesLoaded, groupId, resortId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Manual refresh only — switching tabs never re-fetches on its own otherwise (see the lazy-load
+  // effects above). Pulls whichever the active tab needs. The Locales tab's own data lives inside
+  // ResortFacilityGroupLocaleTranslations, so it's refreshed by bumping a signal counter instead
+  // of calling a fetch function this dialog doesn't own.
+  async function handleRefresh(): Promise<void> {
+    if (groupId == null) return
+    setRefreshing(true)
+    try {
+      if (activeTab === "general" || activeTab === "icon") {
+        const res = await resortFacilityGroupsService.get(resortId, groupId)
+        onFormChange({
+          ...form,
+          sort_order: res.data.sort_order,
+          icon_type: (res.data.icon_type ?? "") as ResortFacilityGroupFormState["icon_type"],
+          icon_value: res.data.icon_value ?? "",
+          icon_color: String(res.data.icon_meta?.color ?? ""),
+        })
+      }
+      if (activeTab === "locales") {
+        setLocalesRefreshSignal((n) => n + 1)
+      }
+      if (activeTab === "facilities") {
+        await fetchGroupFacilities()
+      }
+      toast.success(t("common.refreshed"))
+    } catch (err) {
+      toast.error((err as Error).message)
+    } finally {
+      setRefreshing(false)
     }
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (mode !== "create") return
-    if (form.icon_type && !form.icon_value) {
-      toast.error(t("resortFacilityGroup.errIconValue"))
-      return
-    }
-    for (const [i, row] of form.locales.entries()) {
-      if (!row.locale_id) { toast.error(t("locale.errLang", { n: i + 1 })); return }
-      if (!row.name.trim()) { toast.error(t("locale.errName", { n: i + 1 })); return }
-    }
+    if (!validateGeneral()) { setActiveTab("general"); return }
+    if (!validateIcon()) { setActiveTab("icon"); return }
+    if (!validateLocale()) { setActiveTab("locales"); return }
     setSubmitting(true)
     try {
       const result = await resortFacilityGroupsService.create(resortId, {
         facility_group_id: form.facility_group_id ? Number(form.facility_group_id) : undefined,
+        code: form.code.trim(),
         sort_order: Number(form.sort_order) || 0,
         ...toApiIconPayload(form),
-        locales: form.locales.map((row) => ({
-          locale_id: Number(row.locale_id),
-          name: row.name.trim(),
-          description: row.description.trim(),
-          sort_order: Number(row.sort_order) || 0,
-        })),
+        locale: {
+          name: form.locale.name.trim(),
+          description: form.locale.description.trim(),
+          sort_order: Number(form.locale.sort_order) || 0,
+        },
       })
+      clearDraft(resortId)
       toast.success(t("resortFacilityGroup.created"))
       setNewGroupId(result.id)
-      setStep(2)
+      setGroupCreated(true)
+      setAddFacStep(2)
+      setActiveTab("facilities")
       await onSaved?.()
     } catch (err) {
       toast.error((err as Error).message)
@@ -741,134 +410,71 @@ export function ResortFacilityGroupDialog({
     }
   }
 
-  async function handleCreateFacilities() {
-    if (selectedFacilityIds.size === 0) {
-      finishAndClose()
-      return
-    }
-    setCreatingFacilities(true)
-    try {
-      const toCreate = platformFacilities.filter((f) => selectedFacilityIds.has(f.id))
-      await Promise.all(
-        toCreate.map((f) => {
-          const custom = facilityCustomizations[f.id] ?? initCustomization(f)
-          const hasIcon = !!custom.icon_type && !!custom.icon_value
-          return resortFacilitiesService.create(resortId, {
-            resort_facility_group_id: newGroupId,
-            facility_id: f.id,
-            sort_order: custom.sort_order,
-            icon_type: hasIcon ? (custom.icon_type as IconType) : null,
-            icon_value: hasIcon ? custom.icon_value : null,
-            icon_meta: hasIcon && custom.icon_color ? { color: custom.icon_color } : null,
-            locales: custom.locales.map((l) => ({
-              locale_id: l.locale_id,
-              name: l.name,
-              description: l.description,
-              sort_order: l.sort_order,
-            })),
-          })
-        }),
-      )
-      toast.success(t("resortFacilityGroup.facilitiesAdded", { count: toCreate.length }))
-      finishAndClose()
-    } catch (err) {
-      toast.error((err as Error).message)
-    } finally {
-      setCreatingFacilities(false)
-    }
-  }
-
-  function toggleFacility(id: number) {
-    const isSelected = selectedFacilityIds.has(id)
-    setSelectedFacilityIds((prev) => {
-      const next = new Set(prev)
-      isSelected ? next.delete(id) : next.add(id)
-      return next
-    })
-    if (!isSelected && !facilityCustomizations[id]) {
-      const f = platformFacilities.find((f) => f.id === id)
-      if (f) setFacilityCustomizations((prev) => ({ ...prev, [id]: initCustomization(f) }))
-    }
-  }
-
-  function handleCustomizationChange(id: number, patch: Partial<FacilityCustomization>) {
-    setFacilityCustomizations((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }))
-  }
-
-  function handleLocaleChange(id: number, idx: number, patch: Partial<FacilityCustomization["locales"][number]>) {
-    setFacilityCustomizations((prev) => {
-      const custom = prev[id]
-      if (!custom) return prev
-      return { ...prev, [id]: { ...custom, locales: custom.locales.map((l, i) => i === idx ? { ...l, ...patch } : l) } }
-    })
-  }
-
   const isEditing = generalEditing || iconEditing || translationsEditing
 
-  // ── Header content switches on step ──────────────────────────────────────
-  const headerIcon = step === 3
-    ? <ListChecks className="h-4 w-4" />
-    : step === 2
-      ? <CircleCheck className="h-4 w-4 text-green-500" />
-      : <Layers className="h-4 w-4" />
-  const headerTitle = step === 3
-    ? t("resortFacilityGroup.addFacilitiesStep")
-    : step === 2
-      ? t("resortFacilityGroup.createdTitle")
-      : mode === "create"
-        ? t("resortFacilityGroup.dialogCreate")
-        : isEditing ? t("resortFacilityGroup.dialogEdit") : t("resortFacilityGroup.dialogView")
-  const headerDesc = step === 3
-    ? t("resortFacilityGroup.addFacilitiesDesc")
-    : step === 2
-      ? t("resortFacilityGroup.createdAsk")
-      : mode === "create"
-        ? t("resortFacilityGroup.dialogDescCreate")
-        : isEditing ? t("resortFacilityGroup.dialogDescEdit") : t("resortFacilityGroup.dialogDescView")
+  const headerIcon = mode === "create" && activeTab === "facilities"
+    ? (addFacStep === 3 ? <ListChecks className="h-4 w-4" /> : <CircleCheck className="h-4 w-4 text-green-500" />)
+    : <Layers className="h-4 w-4" />
+  const headerTitle = mode === "create" && activeTab === "facilities"
+    ? (addFacStep === 3 ? t("resortFacilityGroup.addFacilitiesStep") : t("resortFacilityGroup.createdTitle"))
+    : mode === "create"
+      ? t("resortFacilityGroup.dialogCreate")
+      : isEditing ? t("resortFacilityGroup.dialogEdit") : t("resortFacilityGroup.dialogView")
+  const headerDesc = mode === "create" && activeTab === "facilities"
+    ? (addFacStep === 3 ? t("resortFacilityGroup.addFacilitiesDesc") : t("resortFacilityGroup.createdAsk"))
+    : mode === "create"
+      ? t("resortFacilityGroup.dialogDescCreate")
+      : isEditing ? t("resortFacilityGroup.dialogDescEdit") : t("resortFacilityGroup.dialogDescView")
 
   return (
     <>
-      <Dialog open={open} onOpenChange={(v) => { if (!v) requestClose() }}>
-        <DialogContent
-          className="max-w-3xl p-0 gap-0 overflow-hidden flex flex-col max-h-[90vh]"
+      <Sheet open={open} onOpenChange={(v) => { if (!v) requestClose() }}>
+        <SheetContent
+          side="right"
+          className="w-full sm:max-w-xl p-0 gap-0 overflow-hidden flex flex-col h-full"
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => { e.preventDefault(); requestClose() }}
         >
-          <DialogTitle className="sr-only">{mode === "create" ? t("resortFacilityGroup.dialogCreate") : t("resortFacilityGroup.dialogView")}</DialogTitle>
-          {/* ── Step indicator (only in create mode, step 3) ─────────────────── */}
-          {step === 3 && (
-            <div className="flex items-center gap-2 px-6 pt-4 shrink-0">
-              <div className="flex items-center gap-1.5">
-                <div className="flex size-5 items-center justify-center rounded-full bg-primary/20 text-primary">
-                  <Check className="h-3 w-3" />
-                </div>
-                <span className="text-xs text-muted-foreground">{t("resortFacilityGroup.stepGroup")}</span>
-              </div>
-              <div className="flex-1 h-px bg-border" />
-              <div className="flex items-center gap-1.5">
-                <div className="flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-bold">
-                  2
-                </div>
-                <span className="text-xs font-medium">{t("resortFacilityGroup.stepFacilities")}</span>
-              </div>
-            </div>
-          )}
+          <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
 
-          {/* ── Dialog header ─────────────────────────────────────────────────── */}
-          <div className="flex items-center gap-3 px-6 py-4 border-b shrink-0">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              {headerIcon}
-            </div>
-            <div>
-              <p className="text-sm font-semibold">{headerTitle}</p>
-              <p className="text-xs text-muted-foreground">{headerDesc}</p>
-            </div>
-          </div>
+            <DialogEntityHeader icon={headerIcon} title={headerTitle} description={headerDesc} />
 
-          {/* ── Step 1: Group creation form ───────────────────────────────────── */}
-          {step === 1 && (
-            <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
-              <div className="flex-1 overflow-y-auto px-6 py-5 space-y-6">
+            <Tabs
+              value={activeTab}
+              onValueChange={(v) => setActiveTab(v as "general" | "icon" | "locales" | "facilities")}
+              className="flex-1 min-h-0 flex-col"
+            >
+              <div className="flex items-center justify-between mx-6 mt-4 gap-2">
+                <TabsList className="w-fit shrink-0">
+                  <TabsTrigger value="general" disabled={mode === "create" && groupCreated} className="cursor-pointer disabled:cursor-not-allowed">
+                    {t("common.generalInfo")}
+                  </TabsTrigger>
+                  <TabsTrigger value="icon" disabled={mode === "create" && (groupCreated || !isGeneralValid())} className="cursor-pointer disabled:cursor-not-allowed">
+                    {t("resortFacilityGroup.iconSection")}
+                  </TabsTrigger>
+                  <TabsTrigger value="locales" disabled={mode === "create" && (groupCreated || !(isGeneralValid() && isIconValid()))} className="cursor-pointer disabled:cursor-not-allowed">
+                    {t("locale.translations")}
+                  </TabsTrigger>
+                  <TabsTrigger value="facilities" disabled={mode === "create" && !groupCreated} className="cursor-pointer disabled:cursor-not-allowed">
+                    {t("resortFacilityGroup.stepFacilities")}
+                  </TabsTrigger>
+                </TabsList>
+                {mode !== "create" && (
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 shrink-0"
+                    onClick={handleRefresh}
+                    disabled={refreshing || generalEditing || iconEditing || translationsEditing}
+                    title={t("common.refresh")}
+                  >
+                    <RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                  </Button>
+                )}
+              </div>
+
+              <TabsContent value="general" className="min-h-0 overflow-y-auto px-6 py-5">
                 <ResortFacilityGroupGeneralInfo
                   resortId={resortId}
                   mode={mode}
@@ -881,9 +487,12 @@ export function ResortFacilityGroupDialog({
                   open={open}
                   createGroupMode={createGroupMode}
                   onCreateGroupModeChange={setCreateGroupMode}
+                  selectedPlatGroup={selectedPlatGroup}
+                  onSelectedPlatGroupChange={setSelectedPlatGroup}
                 />
+              </TabsContent>
 
-                {/* Icon section */}
+              <TabsContent value="icon" className="min-h-0 overflow-y-auto px-6 py-5">
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -892,9 +501,9 @@ export function ResortFacilityGroupDialog({
                         {t("resortFacilityGroup.iconSection")}
                       </h3>
                     </div>
-                      {mode !== "create" && !iconEditing && (
+                    {mode !== "create" && !iconEditing && (
                       <Button type="button" size="sm" variant="outline" onClick={startIconEdit} className="h-7 text-xs px-2.5 gap-1.5">
-                        <Layers className="h-3.5 w-3.5" /> {t("common.edit")}
+                        <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
                       </Button>
                     )}
                     {iconEditing && (
@@ -922,7 +531,9 @@ export function ResortFacilityGroupDialog({
                     onEditingHintChange={setCreateIconEditing}
                   />
                 </div>
+              </TabsContent>
 
+              <TabsContent value="locales" className="min-h-0 overflow-y-auto px-6 py-5">
                 <ResortFacilityGroupLocaleTranslations
                   resortId={resortId}
                   mode={mode}
@@ -936,111 +547,107 @@ export function ResortFacilityGroupDialog({
                   onEditingChange={setTranslationsEditing}
                   open={open}
                   disabled={inputsDisabled}
+                  search={localeSearch}
+                  onSearchChange={setLocaleSearch}
+                  refreshSignal={localesRefreshSignal}
                 />
-              </div>
+              </TabsContent>
 
-              {mode === "create" && (
-                <div className="flex items-center justify-end gap-2 px-6 py-4 border-t shrink-0">
-                  <Button type="button" variant="outline" onClick={requestClose} disabled={submitting}>
-                    {t("common.cancel")}
+              <TabsContent value="facilities" className="min-h-0 overflow-y-auto px-6 py-5 flex-1 flex flex-col">
+                {mode === "create" ? (
+                  groupCreated && (
+                    <ResortFacilityGroupAddFacilitiesStep
+                      resortId={resortId}
+                      newGroupId={newGroupId}
+                      platformGroupId={form.facility_group_id}
+                      step={addFacStep}
+                      onStepChange={setAddFacStep}
+                      onOpenChange={onOpenChange}
+                      onSaved={onSaved}
+                    />
+                  )
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1 w-1 rounded-full bg-primary" />
+                        <h3 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+                          {t("resortFacilityGroup.facilitiesSectionTitle")}
+                        </h3>
+                      </div>
+                      <Button type="button" size="sm" variant="outline" onClick={openCreateFacility} className="h-7 text-xs px-2.5 gap-1.5">
+                        <Plus className="h-3.5 w-3.5" /> {t("resortFacility.new")}
+                      </Button>
+                    </div>
+                    {facilitiesLoading ? (
+                      <div className="py-10 text-center text-sm text-muted-foreground">{t("resortFacility.loading")}</div>
+                    ) : groupFacilities.length === 0 ? (
+                      <div className="py-10 text-center text-sm text-muted-foreground border rounded-xl border-dashed">
+                        {t("resortFacility.empty")}
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {groupFacilities.map((f) => (
+                          <ResortFacilityCard key={f.id} facility={f} />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+
+            {mode === "create" && activeTab === "general" && (
+              <div className={`shrink-0 px-6 py-4 border-t bg-muted/40 flex items-center gap-2 ${draftIndicator ? "justify-between" : "justify-end"}`}>
+                {draftIndicator}
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={requestClose} className="gap-1.5">
+                    <X className="h-3.5 w-3.5" /> {t("common.cancel")}
                   </Button>
-                  <Button type="submit" disabled={submitting}>
-                    {submitting ? t("common.saving") : t("resortFacilityGroup.create")}
+                  <Button type="button" size="sm" onClick={handleNextFromGeneral} disabled={!isGeneralValid()} className="gap-1.5">
+                    {t("common.next")} <ArrowRight className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-              )}
-            </form>
-          )}
+              </div>
+            )}
 
-          {/* ── Step 2: Success + confirm ─────────────────────────────────────── */}
-          {step === 2 && (
-            <div className="flex flex-col min-h-0 flex-1">
-              <div className="flex-1 overflow-y-auto px-6 py-10 flex flex-col items-center justify-center text-center gap-5">
-                <div className="flex size-20 items-center justify-center rounded-full bg-green-500/10">
-                  <CircleCheck className="h-10 w-10 text-green-500" />
+            {mode === "create" && activeTab === "icon" && (
+              <div className={`shrink-0 px-6 py-4 border-t bg-muted/40 flex items-center gap-2 ${draftIndicator ? "justify-between" : "justify-end"}`}>
+                {draftIndicator}
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={requestClose} className="gap-1.5">
+                    <X className="h-3.5 w-3.5" /> {t("common.cancel")}
+                  </Button>
+                  <Button type="button" size="sm" onClick={handleNextFromIcon} disabled={!isIconValid()} className="gap-1.5">
+                    {t("common.next")} <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-                <div className="space-y-1.5 max-w-xs">
-                  <h3 className="text-base font-semibold">{t("resortFacilityGroup.createdTitle")}</h3>
-                  <p className="text-sm text-muted-foreground">{t("resortFacilityGroup.createdAsk")}</p>
-                </div>
               </div>
-              <div className="flex items-center justify-end gap-2 px-6 py-4 border-t shrink-0">
-                <Button type="button" variant="outline" onClick={finishAndClose}>
-                  {t("resortFacilityGroup.addFacilitiesSkip")}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    if (form.facility_group_id) {
-                      setStep(3)
-                      loadPlatformFacilities(Number(form.facility_group_id))
-                    } else {
-                      onOpenChange(false)
-                      router.push(`/resorts/${resortId}/facility-groups/${newGroupId}/facilities`)
-                    }
-                  }}
-                >
-                  {t("resortFacilityGroup.addFacilitiesYes")}
-                </Button>
-              </div>
-            </div>
-          )}
+            )}
 
-          {/* ── Step 3: Platform facility selection ───────────────────────────── */}
-          {step === 3 && (
-            <div className="flex flex-col min-h-0 flex-1">
-              <div className="flex-1 overflow-y-auto px-6 py-5">
-                <FacilityPicker
-                  facilities={platformFacilities}
-                  loading={platformFacilitiesLoading}
-                  selectedIds={selectedFacilityIds}
-                  onToggle={toggleFacility}
-                  onSelectAll={() => {
-                    setSelectedFacilityIds(new Set(platformFacilities.map((f) => f.id)))
-                    setFacilityCustomizations((prev) => {
-                      const next = { ...prev }
-                      for (const f of platformFacilities) {
-                        if (!next[f.id]) next[f.id] = initCustomization(f)
-                      }
-                      return next
-                    })
-                  }}
-                  onDeselectAll={() => setSelectedFacilityIds(new Set())}
-                  customizations={facilityCustomizations}
-                  onCustomizationChange={handleCustomizationChange}
-                  onLocaleChange={handleLocaleChange}
-                  availableLocales={availableLocales}
-                />
-              </div>
+            {mode === "create" && activeTab === "locales" && (
+              <DialogCreateFooter submitting={submitting} onCancel={requestClose} disabled={!isLocaleValid()} indicator={draftIndicator} />
+            )}
 
-              <div className="flex items-center justify-between gap-2 px-6 py-4 border-t shrink-0">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground"
-                  onClick={finishAndClose}
-                  disabled={creatingFacilities}
-                >
-                  {t("resortFacilityGroup.addFacilitiesSkip")}
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleCreateFacilities}
-                  disabled={creatingFacilities || platformFacilitiesLoading}
-                >
-                  {creatingFacilities
-                    ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{t("resortFacilityGroup.creatingFacilities")}</>
-                    : selectedFacilityIds.size === 0
-                      ? t("resortFacilityGroup.addFacilitiesSkip")
-                      : t("resortFacilityGroup.addFacilitiesBtn", { count: selectedFacilityIds.size })
-                  }
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+          </form>
+        </SheetContent>
+      </Sheet>
+
+      {mode !== "create" && groupId != null && (
+        <ResortFacilityDialog
+          resortId={resortId}
+          open={facilityCreateOpen}
+          onOpenChange={setFacilityCreateOpen}
+          mode="create"
+          form={facilityCreateForm}
+          onFormChange={setFacilityCreateForm}
+          availableLocales={availableLocales}
+          totalLocaleCount={totalLocaleCount}
+          onSaved={fetchGroupFacilities}
+          lockedGroupName={groupName || `Group #${groupId}`}
+          platformFacilityGroupId={typeof form.facility_group_id === "number" ? form.facility_group_id : undefined}
+        />
+      )}
 
       <AlertDialog open={confirmClose} onOpenChange={setConfirmClose}>
         <AlertDialogContent>
@@ -1051,6 +658,19 @@ export function ResortFacilityGroupDialog({
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => onOpenChange(false)}>{t("dialog.discardChanges.confirm")}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!draftPrompt} onOpenChange={(v) => { if (!v) discardDraft() }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("dialog.restoreDraft.title")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("dialog.restoreDraft.descResortFacilityGroup")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={discardDraft}>{t("dialog.restoreDraft.discard")}</AlertDialogCancel>
+            <AlertDialogAction onClick={restoreDraft}>{t("dialog.restoreDraft.restore")}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

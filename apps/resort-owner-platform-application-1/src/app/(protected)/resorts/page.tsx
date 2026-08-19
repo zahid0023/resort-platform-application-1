@@ -26,7 +26,7 @@ export default function ResortsPage() {
   const fetchList = useCallback(async () => {
     setLoading(true)
     try {
-      setData(await listResorts({ page, size: 12, sort_by: "id", sort_dir: "ASC" }))
+      setData(await listResorts({ page, size: 12 }))
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t("resorts.errLoad"))
     } finally {

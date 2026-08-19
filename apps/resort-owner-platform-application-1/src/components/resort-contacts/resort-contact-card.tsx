@@ -75,8 +75,8 @@ export function ResortContactCard({ contact, accent, onEdit, onDelete }: ResortC
   const { t } = useTranslation()
   const href = getHref(contact)
   const ch = contact.communication_channel
-  const typeName = contact.contact_type.locales[0]?.name ?? contact.contact_type.code
-  const channelName = ch.locales[0]?.name ?? ch.code
+  const typeName = contact.contact_type.locale?.name ?? contact.contact_type.code
+  const channelName = ch.locale?.name ?? ch.code
   const isExternalUrl = ch.is_url && !ch.is_phone && !ch.is_email
 
   const cardClass =

@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
-import { LayoutDashboard, BuildingIcon, ImageIcon, Images, Layers, ListTree, LogOut, ZapIcon, PhoneIcon, SettingsIcon, BedDouble } from "lucide-react"
+import { LayoutDashboard, Eye, ImageIcon, Images, ListTree, LogOut, ZapIcon, PhoneIcon, SettingsIcon, BedDouble } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import {
   Sidebar,
@@ -27,9 +27,8 @@ export function ResortPortalSidebar() {
 
   const navItems = [
     { key: "dashboard", url: `/resorts/${id}/dashboard`, icon: LayoutDashboard },
-    { key: "basicInfo", url: `/resorts/${id}/basic-info`, icon: BuildingIcon },
+    { key: "overview", url: `/resorts/${id}/overview`, icon: Eye },
     { key: "contacts", url: `/resorts/${id}/contacts`, icon: PhoneIcon },
-    { key: "facilityGroups", url: `/resorts/${id}/facility-groups`, icon: Layers },
     { key: "facilities", url: `/resorts/${id}/facilities`, icon: ListTree },
     { key: "roomCategories", url: `/resorts/${id}/room-categories`, icon: BedDouble },
     { key: "images", url: `/resorts/${id}/images`, icon: Images },

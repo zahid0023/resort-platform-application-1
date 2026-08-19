@@ -1,8 +1,9 @@
 import { api } from "./api"
+import type { Locale } from "./locales"
 
 export interface ContactTypeLocale {
   id: number
-  locale_id: number
+  locale: Locale
   name: string
   description?: string
   sort_order: number
@@ -12,7 +13,8 @@ export interface ContactType {
   id: number
   code: string
   sort_order: number
-  locales: ContactTypeLocale[]
+  /** The single translation matching Accept-Language (falls back to en, then null). */
+  locale: ContactTypeLocale | null
 }
 
 export interface ContactTypeListResponse {

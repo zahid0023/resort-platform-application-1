@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import { useTranslation } from "react-i18next"
-import { Ban, Check, Languages, Pencil, Plus, Trash2, X } from "lucide-react"
+import { Ban, Check, Languages, Pencil, Plus, Search, Trash2, X } from "lucide-react"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -25,30 +25,97 @@ export interface ResortFacilityGroupLocaleTranslationsProps {
   availableLocales: Locale[]
   totalLocaleCount: number | null
   onSaved?: () => void | Promise<void>
+  /** True while any single translation row has an in-progress edit (existing or newly added) —
+   * derived from `rowEditData` below, not toggled by any section-wide button, same as platform's. */
   editing: boolean
   onEditingChange: (v: boolean) => void
   open: boolean
   disabled?: boolean
+  /** Owned by the parent dialog — survives this component unmounting on tab switch. */
+  search: string
+  onSearchChange: (v: string) => void
+  /** Bumped by the parent dialog's manual Refresh button — any change re-fetches the full set. */
+  refreshSignal?: number
 }
 
 export function ResortFacilityGroupLocaleTranslations({
   resortId, mode, form, onFormChange, groupId, availableLocales, totalLocaleCount,
-  onSaved, editing, onEditingChange, open, disabled,
+  onSaved, editing, onEditingChange, open, disabled, search, onSearchChange, refreshSignal,
 }: ResortFacilityGroupLocaleTranslationsProps) {
   const { t } = useTranslation()
+  const [localesLoaded, setLocalesLoaded] = useState(false)
+  const [localesLoading, setLocalesLoading] = useState(false)
   const [newLocaleRows, setNewLocaleRows] = useState<NewLocaleRow[]>([])
   const [rowEditData, setRowEditData] = useState<Record<string, LocaleRow>>({})
   const [busyRowKeys, setBusyRowKeys] = useState<Set<string>>(new Set())
   const [pendingDeleteRow, setPendingDeleteRow] = useState<LocaleRow | null>(null)
   const rKeyCounter = useRef(0)
+  const lastLocaleSearchKey = useRef("")
 
   useEffect(() => {
     if (!open) {
+      setLocalesLoaded(false)
       setNewLocaleRows([])
       setRowEditData({})
       setBusyRowKeys(new Set())
+      lastLocaleSearchKey.current = ""
     }
   }, [open])
+
+  // A translation is "being edited" whenever any row (existing or newly added) has an open draft —
+  // there's no section-wide edit toggle, so this is what drives isDirty upstream.
+  useEffect(() => {
+    onEditingChange(Object.keys(rowEditData).length > 0)
+  }, [rowEditData]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Lazy-load the full translation set once, the first time it's needed — GET /{id} only
+  // returns the single Accept-Language-resolved `locale`, never the full set.
+  useEffect(() => {
+    if (!open || mode === "create" || groupId == null || localesLoaded) return
+    setLocalesLoaded(true)
+    fetchLocales()
+  }, [open, mode, groupId, localesLoaded]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Manual refresh, triggered by the parent dialog's Refresh button — skips the initial mount
+  // (refreshSignal starts at 0) and only re-fetches once the section has already loaded once.
+  useEffect(() => {
+    if (!refreshSignal || !localesLoaded) return
+    fetchLocales(search.trim())
+  }, [refreshSignal]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Debounced server-side search, view mode only — edit mode always needs the complete,
+  // unfiltered list (see the duplicate-locale checks below).
+  useEffect(() => {
+    if (!open || mode === "create" || editing) return
+    if (lastLocaleSearchKey.current === search) return
+    lastLocaleSearchKey.current = search
+    const timer = setTimeout(() => {
+      fetchLocales(search.trim())
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [search, open, mode, editing]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function fetchLocales(localeCode?: string): Promise<LocaleRow[]> {
+    if (groupId == null) return []
+    setLocalesLoading(true)
+    try {
+      const res = await resortFacilityGroupsService.listLocales(resortId, groupId, { size: 50, localeCode: localeCode || undefined })
+      const rows = res.data.map((l) => ({
+        id: l.id,
+        locale: l.locale,
+        name: l.name,
+        description: l.description ?? "",
+        sort_order: l.sort_order,
+      }))
+      onFormChange({ ...form, locales: rows })
+      return rows
+    } catch (err) {
+      toast.error((err as Error).message)
+      return form.locales
+    } finally {
+      setLocalesLoading(false)
+    }
+  }
 
   function rowKey(row: LocaleRow): string {
     return row.id != null ? `e_${row.id}` : (row as NewLocaleRow)._rkey ?? ""
@@ -74,7 +141,7 @@ export function ResortFacilityGroupLocaleTranslations({
     if (groupId == null) return
     const data = rowEditData[key]
     if (!data) return
-    if (!data.locale_id) { toast.error(t("locale.errLang", { n: 1 })); return }
+    if (isNew && !data.locale_id) { toast.error(t("locale.errLang", { n: 1 })); return }
     if (!data.name.trim()) { toast.error(t("locale.errName", { n: 1 })); return }
     setBusy(key, true)
     try {
@@ -95,6 +162,7 @@ export function ResortFacilityGroupLocaleTranslations({
       }
       setRowEditData((prev) => { const n = { ...prev }; delete n[key]; return n })
       toast.success(t("common.saved"))
+      await fetchLocales()
       await onSaved?.()
     } catch (err) {
       toast.error((err as Error).message)
@@ -110,8 +178,9 @@ export function ResortFacilityGroupLocaleTranslations({
     setPendingDeleteRow(null)
     setBusy(key, true)
     try {
-      await resortFacilityGroupsService.removeLocale(resortId, groupId, row.id)
+      await resortFacilityGroupsService.removeLocale(resortId, groupId, row.id!)
       toast.success(t("locale.removedToast"))
+      await fetchLocales()
       await onSaved?.()
     } catch (err) {
       toast.error((err as Error).message)
@@ -120,49 +189,44 @@ export function ResortFacilityGroupLocaleTranslations({
     }
   }
 
-  function cancelEditing() {
-    setNewLocaleRows([])
-    setRowEditData({})
-    onEditingChange(false)
-  }
-
-  function addNewLocaleRow() {
+  // `existingRows` is passed explicitly (rather than read off `form.locales`) because the caller
+  // may have just awaited a fresh unfiltered fetch — the prop won't reflect that until the next render.
+  function addNewLocaleRow(existingRows: LocaleRow[]) {
     const usedIds = new Set([
-      ...form.locales.map((r) => r.locale_id),
+      ...existingRows.map((r) => r.locale?.id),
       ...newLocaleRows.map((r) => r.locale_id),
     ].filter((v): v is number => typeof v === "number"))
     const nextLocale = availableLocales.find((l) => !usedIds.has(l.id))
     const _rkey = `n_${rKeyCounter.current++}`
     const newRow: NewLocaleRow = {
       _rkey, locale_id: nextLocale?.id ?? "", name: "", description: "",
-      sort_order: form.locales.length + newLocaleRows.length + 1, _new: true,
+      sort_order: existingRows.length + newLocaleRows.length + 1, _new: true,
     }
     setNewLocaleRows((prev) => [...prev, newRow])
     setRowEditData((prev) => ({ ...prev, [_rkey]: { ...newRow } }))
   }
 
-  function addLocaleRow() {
-    const usedIds = new Set(
-      form.locales.map((r) => r.locale_id).filter((v): v is number => typeof v === "number"),
-    )
-    const nextLocale = availableLocales.find((l) => !usedIds.has(l.id))
-    const newRow = { locale_id: nextLocale ? nextLocale.id : "", name: "", description: "", sort_order: form.locales.length + 1, _new: true }
-    onFormChange({ ...form, locales: [...form.locales, newRow] })
+  // Adding a translation always needs the complete list — clear any active search and re-pull
+  // everything first, so the duplicate-locale check above never operates on a filtered subset.
+  async function handleAddLocale() {
+    let rows = form.locales
+    if (search.trim() !== "") {
+      onSearchChange("")
+      lastLocaleSearchKey.current = ""
+      rows = await fetchLocales()
+    }
+    if (!canAddLocaleTranslation(rows.length + newLocaleRows.length, totalLocaleCount)) {
+      toast.error(t("locale.allLanguagesAdded"))
+      return
+    }
+    addNewLocaleRow(rows)
   }
 
-  function updateLocaleRow(idx: number, patch: Partial<LocaleRow>) {
-    onFormChange({ ...form, locales: form.locales.map((r, i) => (i === idx ? { ...r, ...patch } : r)) })
-  }
-
-  function removeLocaleRow(idx: number) {
-    const key = `c_${idx}`
-    setRowEditData((prev) => { const n = { ...prev }; delete n[key]; return n })
-    onFormChange({ ...form, locales: form.locales.filter((_, i) => i !== idx) })
-  }
-
+  // New rows go first so the owner lands on the row they just added instead of
+  // scrolling past every existing translation to reach it.
   const allLocaleRows: Array<LocaleRow & { _rkey: string }> = [
-    ...form.locales.map((l) => ({ ...l, _rkey: `e_${l.id}` })),
     ...newLocaleRows,
+    ...form.locales.map((l) => ({ ...l, _rkey: `e_${l.id}` })),
   ]
 
   return (
@@ -174,27 +238,9 @@ export function ResortFacilityGroupLocaleTranslations({
             {t("locale.translations")}
           </h3>
         </div>
-        {mode !== "create" && !editing && (
-          <Button type="button" size="sm" variant="outline" onClick={() => onEditingChange(true)} className="h-7 text-xs px-2.5 gap-1.5">
-            <Pencil className="h-3.5 w-3.5" /> {t("common.edit")}
-          </Button>
-        )}
-        {editing && (
-          <div className="flex items-center gap-1.5">
-            <Button type="button" size="sm" variant="outline" onClick={cancelEditing} className="h-7 text-xs px-2.5 gap-1.5">
-              <X className="h-3.5 w-3.5" /> {t("common.cancel")}
-            </Button>
-            <Button type="button" size="sm" variant="outline" onClick={addNewLocaleRow}
-              disabled={!canAddLocaleTranslation(form.locales.length + newLocaleRows.length, totalLocaleCount)}
-              className="h-7 text-xs px-2.5"
-            >
-              <Plus className="h-3.5 w-3.5 mr-1" /> {t("locale.add")}
-            </Button>
-          </div>
-        )}
-        {mode === "create" && !disabled && (
-          <Button type="button" size="sm" variant="outline" onClick={addLocaleRow}
-            disabled={!canAddLocaleTranslation(form.locales.length, totalLocaleCount)}
+        {mode !== "create" && (
+          <Button type="button" size="sm" variant="outline" onClick={handleAddLocale}
+            disabled={newLocaleRows.length > 0 || !canAddLocaleTranslation(form.locales.length + newLocaleRows.length, totalLocaleCount)}
             className="h-7 text-xs px-2.5"
           >
             <Plus className="h-3.5 w-3.5 mr-1" /> {t("locale.add")}
@@ -202,8 +248,21 @@ export function ResortFacilityGroupLocaleTranslations({
         )}
       </div>
 
+      {/* Search is view mode only — edit mode always needs the complete, unfiltered list. */}
+      {mode !== "create" && !editing && (form.locales.length > 0 || search.trim() !== "") && (
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+          <Input
+            value={search}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={t("locale.searchByCode")}
+            className="pl-8 h-8 text-sm"
+          />
+        </div>
+      )}
+
       <Card className="gap-0 py-0 overflow-hidden">
-        {/* DISABLED placeholder */}
+        {/* DISABLED placeholder — group type not chosen yet in create mode */}
         {disabled && (
           <div className="flex items-center gap-3 py-6 px-4 text-muted-foreground">
             <Ban className="h-4 w-4 shrink-0 opacity-40" />
@@ -211,131 +270,42 @@ export function ResortFacilityGroupLocaleTranslations({
           </div>
         )}
 
-        {/* VIEW mode */}
-        {!editing && mode !== "create" && (
-          form.locales.length === 0 ? (
-            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-              <Languages className="h-4 w-4 mr-2 opacity-40" />
-              {t("locale.empty.basicInfo")}
-            </div>
-          ) : (
-            <div className="divide-y">
-              {form.locales.map((row, idx) => {
-                const localeMeta = availableLocales.find((l) => l.id === row.locale_id)
-                return (
-                  <div key={`e_${row.id}`} className="p-4 space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-medium">
-                      <Languages className="h-3.5 w-3.5 text-muted-foreground" />
-                      {localeMeta ? `${localeMeta.name} (${localeMeta.code})` : t("locale.row.label", { n: idx + 1 })}
-                    </div>
-                    <div className="flex flex-col gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">{t("field.language")}</Label>
-                        <Select value={row.locale_id ? String(row.locale_id) : ""} disabled>
-                          <SelectTrigger className="h-9 text-sm w-full">
-                            <SelectValue placeholder={t("field.language")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableLocales.map((l) => (
-                              <SelectItem key={l.id} value={String(l.id)}>{l.name} ({l.code})</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">{t("field.sort")}</Label>
-                        <Input type="number" value={row.sort_order} disabled className="h-9 text-sm" onChange={() => {}} />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">{t("common.name")}</Label>
-                      <Input value={row.name} disabled className="h-9 text-sm" onChange={() => {}} />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">{t("resortFacilityGroup.description")}</Label>
-                      <Textarea value={row.description} disabled rows={2} className="text-sm resize-none" onChange={() => {}} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )
-        )}
-
-        {/* CREATE mode — direct binding, no per-row save/cancel */}
+        {/* CREATE mode — single "en" translation, no add/remove (server always resolves to en) */}
         {mode === "create" && !disabled && (
-          form.locales.length === 0 ? (
-            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-              <Languages className="h-4 w-4 mr-2 opacity-40" />
-              {t("locale.empty.basicInfo")}
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Languages className="h-3.5 w-3.5 text-muted-foreground" />
+              {t("locale.row.label", { n: 1 })} (en)
             </div>
-          ) : (
-            <div className="divide-y">
-              {form.locales.map((row, idx) => {
-                const usedIds = form.locales
-                  .map((r, i) => i !== idx ? r.locale_id : null)
-                  .filter((v): v is number => typeof v === "number")
-
-                return (
-                  <div key={idx} className="p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <Languages className="h-3.5 w-3.5 text-muted-foreground" />
-                        {t("locale.row.label", { n: idx + 1 })}
-                      </div>
-                      <Button type="button" size="icon" variant="ghost"
-                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                        onClick={() => removeLocaleRow(idx)}>
-                        <X className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                    <div className="flex flex-col gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">{t("field.language")} *</Label>
-                        <Select value={row.locale_id ? String(row.locale_id) : ""}
-                          onValueChange={(v) => updateLocaleRow(idx, { locale_id: Number(v) })}>
-                          <SelectTrigger className="h-9 text-sm w-full">
-                            <SelectValue placeholder={t("field.language")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableLocales.map((l) => (
-                              <SelectItem key={l.id} value={String(l.id)} disabled={usedIds.includes(l.id)}>
-                                {l.name} ({l.code})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">{t("field.sort")} *</Label>
-                        <Input type="number" value={row.sort_order}
-                          onChange={(e) => updateLocaleRow(idx, { sort_order: Number(e.target.value) })}
-                          className="h-9 text-sm" />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">{t("common.name")} *</Label>
-                      <Input value={row.name}
-                        onChange={(e) => updateLocaleRow(idx, { name: e.target.value })}
-                        placeholder={t("resortFacilityGroup.namePlaceholder")}
-                        className="h-9 text-sm" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">{t("resortFacilityGroup.description")}</Label>
-                      <Textarea value={row.description}
-                        onChange={(e) => updateLocaleRow(idx, { description: e.target.value })}
-                        rows={2} className="text-sm resize-none" />
-                    </div>
-                  </div>
-                )
-              })}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">{t("field.sort")} *</Label>
+              <Input type="number" value={form.locale.sort_order}
+                onChange={(e) => onFormChange({ ...form, locale: { ...form.locale, sort_order: Number(e.target.value) } })}
+                className="h-9 text-sm" />
             </div>
-          )
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">{t("common.name")} *</Label>
+              <Input value={form.locale.name}
+                onChange={(e) => onFormChange({ ...form, locale: { ...form.locale, name: e.target.value } })}
+                placeholder={t("resortFacilityGroup.namePlaceholder")}
+                className="h-9 text-sm" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">{t("resortFacilityGroup.description")}</Label>
+              <Textarea value={form.locale.description}
+                onChange={(e) => onFormChange({ ...form, locale: { ...form.locale, description: e.target.value } })}
+                rows={2} className="text-sm resize-none" />
+            </div>
+          </div>
         )}
 
-        {/* EDIT mode */}
-        {editing && (
-          allLocaleRows.length === 0 ? (
+        {/* VIEW/EDIT — unified per-row Pencil/Trash → Check/X, no section-wide gate */}
+        {mode !== "create" && (
+          localesLoading && allLocaleRows.length === 0 ? (
+            <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+              {t("common.loading")}
+            </div>
+          ) : allLocaleRows.length === 0 ? (
             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
               <Languages className="h-4 w-4 mr-2 opacity-40" />
               {t("locale.empty.basicInfo")}
@@ -348,10 +318,9 @@ export function ResortFacilityGroupLocaleTranslations({
                 const rowEditing = isRowEditing(key)
                 const busy = isRowBusy(key)
                 const editData = rowEditData[key] ?? row
-                const localeMeta = availableLocales.find((l) => l.id === row.locale_id)
                 const usedIds = allLocaleRows
                   .filter((r) => r._rkey !== key)
-                  .map((r) => r.locale_id)
+                  .map((r) => r.locale?.id)
                   .filter((v): v is number => typeof v === "number")
 
                 return (
@@ -359,8 +328,8 @@ export function ResortFacilityGroupLocaleTranslations({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-sm font-medium">
                         <Languages className="h-3.5 w-3.5 text-muted-foreground" />
-                        {!rowEditing && localeMeta
-                          ? `${localeMeta.name} (${localeMeta.code})`
+                        {!rowEditing && row.locale
+                          ? `${row.locale.name} (${row.locale.code})`
                           : t("locale.row.label", { n: allLocaleRows.indexOf(row) + 1 })}
                         {isNew && (
                           <span className="text-xs px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-medium">
@@ -403,20 +372,24 @@ export function ResortFacilityGroupLocaleTranslations({
                     <div className="flex flex-col gap-3">
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground">{t("field.language")} *</Label>
-                        <Select value={editData.locale_id ? String(editData.locale_id) : ""}
-                          onValueChange={(v) => patchRowEdit(key, { locale_id: Number(v) })}
-                          disabled={!rowEditing || !isNew}>
-                          <SelectTrigger className="h-9 text-sm w-full">
-                            <SelectValue placeholder={t("field.language")} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {availableLocales.map((l) => (
-                              <SelectItem key={l.id} value={String(l.id)} disabled={usedIds.includes(l.id)}>
-                                {l.name} ({l.code})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        {isNew ? (
+                          <Select value={editData.locale_id ? String(editData.locale_id) : ""}
+                            onValueChange={(v) => patchRowEdit(key, { locale_id: Number(v) })}
+                            disabled={!rowEditing}>
+                            <SelectTrigger className="h-9 text-sm w-full cursor-pointer">
+                              <SelectValue placeholder={t("field.language")} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableLocales.map((l) => (
+                                <SelectItem key={l.id} value={String(l.id)} disabled={usedIds.includes(l.id)}>
+                                  {l.name} ({l.code})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Input value={row.locale ? `${row.locale.name} (${row.locale.code})` : ""} disabled className="h-9 text-sm" onChange={() => {}} />
+                        )}
                       </div>
                       <div className="space-y-1.5">
                         <Label className="text-xs text-muted-foreground">{t("field.sort")} *</Label>

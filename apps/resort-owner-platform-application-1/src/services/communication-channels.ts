@@ -1,8 +1,9 @@
 import { api } from "./api"
+import type { Locale } from "./locales"
 
 export interface CommunicationChannelLocale {
   id: number
-  locale_id: number
+  locale: Locale
   name: string
   description?: string
   sort_order: number
@@ -16,7 +17,8 @@ export interface CommunicationChannel {
   is_phone: boolean
   is_email: boolean
   is_clickable: boolean
-  locales: CommunicationChannelLocale[]
+  /** The single translation matching Accept-Language (falls back to en, then null). */
+  locale: CommunicationChannelLocale | null
 }
 
 export interface CommunicationChannelListResponse {

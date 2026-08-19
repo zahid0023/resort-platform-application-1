@@ -1,5 +1,5 @@
-import { Eye, Star, Trash2 } from "lucide-react"
-import { Badge, Button, Card } from "@resort/shadcn-ui"
+import { Eye, Trash2 } from "lucide-react"
+import { Button, Card } from "@resort/shadcn-ui"
 import { LucideIconRenderer } from "ui-blocks"
 import type { ResortFacilitySummary } from "@/services/resort-facilities"
 
@@ -12,7 +12,7 @@ export interface ResortFacilityCardProps {
 
 export function ResortFacilityCard({ facility, defaultName, onView, onDelete }: ResortFacilityCardProps) {
   const accentColor = String(facility.icon_meta?.color ?? "") || undefined
-  const title = defaultName?.trim() || `Facility #${facility.id}`
+  const title = defaultName?.trim() || facility.locale?.name?.trim() || `Facility #${facility.id}`
 
   return (
     <Card
@@ -46,10 +46,7 @@ export function ResortFacilityCard({ facility, defaultName, onView, onDelete }: 
 
           <div className="min-w-0">
             <h3 className="font-semibold truncate">{title}</h3>
-            <p className="text-xs text-muted-foreground truncate">
-              {"ID #"}{facility.id}
-              {facility.platform_facility ? ` · Platform #${facility.platform_facility.id}` : " · Custom"}
-            </p>
+            <p className="text-xs text-muted-foreground font-mono truncate">{facility.code}</p>
           </div>
         </div>
 
@@ -74,21 +71,6 @@ export function ResortFacilityCard({ facility, defaultName, onView, onDelete }: 
             </Button>
           )}
         </div>
-      </div>
-
-      <div className="mt-4 pt-3 border-t flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <Badge variant="secondary">#{facility.sort_order}</Badge>
-          {facility.is_highlighted && (
-            <Badge variant="outline" className="gap-1 text-amber-600 border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 dark:text-amber-400">
-              <Star className="h-3 w-3 fill-current" />
-              Highlighted
-            </Badge>
-          )}
-        </div>
-        <span className="text-xs text-muted-foreground">
-          {facility.locales.length} locale{facility.locales.length !== 1 ? "s" : ""}
-        </span>
       </div>
     </Card>
   )

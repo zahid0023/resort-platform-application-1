@@ -1,0 +1,7 @@
+Get-NetFirewallRule -PolicyStore ActiveStore |
+    Where-Object {
+        $_.Enabled -eq 'True' -and
+        $_.Direction -eq 'Inbound' -and
+        $_.Action -eq 'Allow'
+    } |
+    Measure-Object

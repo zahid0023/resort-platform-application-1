@@ -26,6 +26,11 @@ export interface ResortFacilityGroupGeneralInfoProps {
   open: boolean
   createGroupMode: GroupMode
   onCreateGroupModeChange: (m: GroupMode) => void
+  /** Owned by the parent dialog — persisted alongside the create-form draft so the picked
+   * platform group's display details survive a close/reopen/restore-draft round trip, not just
+   * its bare `facility_group_id`. */
+  selectedPlatGroup: PlatformFacilityGroupSummary | null
+  onSelectedPlatGroupChange: (g: PlatformFacilityGroupSummary | null) => void
 }
 
 export function ResortFacilityGroupGeneralInfo({
@@ -40,41 +45,31 @@ export function ResortFacilityGroupGeneralInfo({
   open,
   createGroupMode,
   onCreateGroupModeChange,
+  selectedPlatGroup,
+  onSelectedPlatGroupChange,
 }: ResortFacilityGroupGeneralInfoProps) {
   const { t } = useTranslation()
-  const [local, setLocal] = useState<{ sort_order: number; facility_group_id: number | "" }>({
-    sort_order: 0,
-    facility_group_id: "",
-  })
-  const [localGroupMode, setLocalGroupMode] = useState<GroupMode>("custom")
+  const [local, setLocal] = useState<{ sort_order: number }>({ sort_order: 0 })
   const [submitting, setSubmitting] = useState(false)
 
-  // Platform group picker dialog state
+  // Platform group picker dialog state — create mode only, facility_group_id is immutable afterward
   const [platPickerOpen, setPlatPickerOpen] = useState(false)
-  const [selectedPlatGroup, setSelectedPlatGroup] = useState<PlatformFacilityGroupSummary | null>(null)
 
   useEffect(() => {
     if (!open) {
       setSubmitting(false)
       setPlatPickerOpen(false)
-      setSelectedPlatGroup(null)
     }
   }, [open])
 
   function handleCreateGroupModeChange(m: GroupMode) {
     onCreateGroupModeChange(m)
-    if (m === "custom") { onFormChange({ facility_group_id: "" }); setSelectedPlatGroup(null) }
+    if (m === "custom") { onFormChange({ facility_group_id: "" }); onSelectedPlatGroupChange(null) }
   }
 
   function startEdit() {
-    setLocal({ sort_order: form.sort_order, facility_group_id: form.facility_group_id })
-    setLocalGroupMode(form.facility_group_id ? "platform" : "custom")
+    setLocal({ sort_order: form.sort_order })
     onEditingChange(true)
-  }
-
-  function handleEditGroupModeChange(m: GroupMode) {
-    setLocalGroupMode(m)
-    if (m === "custom") { setLocal((p) => ({ ...p, facility_group_id: "" })); setSelectedPlatGroup(null) }
   }
 
   async function save() {
@@ -82,13 +77,12 @@ export function ResortFacilityGroupGeneralInfo({
     setSubmitting(true)
     try {
       await resortFacilityGroupsService.update(resortId, groupId, {
-        facility_group_id: local.facility_group_id ? Number(local.facility_group_id) : null,
         sort_order: Number(local.sort_order) || 0,
         ...toApiIconPayload(form),
       })
       toast.success(t("resortFacilityGroup.updated"))
       onEditingChange(false)
-      onFormChange({ sort_order: Number(local.sort_order) || 0, facility_group_id: local.facility_group_id })
+      onFormChange({ sort_order: Number(local.sort_order) || 0 })
       await onSaved?.()
     } catch (err) {
       toast.error((err as Error).message)
@@ -99,39 +93,26 @@ export function ResortFacilityGroupGeneralInfo({
 
   const isReadOnly = !editing && mode !== "create"
   const sortValue = editing ? local.sort_order : form.sort_order
-  const activeGroupMode = mode === "create" ? createGroupMode : localGroupMode
-  const activeFgId = mode === "create" ? form.facility_group_id : (editing ? local.facility_group_id : form.facility_group_id)
 
   function handlePlatGroupSelect(g: PlatformFacilityGroupSummary) {
-    setSelectedPlatGroup(g)
-    if (mode === "create") {
-      onFormChange({
-        facility_group_id: g.id,
-        sort_order: g.sort_order,
-        icon_type: (g.icon_type ?? "") as ResortFacilityGroupFormState["icon_type"],
-        icon_value: g.icon_value ?? "",
-        icon_color: String(g.icon_meta?.color ?? ""),
-        locales: g.locales.length > 0
-          ? g.locales.map((l) => ({
-              locale_id: l.locale_id,
-              name: l.name,
-              description: "",
-              sort_order: l.sort_order,
-            }))
-          : [{ locale_id: "", name: "", description: "", sort_order: 0 }],
-      })
-    } else {
-      setLocal((p) => ({ ...p, facility_group_id: g.id }))
-    }
+    onSelectedPlatGroupChange(g)
+    const translation = g.locale
+    onFormChange({
+      facility_group_id: g.id,
+      code: g.code,
+      sort_order: g.sort_order,
+      icon_type: (g.icon_type ?? "") as ResortFacilityGroupFormState["icon_type"],
+      icon_value: g.icon_value ?? "",
+      icon_color: String(g.icon_meta?.color ?? ""),
+      locale: { name: translation?.name ?? "", description: "", sort_order: 0 },
+    })
   }
-
-  const showGroupChooser = mode === "create" || editing
 
   // ── Selected platform group display ───────────────────────────────────────
   function renderSelectedPlatGroup() {
     const g = selectedPlatGroup
     if (!g) return null
-    const name = g.locales[0]?.name ?? g.code
+    const name = g.locale?.name ?? g.code
     const accentColor = String(g.icon_meta?.color ?? "") || undefined
     return (
       <div className="flex items-center gap-3 rounded-lg border border-primary bg-primary/5 px-3 py-2.5">
@@ -159,26 +140,25 @@ export function ResortFacilityGroupGeneralInfo({
   }
 
   return (
-    <>
-      {/* ── Section 1: Group Type ─────────────────────────────────────────── */}
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <div className="h-1 w-1 rounded-full bg-primary" />
-          <h3 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
-            {t("resortFacilityGroup.groupType")}
-          </h3>
-        </div>
+    <div className="space-y-8">
+      {/* ── Section 1: Group Type — create-only, facility_group_id is immutable after creation ── */}
+      {mode === "create" && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="h-1 w-1 rounded-full bg-primary" />
+            <h3 className="text-sm font-semibold tracking-wide uppercase text-muted-foreground">
+              {t("resortFacilityGroup.groupType")}
+            </h3>
+          </div>
 
-        <Card>
-          <CardContent className="space-y-4">
-            {/* Toggle — shown in create and edit modes */}
-            {showGroupChooser && (
+          <Card>
+            <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => mode === "create" ? handleCreateGroupModeChange("platform") : handleEditGroupModeChange("platform")}
-                  className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors hover:bg-accent/50
-                    ${activeGroupMode === "platform" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"}`}
+                  onClick={() => handleCreateGroupModeChange("platform")}
+                  className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left cursor-pointer transition-colors hover:bg-accent/50
+                    ${createGroupMode === "platform" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"}`}
                 >
                   <div className="flex items-center gap-1.5">
                     <Link2 className="h-3.5 w-3.5 text-primary" />
@@ -188,9 +168,9 @@ export function ResortFacilityGroupGeneralInfo({
                 </button>
                 <button
                   type="button"
-                  onClick={() => mode === "create" ? handleCreateGroupModeChange("custom") : handleEditGroupModeChange("custom")}
-                  className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left transition-colors hover:bg-accent/50
-                    ${activeGroupMode === "custom" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"}`}
+                  onClick={() => handleCreateGroupModeChange("custom")}
+                  className={`flex flex-col items-start gap-1 rounded-lg border p-3 text-left cursor-pointer transition-colors hover:bg-accent/50
+                    ${createGroupMode === "custom" ? "border-primary bg-primary/5 ring-1 ring-primary" : "border-border"}`}
                 >
                   <div className="flex items-center gap-1.5">
                     <Star className="h-3.5 w-3.5 text-primary" />
@@ -199,26 +179,10 @@ export function ResortFacilityGroupGeneralInfo({
                   <span className="text-xs text-muted-foreground">{t("resortFacilityGroup.customDesc")}</span>
                 </button>
               </div>
-            )}
-
-            {/* View mode badge */}
-            {isReadOnly && (
-              form.facility_group_id ? (
-                <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
-                  <Link2 className="h-3.5 w-3.5 text-primary shrink-0" />
-                  <span className="text-sm font-medium">{t("resortFacilityGroup.fromPlatform")}</span>
-                  <span className="ml-auto text-xs text-muted-foreground font-mono">#{form.facility_group_id}</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 px-3 py-2">
-                  <Star className="h-3.5 w-3.5 text-primary shrink-0" />
-                  <span className="text-sm font-medium">{t("resortFacilityGroup.custom")}</span>
-                </div>
-              )
-            )}
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* ── Section 2: General Info ───────────────────────────────────────── */}
       <div className="space-y-4">
@@ -249,15 +213,15 @@ export function ResortFacilityGroupGeneralInfo({
 
         <Card>
           <CardContent className="space-y-4">
-            {/* Platform group picker — shown when From Platform is selected */}
-            {showGroupChooser && activeGroupMode === "platform" && (
+            {/* Platform group picker — create mode only */}
+            {mode === "create" && createGroupMode === "platform" && (
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium">{t("resortFacilityGroup.platformGroup")} *</Label>
                 {selectedPlatGroup ? renderSelectedPlatGroup() : (
                   <button
                     type="button"
                     onClick={() => setPlatPickerOpen(true)}
-                    className="w-full flex items-center justify-between rounded-lg border border-dashed px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent/50 transition-colors"
+                    className="w-full flex items-center justify-between rounded-lg border border-dashed px-3 py-2.5 text-sm text-muted-foreground hover:bg-accent/50 cursor-pointer transition-colors"
                   >
                     <span>{t("resortFacilityGroup.selectPlatformGroup")}</span>
                   </button>
@@ -265,11 +229,24 @@ export function ResortFacilityGroupGeneralInfo({
                 <PlatformFacilityGroupPickerDialog
                   open={platPickerOpen}
                   onOpenChange={setPlatPickerOpen}
-                  selectedId={activeFgId || undefined}
+                  selectedId={form.facility_group_id || undefined}
                   onSelect={handlePlatGroupSelect}
                 />
               </div>
             )}
+
+            {/* Code — auto-filled from the platform group when linked, always owner-editable, immutable after creation */}
+            <div className="space-y-2">
+              <Label htmlFor="rfg-code" className="text-xs font-medium">{t("resortFacilityGroup.code")} {mode === "create" && "*"}</Label>
+              <Input
+                id="rfg-code"
+                value={form.code}
+                onChange={(e) => onFormChange({ code: e.target.value.toUpperCase() })}
+                placeholder="DINING"
+                disabled={mode !== "create"}
+                className="font-mono"
+              />
+            </div>
 
             {/* Sort order */}
             <div className="space-y-2">
@@ -289,6 +266,6 @@ export function ResortFacilityGroupGeneralInfo({
           </CardContent>
         </Card>
       </div>
-    </>
+    </div>
   )
 }

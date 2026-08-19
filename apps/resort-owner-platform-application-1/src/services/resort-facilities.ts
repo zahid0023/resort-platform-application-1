@@ -1,64 +1,26 @@
 import { api } from "./api"
+import type { Locale } from "./locales"
 
 export type IconType = "LUCIDE" | "IMAGE" | "SVG" | "EXTERNAL"
 
 export interface ResortFacilityLocale {
   id: number
-  locale_id: number
+  locale: Locale
   name: string
-  description: string
-  sort_order: number
-}
-
-export interface ResortFacilityGroupRef {
-  id: number
-  resort_id: number
-  facility_group_id?: number
-  sort_order: number
-  locales: Array<{ id: number; locale_id: number; name: string; sort_order: number }>
-}
-
-export interface PlatformFacilityRef {
-  id: number
-  facility_group_id: number
-  code: string
-  sort_order?: number
-  icon_type?: string
-  icon_value?: string
-  icon_meta?: Record<string, unknown>
-  locales: Array<{ id: number; locale_id: number; name: string; sort_order: number }>
-}
-
-export interface FacilityPriceTypeRef {
-  id: number
-  code: string
-  sort_order: number
-  locales: Array<{ id: number; locale_id: number; name: string; sort_order: number }>
-}
-
-export interface ResortFacilityPrice {
-  id: number
-  resort_facility_id: number
-  price_unit: { id: number; code: string }
-  currency: { id: number; code: string }
-  amount: number
-  notes?: string
+  description?: string
   sort_order: number
 }
 
 export interface ResortFacilitySummary {
   id: number
-  resort_id: number
-  resort_facility_group: ResortFacilityGroupRef
-  platform_facility?: PlatformFacilityRef
-  facility_price_type: FacilityPriceTypeRef
+  code: string
   sort_order: number
   is_highlighted: boolean
   icon_type?: IconType
   icon_value?: string
   icon_meta?: Record<string, unknown>
-  locales: ResortFacilityLocale[]
-  prices?: ResortFacilityPrice[]
+  /** The single translation matching Accept-Language (falls back to en, then null). */
+  locale: ResortFacilityLocale | null
 }
 
 export interface ResortFacilityListResponse {
@@ -69,48 +31,56 @@ export interface ResortFacilityListResponse {
   page_size: number
   has_next: boolean
   has_previous: boolean
+  sortable_fields?: string[]
+  searchable_fields?: string[]
 }
 
-export interface CreateResortFacilityLocaleRequest {
-  locale_id: number
+export interface ResortFacilityLocaleListResponse {
+  data: ResortFacilityLocale[]
+  current_page: number
+  total_pages: number
+  total_elements: number
+  page_size: number
+  has_next: boolean
+  has_previous: boolean
+}
+
+export interface CreateResortFacilityLocaleInput {
   name: string
-  description: string
-  sort_order: number
-}
-
-export interface ResortFacilityPriceRequest {
-  price_unit_id: number
-  currency_id: number
-  amount: number
-  notes?: string
+  description?: string
   sort_order: number
 }
 
 export interface CreateResortFacilityRequest {
   resort_facility_group_id: number
-  facility_id?: number
-  facility_price_type_id: number
+  facility_id?: number | null
+  code: string
   sort_order: number
-  is_highlighted?: boolean
+  is_highlighted: boolean
   icon_type?: IconType | null
   icon_value?: string | null
   icon_meta?: Record<string, unknown> | null
-  resort_facility_price?: ResortFacilityPriceRequest
-  locales?: CreateResortFacilityLocaleRequest[]
+  /** Always resolved to the `en` locale server-side — no `locale_id` field. */
+  locale: CreateResortFacilityLocaleInput
 }
 
 export interface UpdateResortFacilityRequest {
-  facility_id?: number | null
-  facility_price_type_id: number
   sort_order: number
   icon_type?: IconType | null
   icon_value?: string | null
   icon_meta?: Record<string, unknown> | null
+}
+
+export interface CreateResortFacilityLocaleRequest {
+  locale_id: number
+  name: string
+  description?: string
+  sort_order: number
 }
 
 export interface UpdateResortFacilityLocaleRequest {
   name: string
-  description: string
+  description?: string
   sort_order: number
 }
 
@@ -119,16 +89,24 @@ export interface MutationResponse {
   id: number
 }
 
-export interface SetHighlightsRequest {
-  facility_ids: number[]
-}
-
+// Query params bind onto ResortFacilityFilterRequest's Java field names via Spring's
+// DataBinder — camelCase, not the snake_case used in JSON request/response bodies.
+// `id` is not a selectable sortBy value — it's the implicit default only.
 export interface ListParams {
   page?: number
   size?: number
-  sort_by?: "id" | "sortOrder" | "createdAt"
+  sort_by?: "createdAt" | "resortFacilityGroupEntity.id" | "facilityEntity.id" | "code" | "name"
   sort_dir?: "ASC" | "DESC"
   resort_facility_group_id?: number
+  facilityId?: number
+  code?: string
+  name?: string
+}
+
+export interface ListLocalesParams {
+  page?: number
+  size?: number
+  localeCode?: string
 }
 
 function base(resortId: number) {
@@ -140,9 +118,12 @@ export const resortFacilitiesService = {
     const q = new URLSearchParams()
     if (params.page !== undefined) q.set("page", String(params.page))
     if (params.size !== undefined) q.set("size", String(params.size))
-    if (params.sort_by) q.set("sort_by", params.sort_by)
-    if (params.sort_dir) q.set("sort_dir", params.sort_dir)
+    if (params.sort_by) q.set("sortBy", params.sort_by)
+    if (params.sort_dir) q.set("sortDir", params.sort_dir)
     if (params.resort_facility_group_id !== undefined) q.set("resortFacilityGroupId", String(params.resort_facility_group_id))
+    if (params.facilityId !== undefined) q.set("facilityId", String(params.facilityId))
+    if (params.code) q.set("code", params.code)
+    if (params.name) q.set("name", params.name)
     return api.get<ResortFacilityListResponse>(`${base(resortId)}?${q}`)
   },
 
@@ -162,6 +143,14 @@ export const resortFacilitiesService = {
     return api.delete<MutationResponse>(`${base(resortId)}/${id}`)
   },
 
+  listLocales(resortId: number, facilityId: number, params: ListLocalesParams = {}): Promise<ResortFacilityLocaleListResponse> {
+    const q = new URLSearchParams()
+    if (params.page !== undefined) q.set("page", String(params.page))
+    if (params.size !== undefined) q.set("size", String(params.size))
+    if (params.localeCode) q.set("localeCode", params.localeCode)
+    return api.get<ResortFacilityLocaleListResponse>(`${base(resortId)}/${facilityId}/locales?${q}`)
+  },
+
   addLocale(resortId: number, facilityId: number, body: CreateResortFacilityLocaleRequest): Promise<MutationResponse> {
     return api.post<MutationResponse>(`${base(resortId)}/${facilityId}/locales`, body)
   },
@@ -172,9 +161,5 @@ export const resortFacilitiesService = {
 
   removeLocale(resortId: number, facilityId: number, localeId: number): Promise<MutationResponse> {
     return api.delete<MutationResponse>(`${base(resortId)}/${facilityId}/locales/${localeId}`)
-  },
-
-  setHighlights(resortId: number, body: SetHighlightsRequest): Promise<MutationResponse> {
-    return api.put<MutationResponse>(`${base(resortId)}/highlights`, body)
   },
 }

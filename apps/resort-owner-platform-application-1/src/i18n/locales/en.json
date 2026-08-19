@@ -73,6 +73,15 @@
     "estd": "Established year",
     "email": "Email",
     "phone": "Phone",
+    "contactType": "Department",
+    "contactTypePlaceholder": "Choose a department (e.g. Reservations)",
+    "channel": "Channel",
+    "channelPlaceholder": "Choose a channel (e.g. Phone, Email)",
+    "contactValueLabel": "Phone, email, or link",
+    "contactValuePlaceholder": "e.g. +8801712345678 or info@resort.com",
+    "primary": "Main contact for this department",
+    "primaryHint": "Shown first when guests have more than one way to reach this department.",
+    "contactSortLabel": "Display order",
     "latitude": "Latitude",
     "longitude": "Longitude",
     "location": "Location",
@@ -84,25 +93,14 @@
     "cityAfterCountry": "Select a country first",
     "address": "Address",
     "addressPlaceholder": "Full street address…",
+    "postalCode": "Postal code",
+    "postalCodePlaceholder": "e.g. 4700",
     "submit": "Create resort",
     "submitting": "Creating…",
     "successToast": "Resort created!",
     "cancel": "Cancel",
     "back": "Back",
-    "next": "Next",
-    "step3Label": "Step 3",
-    "contact": "Contact",
-    "contactSubtitle": "How can guests reach your resort?",
-    "contactType": "Contact type",
-    "contactTypePlaceholder": "Select type",
-    "channel": "Channel",
-    "channelPlaceholder": "Select channel",
-    "contactValueLabel": "Contact value",
-    "contactValuePlaceholder": "Phone number, email, URL…",
-    "primary": "Primary",
-    "addContact": "Add contact",
-    "contactsHint": "Contacts are optional and can be managed from your dashboard.",
-    "contactDataError": "Failed to load contact options."
+    "next": "Next"
   },
   "resortDashboard": {
     "portal": "Resort portal",
@@ -132,6 +130,7 @@
     "logout": "Log out",
     "nav": {
       "dashboard": "Dashboard",
+      "overview": "Overview",
       "basicInfo": "Basic Info",
       "contacts": "Contacts",
       "facilityGroups": "Facility Groups",
@@ -143,13 +142,33 @@
       "settings": "Settings"
     }
   },
+  "resortOverview": {
+    "pageTitle": "Resort Overview",
+    "pageSubtitle": "Basic info, address, and every locale translation at a glance.",
+    "errLoad": "Failed to load resort overview.",
+    "notFound": "Resort not found.",
+    "sortOrder": "sort {{n}}",
+    "basicInfo": {
+      "title": "Basic info"
+    },
+    "address": {
+      "title": "Address",
+      "detailsTitle": "Location",
+      "country": "Country",
+      "city": "City",
+      "postalCode": "Postal code",
+      "coordinates": "Coordinates",
+      "empty": "No locales yet."
+    }
+  },
   "resortFacilityGroup": {
     "title": "Facility Groups",
-    "subtitle": "Manage facility groups for this resort.",
+    "subtitle": "Facilities are organized into groups to make them easier to browse — select a group below to view and manage its facilities.",
     "new": "New Group",
     "create": "Create Group",
     "loading": "Loading facility groups…",
-    "empty": "No facility groups yet.",
+    "empty": "No facility groups yet. Create one to start adding facilities.",
+    "viewFacilities": "View facilities",
     "deleted": "Facility group deleted.",
     "created": "Facility group created.",
     "updated": "Facility group updated.",
@@ -160,10 +179,10 @@
     "deleteLocaleDesc": "This locale translation will be permanently removed.",
     "dialogCreate": "New Facility Group",
     "dialogEdit": "Edit Facility Group",
-    "dialogView": "Facility Group",
-    "dialogDescCreate": "Create a new facility group for this resort.",
-    "dialogDescEdit": "Update this facility group's details.",
-    "dialogDescView": "View facility group details.",
+    "dialogView": "Facility Group Details",
+    "dialogDescCreate": "Create a new group to organize facilities.",
+    "dialogDescEdit": "Update the details below.",
+    "dialogDescView": "View the facility group details.",
     "facilityGroupId": "Platform Facility Group ID",
     "facilityGroupIdPlaceholder": "e.g. 3 (leave empty for custom group)",
     "facilityGroupIdHint": "Link to a platform-level facility group, or leave empty to create a custom group.",
@@ -203,14 +222,17 @@
     "deselectAll": "Deselect all",
     "creatingFacilities": "Creating…",
     "stepGroup": "Create Group",
-    "stepFacilities": "Add Facilities",
+    "stepFacilities": "Facilities",
     "createdTitle": "Facility Group Created!",
     "createdAsk": "Would you like to add facilities to this group now?",
-    "addFacilitiesYes": "Yes, add facilities"
+    "addFacilitiesYes": "Yes, add facilities",
+    "facilitiesSectionTitle": "Facilities in this group",
+    "code": "Code",
+    "errCode": "Code is required."
   },
   "resortFacility": {
     "title": "Facilities",
-    "subtitle": "Manage facilities for this group.",
+    "subtitle": "These facilities belong to the {{groupName}} group.",
     "overviewSubtitle": "Browse and manage all facilities across your groups.",
     "new": "New Facility",
     "create": "Create Facility",
@@ -261,20 +283,11 @@
     "searchGroup": "Search groups…",
     "noGroups": "No groups found.",
     "errGroupRequired": "Please select a facility group.",
+    "code": "Code",
+    "errCode": "Code is required.",
+    "errDuplicateCode": "Code \"{{code}}\" is used more than once — each facility needs a unique code.",
     "allFacilities": "All Facilities",
     "byGroup": "By Group",
-    "highlighted": "Highlight status",
-    "isHighlighted": "Featured highlight",
-    "notHighlighted": "Not highlighted",
-    "highlightedHint": "Manage via Highlights",
-    "manageHighlights": "Manage Highlights",
-    "highlights": "Highlights",
-    "highlightsSubtitle": "Select {{min}}–{{max}} facilities to feature as resort highlights.",
-    "highlightsSaved": "Highlights updated.",
-    "highlightMin": "Select at least {{min}} facilities.",
-    "highlightMax": "Select at most {{max}} facilities.",
-    "highlightCount": "{{count}} / {{max}} selected",
-    "saveHighlights": "Save Highlights",
     "priceSection": "Pricing",
     "priceType": "Price type",
     "selectPriceType": "Select a price type…",
@@ -298,25 +311,15 @@
   "basicInfo": {
     "pageTitle": "Basic Information",
     "pageSubtitle": "Manage your resort's core details and locale translations.",
-    "notFound": "Basic info not found.",
     "updatedToast": "Basic info updated.",
     "errEstd": "Please enter a valid established year.",
     "errCountry": "Please select a country.",
     "errCity": "Please select a city.",
     "logoSection": "Logo",
-    "logoUrl": "Logo URL",
     "noLogo": "No logo set",
-    "replaceLogo": "Replace logo",
     "uploadLogo": "Upload logo",
-    "uploadLogoTitle": "Upload a logo image",
-    "imageFile": "Image file",
-    "selectConfig": "Select image hosting config",
-    "noConfigs": "No image hosting configs available. Add one in Image Storage first.",
-    "errLoadConfigs": "Failed to load image hosting configs.",
-    "errUploadFields": "Please select a config and an image file.",
-    "logoUploadedToast": "Logo uploaded successfully.",
-    "uploading": "Uploading…",
-    "upload": "Upload"
+    "replaceLogo": "Replace logo",
+    "errLoadConfigs": "Failed to load image hosting configs."
   },
   "imageStorage": {
     "pageTitle": "Image Storage",
@@ -350,18 +353,23 @@
     "helpBody": "An image hosting config stores the credentials for a cloud provider (Cloudinary or Amazon S3) used to upload and serve your resort's images.\n\nTo configure Cloudinary, you need your Cloud Name, API Key, and API Secret from the Cloudinary dashboard.\n\nTo configure Amazon S3, you need your Bucket Name, AWS Region, Access Key ID, and Secret Access Key from the AWS IAM console.\n\nOnce added, you can select a config when uploading images such as your resort logo."
   },
   "locale": {
-    "translations": "Locale Translations",
+    "translations": "Translations",
     "add": "Add language",
+    "addShort": "Add",
     "removedToast": "Translation removed.",
     "errLang": "Please select a language for row {{n}}.",
     "errName": "Name is required for row {{n}}.",
     "errTagline": "Tagline is required for row {{n}}.",
+    "errAddress": "Address is required for row {{n}}.",
+    "searchByCode": "Search by locale code (e.g. en, bn)…",
+    "allLanguagesAdded": "A translation already exists for every available language.",
     "row": {
       "label": "Row {{n}}",
       "new": "New"
     },
     "empty": {
-      "basicInfo": "No translations yet. Click Edit to add one."
+      "basicInfo": "No translations yet. Click Edit to add one.",
+      "address": "No translations yet. Click Edit to add one."
     }
   },
   "field": {
@@ -373,11 +381,20 @@
       "title": "Discard changes?",
       "desc": "You have unsaved changes. Are you sure you want to discard them?",
       "confirm": "Discard"
-    }
+    },
+    "restoreDraft": {
+      "title": "Resume draft?",
+      "descResortFacilityGroup": "You have an unsaved draft for a new facility group. Would you like to restore it or start fresh?",
+      "descResortFacility": "You have an unsaved draft for a new facility. Would you like to restore it or start fresh?",
+      "restore": "Restore draft",
+      "discard": "Start fresh"
+    },
+    "draftSaved": "Draft saved at {{time}}",
+    "draftSyncing": "Syncing draft…"
   },
   "contacts": {
     "pageTitle": "Contacts",
-    "pageSubtitle": "Manage your resort's contact information.",
+    "pageSubtitle": "The phone numbers, emails, and links guests use to reach your resort.",
     "new": "New contact",
     "create": "Create contact",
     "empty": "No contacts yet.",
@@ -386,7 +403,7 @@
     "deletedToast": "Contact deleted.",
     "titleCreate": "New contact",
     "titleEdit": "Edit contact",
-    "descCreate": "Add a new contact method for your resort.",
+    "descCreate": "Add a new way for guests to reach your resort.",
     "descEdit": "Update this contact's details.",
     "deleteTitle": "Delete contact?",
     "deleteDesc": "This contact will be permanently removed.",
@@ -395,11 +412,23 @@
     "tapToCall": "Tap to call",
     "tapToEmail": "Tap to email",
     "openLink": "Open link",
-    "channel": "channel",
-    "channels": "channels",
+    "channel": "way",
+    "channels": "ways",
     "statTotal": "Total",
     "statPrimary": "Primary",
-    "statTypes": "Types"
+    "statTypes": "Departments"
+  },
+  "contactTypePicker": {
+    "title": "Select Department",
+    "count": "{{count}} departments",
+    "searchPlaceholder": "Search by code…",
+    "empty": "No departments found."
+  },
+  "channelPicker": {
+    "title": "Select Channel",
+    "count": "{{count}} channels",
+    "searchPlaceholder": "Search by code…",
+    "empty": "No channels found."
   },
   "images": {
     "upload": "Upload images",
@@ -558,13 +587,14 @@
   },
   "common": {
     "cancel": "Cancel",
+    "create": "Create",
     "save": "Save",
     "delete": "Delete",
     "edit": "Edit",
     "saving": "Saving…",
     "saved": "Saved!",
     "loading": "Loading…",
-    "generalInfo": "General Info",
+    "generalInfo": "General Information",
     "name": "Name",
     "allProviders": "All providers",
     "next": "Next",
@@ -573,11 +603,23 @@
     "allFields": "All Fields",
     "search": "Search",
     "change": "Change",
-    "description": "Description"
+    "description": "Description",
+    "refresh": "Refresh",
+    "refreshed": "Refreshed"
   },
   "apiFields": {
     "id": "ID",
     "sortOrder": "Sort Order",
-    "createdAt": "Created At"
+    "createdAt": "Created At",
+    "name": "Name",
+    "facilityGroupEntity": {
+      "id": "Platform Group"
+    },
+    "resortFacilityGroupEntity": {
+      "id": "Resort Group"
+    },
+    "facilityEntity": {
+      "id": "Platform Facility"
+    }
   }
 }

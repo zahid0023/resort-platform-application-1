@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
+import { useTranslation } from "react-i18next"
 import { Loader2, MessageSquare, Search } from "lucide-react"
 import { Badge, Dialog, DialogContent, DialogTitle, Input } from "@resort/shadcn-ui"
 import { communicationChannelsService, type CommunicationChannel } from "@/services/communication-channels"
@@ -16,6 +17,7 @@ export interface CommunicationChannelPickerDialogProps {
 }
 
 export function CommunicationChannelPickerDialog({ open, onOpenChange, selectedId, onSelect }: CommunicationChannelPickerDialogProps) {
+  const { t } = useTranslation()
   const [channels, setChannels] = useState<CommunicationChannel[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState("")
@@ -75,7 +77,7 @@ export function CommunicationChannelPickerDialog({ open, onOpenChange, selectedI
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl p-0 gap-0 overflow-hidden flex flex-col max-h-[85vh]">
-        <DialogTitle className="sr-only">Select Channel</DialogTitle>
+        <DialogTitle className="sr-only">{t("channelPicker.title")}</DialogTitle>
 
         {/* Header */}
         <div className="flex flex-col gap-3 px-5 pt-4 pb-4 pr-12 border-b shrink-0">
@@ -84,9 +86,9 @@ export function CommunicationChannelPickerDialog({ open, onOpenChange, selectedI
               <MessageSquare className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold">Select Channel</p>
+              <p className="text-sm font-semibold">{t("channelPicker.title")}</p>
               {totalElements > 0 && (
-                <p className="text-xs text-muted-foreground">{totalElements} channels</p>
+                <p className="text-xs text-muted-foreground">{t("channelPicker.count", { count: totalElements })}</p>
               )}
             </div>
           </div>
@@ -95,7 +97,7 @@ export function CommunicationChannelPickerDialog({ open, onOpenChange, selectedI
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by code…"
+              placeholder={t("channelPicker.searchPlaceholder")}
               className="pl-8 h-8 text-sm w-full"
               autoFocus
             />
@@ -110,14 +112,14 @@ export function CommunicationChannelPickerDialog({ open, onOpenChange, selectedI
             </div>
           ) : channels.length === 0 ? (
             <div className="text-center py-16 text-sm text-muted-foreground border rounded-xl border-dashed">
-              No channels found.
+              {t("channelPicker.empty")}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {channels.map((ch) => {
                 const isSelected = ch.id === selectedId
-                const name = ch.locales[0]?.name ?? ch.code
-                const description = ch.locales[0]?.description
+                const name = ch.locale?.name ?? ch.code
+                const description = ch.locale?.description
 
                 const pills = [
                   ch.is_url && "URL",

@@ -1,29 +1,52 @@
 import { api } from "./api";
+import type { Locale } from "./locales";
+import type { Country } from "./countries";
+import type { City } from "./cities";
 
-export interface ResortBasicInfoSummary {
+export interface ResortBasicInfoLocale {
   id: number;
-  resort_id: number;
-  code: string;
+  locale: Locale;
   sort_order: number;
+  name: string;
+  tagline: string;
+  short_description?: string;
+}
+
+export interface ResortBasicInfo {
+  id: number;
   estd: number;
-  country_id: number;
-  city_id: number;
   logo_url?: string;
+  /** The single translation matching Accept-Language (falls back to en, then null). */
+  locale: ResortBasicInfoLocale | null;
+}
+
+export interface ResortAddressLocale {
+  id: number;
+  locale: Locale;
+  address: string;
+  sort_order: number;
+}
+
+export interface ResortAddress {
+  id: number;
+  country: Country;
+  city: City;
+  postal_code?: string;
   lat?: number;
   lon?: number;
-  locales?: {
-    locale_id: number;
-    name: string;
-    tagline: string;
-    short_description?: string;
-    address?: string;
-  }[];
+  /** The single translation matching Accept-Language (falls back to en, then null). */
+  locale: ResortAddressLocale | null;
 }
 
 export interface ResortSummary {
   id: number;
   code: string;
-  resort_basic_info?: ResortBasicInfoSummary;
+}
+
+/** Full resort shape returned by `GET /resorts/{id}` — list endpoints only ever return `ResortSummary`. */
+export interface Resort extends ResortSummary {
+  basic_info: ResortBasicInfo;
+  address: ResortAddress;
 }
 
 export interface ResortListResponse {
@@ -44,55 +67,60 @@ export interface MutationResponse {
 export interface ListParams {
   page?: number;
   size?: number;
-  sort_by?: string;
+  // sortBy=id throws 400 — it's only valid as the implicit default when sortBy is omitted entirely.
+  sort_by?: "createdAt" | "code";
   sort_dir?: "ASC" | "DESC";
   code?: string;
 }
 
+// No `locale_id` — basic info / address are always created in `en`, resolved server-side.
+// Additional languages are added afterward via their locale sub-resource endpoints.
 export interface CreateResortBasicInfoLocale {
-  locale_id: number;
   sort_order: number;
   name: string;
   tagline: string;
   short_description?: string;
-  address?: string;
 }
 
 export interface CreateResortBasicInfo {
-  code: string;
-  sort_order: number;
   estd: number;
-  country_id: number;
-  city_id: number;
   logo_url?: string;
-  lat?: number;
-  lon?: number;
-  locales?: CreateResortBasicInfoLocale[];
+  locale: CreateResortBasicInfoLocale;
 }
 
-export interface CreateResortContact {
-  contact_type_id: number;
-  communication_channel_id: number;
-  contact_value: string;
-  is_primary: boolean;
+export interface CreateResortAddressLocale {
+  address: string;
   sort_order: number;
+}
+
+export interface CreateResortAddress {
+  country_id: number;
+  city_id: number;
+  postal_code?: string;
+  lat?: number;
+  lon?: number;
+  locale: CreateResortAddressLocale;
 }
 
 export interface CreateResortRequest {
   code: string;
-  basic_info?: CreateResortBasicInfo;
-  contacts?: CreateResortContact[];
+  basic_info: CreateResortBasicInfo;
+  address: CreateResortAddress;
 }
 
 function buildQuery(params: ListParams): URLSearchParams {
-  const { page = 0, size = 10, sort_by = "id", sort_dir = "ASC", code } = params;
-  const q = new URLSearchParams({ page: String(page), size: String(size), sort_by, sort_dir });
+  const { page = 0, size = 10, sort_by, sort_dir, code } = params;
+  const q = new URLSearchParams({ page: String(page), size: String(size) });
+  // Query params bind onto the Java field names via Spring's DataBinder — camelCase, not the
+  // snake_case used in JSON request/response bodies.
+  if (sort_by) q.set("sortBy", sort_by);
+  if (sort_dir) q.set("sortDir", sort_dir);
   if (code) q.set("code", code);
   return q;
 }
 
-/** Resort-user endpoint: only resorts the current user has access to. */
-export function listResorts(params: ListParams = {}): Promise<ResortListResponse> {
+/** Resort-user endpoint: only resorts the current user has access to. No `code` filter — pagination/sorting only. */
+export function listResorts(params: Omit<ListParams, "code"> = {}): Promise<ResortListResponse> {
   return api.get<ResortListResponse>(`/resorts/my-resorts?${buildQuery(params)}`);
 }
 
@@ -101,8 +129,8 @@ export function listAllResorts(params: ListParams = {}): Promise<ResortListRespo
   return api.get<ResortListResponse>(`/resorts?${buildQuery(params)}`);
 }
 
-export function getResort(id: number): Promise<{ data: ResortSummary }> {
-  return api.get<{ data: ResortSummary }>(`/resorts/${id}`);
+export function getResort(id: number): Promise<{ data: Resort }> {
+  return api.get<{ data: Resort }>(`/resorts/${id}`);
 }
 
 export function createResort(body: CreateResortRequest): Promise<MutationResponse> {

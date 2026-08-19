@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import { useParams } from "next/navigation"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
-import { AlertTriangle, Loader2, Phone, Plus } from "lucide-react"
+import { AlertTriangle, ChevronDown, Phone, Plus } from "lucide-react"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,22 +15,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Button,
-  Dialog,
-  DialogContent,
   Input,
   Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Sheet,
+  SheetContent,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
   Spinner,
   Switch,
 } from "@resort/shadcn-ui"
 import { ResortContactCard, CONTACT_ACCENTS } from "@/components/resort-contacts/resort-contact-card"
+import { ContactTypePickerDialog } from "@/components/contact-types/contact-type-picker-dialog"
+import { CommunicationChannelPickerDialog } from "@/components/communication-channels/communication-channel-picker-dialog"
 import { resortContactsService, type ResortContact } from "@/services/resort-contacts"
-import { listContactTypes, type ContactType } from "@/services/contact-types"
-import { listCommunicationChannels, type CommunicationChannel } from "@/services/communication-channels"
+import type { ContactType } from "@/services/contact-types"
+import type { CommunicationChannel } from "@/services/communication-channels"
 
 interface ContactForm {
   contact_type_id: string
@@ -55,14 +55,16 @@ export default function ContactsPage() {
 
   const [contacts, setContacts] = useState<ResortContact[]>([])
   const [loading, setLoading] = useState(true)
-  const [contactTypes, setContactTypes] = useState<ContactType[]>([])
-  const [channels, setChannels] = useState<CommunicationChannel[]>([])
-  const [loadingRef, setLoadingRef] = useState(false)
 
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingContact, setEditingContact] = useState<ResortContact | null>(null)
   const [form, setForm] = useState<ContactForm>(emptyForm)
   const [submitting, setSubmitting] = useState(false)
+
+  const [contactTypePickerOpen, setContactTypePickerOpen] = useState(false)
+  const [selectedContactType, setSelectedContactType] = useState<ContactType | null>(null)
+  const [channelPickerOpen, setChannelPickerOpen] = useState(false)
+  const [selectedChannel, setSelectedChannel] = useState<CommunicationChannel | null>(null)
 
   const [deleteTarget, setDeleteTarget] = useState<ResortContact | null>(null)
 
@@ -80,29 +82,14 @@ export default function ContactsPage() {
 
   useEffect(() => {
     fetchContacts()
-    listContactTypes().then((r) => setContactTypes(r.data)).catch(() => {})
-    listCommunicationChannels().then((r) => setChannels(r.data)).catch(() => {})
   }, [fetchContacts])
 
-  async function ensureRefData() {
-    if (contactTypes.length > 0 && channels.length > 0) return
-    setLoadingRef(true)
-    try {
-      const [ct, ch] = await Promise.all([listContactTypes(), listCommunicationChannels()])
-      setContactTypes(ct.data)
-      setChannels(ch.data)
-    } catch {
-      toast.error(t("resort.contactDataError"))
-    } finally {
-      setLoadingRef(false)
-    }
-  }
-
-  async function openCreate() {
+  function openCreate() {
     setEditingContact(null)
+    setSelectedContactType(null)
+    setSelectedChannel(null)
     setForm({ ...emptyForm, sort_order: String(contacts.length) })
     setDialogOpen(true)
-    await ensureRefData()
   }
 
   async function openEdit(c: ResortContact) {
@@ -213,8 +200,8 @@ export default function ContactsPage() {
         <div className="space-y-10">
           {groupedTypes.map(({ type, contacts: typeContacts }, idx) => {
             const accent = CONTACT_ACCENTS[idx % CONTACT_ACCENTS.length]
-            const typeName = type.locales[0]?.name ?? type.code
-            const typeDesc = type.locales[0]?.description
+            const typeName = type.locale?.name ?? type.code
+            const typeDesc = type.locale?.description
             const isEmergency = type.code === "EMERGENCY"
 
             return (
@@ -258,45 +245,38 @@ export default function ContactsPage() {
         </div>
       )}
 
-      {/* Create / Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-md p-0 gap-0 overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between gap-3 px-6 py-4 border-b">
-            <div className="flex items-center gap-3">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Phone className="h-4 w-4" />
-              </div>
-              <div>
-                <p className="text-sm font-semibold">
-                  {isEditing ? t("contacts.titleEdit") : t("contacts.titleCreate")}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {isEditing ? t("contacts.descEdit") : t("contacts.descCreate")}
-                </p>
-              </div>
+      {/* Create / Edit Sheet */}
+      <Sheet open={dialogOpen} onOpenChange={setDialogOpen}>
+        <SheetContent side="right" className="p-0 gap-0 flex flex-col sm:max-w-md">
+          <SheetHeader className="flex-row items-center gap-3 border-b p-4">
+            <div className="flex size-8 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+              <Phone className="h-4 w-4" />
             </div>
-          </div>
+            <div>
+              <SheetTitle className="text-sm">
+                {isEditing ? t("contacts.titleEdit") : t("contacts.titleCreate")}
+              </SheetTitle>
+              <p className="text-xs text-muted-foreground">
+                {isEditing ? t("contacts.descEdit") : t("contacts.descCreate")}
+              </p>
+            </div>
+          </SheetHeader>
 
-          <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-            {loadingRef ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="size-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <>
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="flex-1 overflow-y-auto px-4 py-5 space-y-4">
                 {isEditing ? (
                   <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-muted/50 border">
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="text-xs text-muted-foreground">{t("resort.contactType")}</span>
                       <span className="text-sm font-medium">
-                        {editingContact.contact_type.locales[0]?.name ?? editingContact.contact_type.code}
+                        {editingContact.contact_type.locale?.name ?? editingContact.contact_type.code}
                       </span>
                     </div>
                     <div className="w-px h-8 bg-border" />
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="text-xs text-muted-foreground">{t("resort.channel")}</span>
                       <span className="text-sm font-medium">
-                        {editingContact.communication_channel.locales[0]?.name ?? editingContact.communication_channel.code}
+                        {editingContact.communication_channel.locale?.name ?? editingContact.communication_channel.code}
                       </span>
                     </div>
                   </div>
@@ -304,42 +284,56 @@ export default function ContactsPage() {
                   <>
                     <div className="space-y-1.5">
                       <Label>{t("resort.contactType")} *</Label>
-                      <Select
-                        value={form.contact_type_id}
-                        onValueChange={(v) => setForm((p) => ({ ...p, contact_type_id: v }))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-between font-normal"
+                        onClick={() => setContactTypePickerOpen(true)}
                         disabled={submitting}
                       >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder={t("resort.contactTypePlaceholder")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {contactTypes.map((ct) => (
-                            <SelectItem key={ct.id} value={String(ct.id)}>
-                              {ct.locales[0]?.name ?? ct.code}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <span className={selectedContactType ? "" : "text-muted-foreground"}>
+                          {selectedContactType
+                            ? (selectedContactType.locale?.name ?? selectedContactType.code)
+                            : t("resort.contactTypePlaceholder")}
+                        </span>
+                        <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                      </Button>
+                      <ContactTypePickerDialog
+                        open={contactTypePickerOpen}
+                        onOpenChange={setContactTypePickerOpen}
+                        selectedId={selectedContactType?.id}
+                        onSelect={(ct) => {
+                          setSelectedContactType(ct)
+                          setForm((p) => ({ ...p, contact_type_id: String(ct.id) }))
+                        }}
+                      />
                     </div>
 
                     <div className="space-y-1.5">
                       <Label>{t("resort.channel")} *</Label>
-                      <Select
-                        value={form.communication_channel_id}
-                        onValueChange={(v) => setForm((p) => ({ ...p, communication_channel_id: v }))}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-between font-normal"
+                        onClick={() => setChannelPickerOpen(true)}
                         disabled={submitting}
                       >
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder={t("resort.channelPlaceholder")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {channels.map((ch) => (
-                            <SelectItem key={ch.id} value={String(ch.id)}>
-                              {ch.locales[0]?.name ?? ch.code}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        <span className={selectedChannel ? "" : "text-muted-foreground"}>
+                          {selectedChannel
+                            ? (selectedChannel.locale?.name ?? selectedChannel.code)
+                            : t("resort.channelPlaceholder")}
+                        </span>
+                        <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                      </Button>
+                      <CommunicationChannelPickerDialog
+                        open={channelPickerOpen}
+                        onOpenChange={setChannelPickerOpen}
+                        selectedId={selectedChannel?.id}
+                        onSelect={(ch) => {
+                          setSelectedChannel(ch)
+                          setForm((p) => ({ ...p, communication_channel_id: String(ch.id) }))
+                        }}
+                      />
                     </div>
                   </>
                 )}
@@ -355,7 +349,7 @@ export default function ContactsPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label>{t("field.sort")}</Label>
+                  <Label>{t("resort.contactSortLabel")}</Label>
                   <Input
                     type="number"
                     value={form.sort_order}
@@ -364,8 +358,11 @@ export default function ContactsPage() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between py-1">
-                  <Label>{t("resort.primary")}</Label>
+                <div className="flex items-center justify-between gap-4 py-1">
+                  <div className="space-y-0.5">
+                    <Label>{t("resort.primary")}</Label>
+                    <p className="text-xs text-muted-foreground">{t("resort.primaryHint")}</p>
+                  </div>
                   <Switch
                     size="sm"
                     checked={form.is_primary}
@@ -373,29 +370,28 @@ export default function ContactsPage() {
                     disabled={submitting}
                   />
                 </div>
-              </>
-            )}
+          </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => setDialogOpen(false)}
-                disabled={submitting}
-              >
-                {t("common.cancel")}
-              </Button>
-              <Button type="submit" disabled={submitting || loadingRef}>
-                {submitting
-                  ? t("common.saving")
-                  : isEditing
-                    ? t("common.save")
-                    : t("contacts.create")}
-              </Button>
-            </div>
+          <SheetFooter className="flex-row justify-end gap-2 border-t p-4">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setDialogOpen(false)}
+              disabled={submitting}
+            >
+              {t("common.cancel")}
+            </Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting
+                ? t("common.saving")
+                : isEditing
+                  ? t("common.save")
+                  : t("contacts.create")}
+            </Button>
+          </SheetFooter>
           </form>
-        </DialogContent>
-      </Dialog>
+        </SheetContent>
+      </Sheet>
 
       {/* Delete Confirm */}
       <AlertDialog open={!!deleteTarget} onOpenChange={(o) => !o && setDeleteTarget(null)}>

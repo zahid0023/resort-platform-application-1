@@ -66,10 +66,7 @@ export function StepLocation({
         label={t("resort.address")}
         htmlFor="address"
         labelExtra={
-          <>
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20 leading-none">EN</span>
-            <span className="text-xs text-muted-foreground">{t("resort.optional")}</span>
-          </>
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20 leading-none">EN</span>
         }
       >
         <Textarea
@@ -80,6 +77,23 @@ export function StepLocation({
           placeholder={t("resort.addressPlaceholder")}
           maxLength={400}
           rows={2}
+          disabled={submitting}
+        />
+      </FieldRow>
+
+      {/* Postal code — optional */}
+      <FieldRow
+        label={t("resort.postalCode")}
+        htmlFor="postal_code"
+        labelExtra={<span className="text-xs text-muted-foreground">{t("resort.optional")}</span>}
+      >
+        <Input
+          id="postal_code"
+          name="postal_code"
+          value={form.postal_code}
+          onChange={onChange}
+          placeholder={t("resort.postalCodePlaceholder")}
+          maxLength={50}
           disabled={submitting}
         />
       </FieldRow>
