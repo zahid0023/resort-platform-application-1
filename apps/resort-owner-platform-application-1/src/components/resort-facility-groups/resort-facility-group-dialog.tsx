@@ -643,6 +643,10 @@ export function ResortFacilityGroupDialog({
           onFormChange={setFacilityCreateForm}
           availableLocales={availableLocales}
           totalLocaleCount={totalLocaleCount}
+          // Always mode="create" here (a quick-create-facility flow launched from within a group) —
+          // the Operating Hours tab is disabled for the entire lifetime of create mode, so it never
+          // needs a real catalog.
+          availableDaysOfWeek={[]}
           onSaved={fetchGroupFacilities}
           lockedGroupName={groupName || `Group #${groupId}`}
           platformFacilityGroupId={typeof form.facility_group_id === "number" ? form.facility_group_id : undefined}

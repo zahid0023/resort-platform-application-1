@@ -1,4 +1,5 @@
 import type { Locale } from "@/services/locales"
+import type { DayOfWeek } from "@/services/days-of-week"
 import type { ResortFacilitySummary, IconType } from "@/services/resort-facilities"
 
 export type ResortFacilityDialogMode = "create" | "view"
@@ -14,6 +15,18 @@ export interface LocaleRow {
   _new?: boolean
 }
 
+// Always exactly one of these per configured day — the full week (all 7 days_of_week) is rendered
+// as a fixed grid, so unlike LocaleRow there's no "add a new row" concept or draft placeholder.
+// A day with no saved record yet just has no matching entry in ResortFacilityFormState.operating_hours.
+export interface OperatingHoursRow {
+  id: number
+  day_of_week: DayOfWeek
+  opens_at: string   // "" or "HH:mm:ss"
+  closes_at: string  // "" or "HH:mm:ss"
+  is_closed: boolean
+  is_twenty_four_hours: boolean
+}
+
 export interface ResortFacilityFormState {
   resort_facility_group_id: number | ""
   facility_id: number | ""
@@ -27,6 +40,9 @@ export interface ResortFacilityFormState {
   locale: { name: string; description: string; sort_order: number }
   /** view-only, populated lazily by the Translations section on first load, see the sub-resource GET */
   locales: LocaleRow[]
+  /** view-only, populated lazily by the Operating Hours section on first load — not part of create,
+   * since the sub-resource requires an existing facility_id in the URL path. */
+  operating_hours: OperatingHoursRow[]
 }
 
 export const emptyForm: ResortFacilityFormState = {
@@ -40,6 +56,7 @@ export const emptyForm: ResortFacilityFormState = {
   icon_color: "",
   locale: { name: "", description: "", sort_order: 0 },
   locales: [],
+  operating_hours: [],
 }
 
 export function toFormState(facility: ResortFacilitySummary): ResortFacilityFormState {
@@ -54,6 +71,7 @@ export function toFormState(facility: ResortFacilitySummary): ResortFacilityForm
     icon_color: String(facility.icon_meta?.color ?? ""),
     locale: { name: "", description: "", sort_order: 0 },
     locales: [],
+    operating_hours: [],
   }
 }
 

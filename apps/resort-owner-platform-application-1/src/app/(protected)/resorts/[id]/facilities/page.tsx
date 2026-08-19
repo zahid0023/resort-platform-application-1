@@ -37,6 +37,7 @@ import {
   type ListParams as GroupListParams,
 } from "@/services/resort-facility-groups"
 import { useLocales } from "@/providers/locales-provider"
+import { useDaysOfWeek } from "@/providers/days-of-week-provider"
 
 const GROUPS_PAGE_SIZE = 4
 const FACILITIES_PAGE_SIZE = 20
@@ -74,6 +75,7 @@ export default function ResortFacilitiesPage() {
   const [sortDir, setSortDir] = useState<"ASC" | "DESC">("ASC")
 
   const { locales: availableLocales, totalCount: totalLocaleCount, loaded: localesLoaded, refresh: refreshLocales } = useLocales()
+  const { daysOfWeek: availableDaysOfWeek, loaded: daysOfWeekLoaded, refresh: refreshDaysOfWeek } = useDaysOfWeek()
 
   // Group dialog — create a new group, or view/edit an existing one's own details
   const [groupDialogOpen, setGroupDialogOpen] = useState(false)
@@ -204,6 +206,11 @@ export default function ResortFacilitiesPage() {
   function loadLocales() {
     if (localesLoaded) return
     refreshLocales().catch((err) => toast.error((err as Error).message))
+  }
+
+  function loadDaysOfWeek() {
+    if (daysOfWeekLoaded) return
+    refreshDaysOfWeek().catch((err) => toast.error((err as Error).message))
   }
 
   // ── Group handlers ──────────────────────────────────────────────────────────
@@ -451,10 +458,12 @@ export default function ResortFacilitiesPage() {
         onFormChange={setFacilityForm}
         availableLocales={availableLocales}
         totalLocaleCount={totalLocaleCount}
+        availableDaysOfWeek={availableDaysOfWeek}
         onSaved={handleFacilitySaved}
         lockedGroupName={dialogGroupName}
         platformFacilityGroupId={dialogPlatformGroupId}
         onLocalesTabOpen={loadLocales}
+        onOperatingHoursTabOpen={loadDaysOfWeek}
       />
 
       <AlertDialog open={!!groupDeleteTarget} onOpenChange={(o) => !o && setGroupDeleteTarget(null)}>

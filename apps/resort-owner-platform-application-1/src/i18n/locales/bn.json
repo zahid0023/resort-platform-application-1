@@ -300,7 +300,19 @@
     "priceNotesPlaceholder": "ঐচ্ছিক নোট…",
     "errPriceUnit": "অনুগ্রহ করে একটি মূল্য ইউনিট নির্বাচন করুন।",
     "errCurrency": "অনুগ্রহ করে একটি মুদ্রা নির্বাচন করুন।",
-    "errAmount": "অনুগ্রহ করে একটি বৈধ পরিমাণ লিখুন (≥ ০)।"
+    "errAmount": "অনুগ্রহ করে একটি বৈধ পরিমাণ লিখুন (≥ ০)।",
+    "operatingHoursSection": "চালু থাকার সময়",
+    "operatingHoursNotSet": "নির্ধারিত নয়",
+    "operatingHoursNotConfigured": "এই দিনের জন্য এখনও কোনো সময় নির্ধারণ করা হয়নি। নির্ধারণ করতে এডিট ক্লিক করুন।",
+    "operatingHoursState": "অবস্থা",
+    "operatingHoursCustom": "নির্দিষ্ট সময়",
+    "operatingHoursOpen24": "২৪ ঘণ্টা খোলা",
+    "operatingHoursClosed": "সারাদিন বন্ধ",
+    "operatingHoursOvernightHint": "মধ্যরাতের পর বন্ধ হয় — এই সময়সীমা পরের দিনে গড়িয়ে যায়।",
+    "operatingHoursRemovedToast": "চালু থাকার সময় সরানো হয়েছে।",
+    "errOperatingHoursTimes": "নির্দিষ্ট সময়ের জন্য খোলা এবং বন্ধের সময় আবশ্যক।",
+    "deleteOperatingHoursTitle": "এই চালু থাকার সময় সরাবেন?",
+    "deleteOperatingHoursDesc": "এই দিনের চালু থাকার সময় স্থায়ীভাবে সরানো হবে।"
   },
   "basicInfo": {
     "pageTitle": "মৌলিক তথ্য",
@@ -368,7 +380,9 @@
   },
   "field": {
     "sort": "সাজানোর ক্রম",
-    "language": "ভাষা"
+    "language": "ভাষা",
+    "opensAt": "খোলার সময়",
+    "closesAt": "বন্ধের সময়"
   },
   "dialog": {
     "discardChanges": {

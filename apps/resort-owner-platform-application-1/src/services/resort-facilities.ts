@@ -1,5 +1,6 @@
 import { api } from "./api"
 import type { Locale } from "./locales"
+import type { DayOfWeek } from "./days-of-week"
 
 export type IconType = "LUCIDE" | "IMAGE" | "SVG" | "EXTERNAL"
 
@@ -49,6 +50,46 @@ export interface CreateResortFacilityLocaleInput {
   name: string
   description?: string
   sort_order: number
+}
+
+export interface ResortFacilityOperatingHours {
+  id: number
+  day_of_week: DayOfWeek
+  opens_at: string | null
+  closes_at: string | null
+  is_closed: boolean
+  is_twenty_four_hours: boolean
+}
+
+export interface ResortFacilityOperatingHoursListResponse {
+  data: ResortFacilityOperatingHours[]
+  current_page: number
+  total_pages: number
+  total_elements: number
+  page_size: number
+  has_next: boolean
+  has_previous: boolean
+}
+
+export interface CreateOperatingHoursRequest {
+  day_of_week_id: number
+  opens_at?: string | null
+  closes_at?: string | null
+  is_closed: boolean
+  is_twenty_four_hours: boolean
+}
+
+export interface UpdateOperatingHoursRequest {
+  day_of_week_id: number
+  opens_at?: string | null
+  closes_at?: string | null
+  is_closed: boolean
+  is_twenty_four_hours: boolean
+}
+
+export interface ListOperatingHoursParams {
+  page?: number
+  size?: number
 }
 
 export interface CreateResortFacilityRequest {
@@ -161,5 +202,24 @@ export const resortFacilitiesService = {
 
   removeLocale(resortId: number, facilityId: number, localeId: number): Promise<MutationResponse> {
     return api.delete<MutationResponse>(`${base(resortId)}/${facilityId}/locales/${localeId}`)
+  },
+
+  listOperatingHours(resortId: number, facilityId: number, params: ListOperatingHoursParams = {}): Promise<ResortFacilityOperatingHoursListResponse> {
+    const q = new URLSearchParams()
+    if (params.page !== undefined) q.set("page", String(params.page))
+    if (params.size !== undefined) q.set("size", String(params.size))
+    return api.get<ResortFacilityOperatingHoursListResponse>(`${base(resortId)}/${facilityId}/operating-hours?${q}`)
+  },
+
+  createOperatingHours(resortId: number, facilityId: number, body: CreateOperatingHoursRequest): Promise<MutationResponse> {
+    return api.post<MutationResponse>(`${base(resortId)}/${facilityId}/operating-hours`, body)
+  },
+
+  updateOperatingHours(resortId: number, facilityId: number, id: number, body: UpdateOperatingHoursRequest): Promise<MutationResponse> {
+    return api.put<MutationResponse>(`${base(resortId)}/${facilityId}/operating-hours/${id}`, body)
+  },
+
+  removeOperatingHours(resortId: number, facilityId: number, id: number): Promise<MutationResponse> {
+    return api.delete<MutationResponse>(`${base(resortId)}/${facilityId}/operating-hours/${id}`)
   },
 }

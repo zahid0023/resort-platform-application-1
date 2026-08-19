@@ -306,7 +306,19 @@
     "priceNotesPlaceholder": "Optional notes…",
     "errPriceUnit": "Please select a price unit.",
     "errCurrency": "Please select a currency.",
-    "errAmount": "Please enter a valid amount (≥ 0)."
+    "errAmount": "Please enter a valid amount (≥ 0).",
+    "operatingHoursSection": "Operating Hours",
+    "operatingHoursNotSet": "Not set",
+    "operatingHoursNotConfigured": "No hours configured for this day yet. Click edit to set them.",
+    "operatingHoursState": "Status",
+    "operatingHoursCustom": "Custom hours",
+    "operatingHoursOpen24": "Open 24 hours",
+    "operatingHoursClosed": "Closed all day",
+    "operatingHoursOvernightHint": "Closes after midnight — this window rolls into the next day.",
+    "operatingHoursRemovedToast": "Operating hours removed.",
+    "errOperatingHoursTimes": "Opening and closing times are required for custom hours.",
+    "deleteOperatingHoursTitle": "Remove these operating hours?",
+    "deleteOperatingHoursDesc": "This day's operating hours will be permanently removed."
   },
   "basicInfo": {
     "pageTitle": "Basic Information",
@@ -374,7 +386,9 @@
   },
   "field": {
     "sort": "Sort order",
-    "language": "Language"
+    "language": "Language",
+    "opensAt": "Opens at",
+    "closesAt": "Closes at"
   },
   "dialog": {
     "discardChanges": {

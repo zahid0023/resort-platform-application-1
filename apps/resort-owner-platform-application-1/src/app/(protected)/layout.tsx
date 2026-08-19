@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { getToken } from "@/services/api"
 import { LocalesProvider } from "@/providers/locales-provider"
+import { DaysOfWeekProvider } from "@/providers/days-of-week-provider"
 
 export default function ProtectedLayout({
   children,
@@ -23,5 +24,9 @@ export default function ProtectedLayout({
 
   if (!ready) return null
 
-  return <LocalesProvider>{children}</LocalesProvider>
+  return (
+    <LocalesProvider>
+      <DaysOfWeekProvider>{children}</DaysOfWeekProvider>
+    </LocalesProvider>
+  )
 }

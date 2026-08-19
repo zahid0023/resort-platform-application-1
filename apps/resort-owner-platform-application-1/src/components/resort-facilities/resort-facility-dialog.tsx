@@ -14,11 +14,13 @@ import { DialogCreateFooter } from "@/components/shared/dialog-create-footer"
 import { resortFacilitiesService } from "@/services/resort-facilities"
 import type { PlatformFacilitySummary } from "@/services/platform-facilities"
 import type { Locale } from "@/services/locales"
+import type { DayOfWeek } from "@/services/days-of-week"
 import { toast } from "sonner"
 import type { ResortFacilityDialogMode, ResortFacilityFormState, FacilityMode } from "./types"
 import { emptyForm, toApiIconPayload } from "./types"
 import { ResortFacilityGeneralInfo } from "./resort-facility-general-info"
 import { ResortFacilityLocaleTranslations } from "./resort-facility-locale-translations"
+import { ResortFacilityOperatingHours } from "./resort-facility-operating-hours"
 import { IconSection } from "./resort-facility-icon-section"
 
 // Local autosave for the create form — never sent to the backend, just a browser-local checkpoint,
@@ -66,6 +68,7 @@ export interface ResortFacilityDialogProps {
 	onFormChange: (form: ResortFacilityFormState) => void
 	availableLocales: Locale[]
 	totalLocaleCount: number | null
+	availableDaysOfWeek: DayOfWeek[]
 	onSaved?: () => void | Promise<void>
 	lockedGroupName?: string
 	defaultFacilityMode?: FacilityMode
@@ -74,6 +77,8 @@ export interface ResortFacilityDialogProps {
 	 * page lazy-load the shared locale catalog only once it's actually needed, instead of prefetching
 	 * it the moment this dialog opens. */
 	onLocalesTabOpen?: () => void
+	/** Same as `onLocalesTabOpen`, but for the Operating Hours tab's day-of-week catalog. */
+	onOperatingHoursTabOpen?: () => void
 }
 
 export function ResortFacilityDialog({
@@ -86,11 +91,13 @@ export function ResortFacilityDialog({
 	onFormChange,
 	availableLocales,
 	totalLocaleCount,
+	availableDaysOfWeek,
 	onSaved,
 	lockedGroupName,
 	defaultFacilityMode = "platform",
 	platformFacilityGroupId,
 	onLocalesTabOpen,
+	onOperatingHoursTabOpen,
 }: ResortFacilityDialogProps) {
 	const { t } = useTranslation()
 	const [submitting, setSubmitting] = useState(false)
@@ -102,15 +109,19 @@ export function ResortFacilityDialog({
 		icon_type: "", icon_value: "", icon_color: "",
 	})
 	const [translationsEditing, setTranslationsEditing] = useState(false)
+	const [operatingHoursEditing, setOperatingHoursEditing] = useState(false)
 	const [confirmClose, setConfirmClose] = useState(false)
 	const [facilityMode, setFacilityMode] = useState<FacilityMode>(defaultFacilityMode)
 	const [createIconEditing, setCreateIconEditing] = useState(false)
-	const [activeTab, setActiveTab] = useState<"general" | "icon" | "locales">("general")
+	const [activeTab, setActiveTab] = useState<"general" | "icon" | "locales" | "operating-hours">("general")
 
 	// View/edit mode only — the Locale Translations section loads/refetches its own data internally,
 	// so a manual refresh signals it by incrementing this counter rather than calling a fetch function
 	// owned by this dialog.
 	const [localesRefreshSignal, setLocalesRefreshSignal] = useState(0)
+
+	// Same idea, for the Operating Hours tab.
+	const [operatingHoursRefreshSignal, setOperatingHoursRefreshSignal] = useState(0)
 
 	// Owned here (not inside the Locales tab content) so it survives that tab unmounting on switch.
 	const [localeSearch, setLocaleSearch] = useState("")
@@ -118,6 +129,9 @@ export function ResortFacilityDialog({
 	// Guards `onLocalesTabOpen` to fire at most once per dialog session, the first time the Locales
 	// tab is actually selected — not the moment this dialog opens.
 	const [localesCatalogRequested, setLocalesCatalogRequested] = useState(false)
+
+	// Same idea, for `onOperatingHoursTabOpen`.
+	const [operatingHoursCatalogRequested, setOperatingHoursCatalogRequested] = useState(false)
 
 	// Create mode only — the picked platform facility's own display details, kept alongside `form` so
 	// it can round-trip through the draft (see DraftState above).
@@ -136,13 +150,16 @@ export function ResortFacilityDialog({
 			setIconEditing(false)
 			setIconSubmitting(false)
 			setTranslationsEditing(false)
+			setOperatingHoursEditing(false)
 			setConfirmClose(false)
 			setFacilityMode(defaultFacilityMode)
 			setCreateIconEditing(false)
 			setActiveTab("general")
 			setLocalesRefreshSignal(0)
+			setOperatingHoursRefreshSignal(0)
 			setLocaleSearch("")
 			setLocalesCatalogRequested(false)
+			setOperatingHoursCatalogRequested(false)
 			setSelectedPlatFacility(null)
 			setDraftPrompt(null)
 			setDraftSavedAt(null)
@@ -157,6 +174,13 @@ export function ResortFacilityDialog({
 		setLocalesCatalogRequested(true)
 		onLocalesTabOpen?.()
 	}, [open, activeTab, localesCatalogRequested]) // eslint-disable-line react-hooks/exhaustive-deps
+
+	// Same idea, for the Operating Hours tab's day-of-week catalog.
+	useEffect(() => {
+		if (!open || activeTab !== "operating-hours" || operatingHoursCatalogRequested) return
+		setOperatingHoursCatalogRequested(true)
+		onOperatingHoursTabOpen?.()
+	}, [open, activeTab, operatingHoursCatalogRequested]) // eslint-disable-line react-hooks/exhaustive-deps
 
 	// On opening a fresh create form, offer to resume a locally-saved draft.
 	useEffect(() => {
@@ -308,6 +332,9 @@ export function ResortFacilityDialog({
 			if (activeTab === "locales") {
 				setLocalesRefreshSignal((n) => n + 1)
 			}
+			if (activeTab === "operating-hours") {
+				setOperatingHoursRefreshSignal((n) => n + 1)
+			}
 			toast.success(t("common.refreshed"))
 		} catch (err) {
 			toast.error((err as Error).message)
@@ -348,7 +375,7 @@ export function ResortFacilityDialog({
 		}
 	}
 
-	const isEditing = generalEditing || iconEditing || translationsEditing
+	const isEditing = generalEditing || iconEditing || translationsEditing || operatingHoursEditing
 	const headerTitle = mode === "create"
 		? t("resortFacility.dialogCreate")
 		: (isEditing ? t("resortFacility.dialogEdit") : t("resortFacility.dialogView"))
@@ -371,7 +398,7 @@ export function ResortFacilityDialog({
 
 						<Tabs
 							value={activeTab}
-							onValueChange={(v) => setActiveTab(v as "general" | "icon" | "locales")}
+							onValueChange={(v) => setActiveTab(v as "general" | "icon" | "locales" | "operating-hours")}
 							className="flex-1 min-h-0 flex-col"
 						>
 							<div className="flex items-center justify-between mx-6 mt-4 gap-2">
@@ -385,6 +412,11 @@ export function ResortFacilityDialog({
 									<TabsTrigger value="locales" disabled={mode === "create" && !(isGeneralValid() && isIconValid())} className="cursor-pointer disabled:cursor-not-allowed">
 										{t("locale.translations")}
 									</TabsTrigger>
+									{/* Operating hours require an existing facility_id in the URL path — never reachable
+									    during create, unlike the other tabs which merely gate on partial validity. */}
+									<TabsTrigger value="operating-hours" disabled={mode === "create"} className="cursor-pointer disabled:cursor-not-allowed">
+										{t("resortFacility.operatingHoursSection")}
+									</TabsTrigger>
 								</TabsList>
 								{mode !== "create" && (
 									<Button
@@ -393,7 +425,7 @@ export function ResortFacilityDialog({
 										variant="ghost"
 										className="h-7 w-7 shrink-0"
 										onClick={handleRefresh}
-										disabled={refreshing || generalEditing || iconEditing || translationsEditing}
+										disabled={refreshing || generalEditing || iconEditing || translationsEditing || operatingHoursEditing}
 										title={t("common.refresh")}
 									>
 										<RefreshCw className={`h-3.5 w-3.5 ${refreshing ? "animate-spin" : ""}`} />
@@ -479,6 +511,21 @@ export function ResortFacilityDialog({
 									search={localeSearch}
 									onSearchChange={setLocaleSearch}
 									refreshSignal={localesRefreshSignal}
+								/>
+							</TabsContent>
+
+							<TabsContent value="operating-hours" className="min-h-0 overflow-y-auto px-6 py-5">
+								<ResortFacilityOperatingHours
+									resortId={resortId}
+									mode={mode}
+									form={form}
+									onFormChange={onFormChange}
+									facilityId={facilityId}
+									availableDaysOfWeek={availableDaysOfWeek}
+									onSaved={onSaved}
+									onEditingChange={setOperatingHoursEditing}
+									open={open}
+									refreshSignal={operatingHoursRefreshSignal}
 								/>
 							</TabsContent>
 						</Tabs>
