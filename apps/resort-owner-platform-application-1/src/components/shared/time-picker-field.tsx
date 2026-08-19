@@ -1,8 +1,9 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { createPortal } from "react-dom"
 import { Clock, Plus } from "lucide-react"
-import { Button, Popover, PopoverContent, PopoverTrigger, cn } from "@resort/shadcn-ui"
+import { Button, cn } from "@resort/shadcn-ui"
 
 // Dial order, not numeric order — index 0 renders at the top of the ring (see polar()'s angle
 // math), so 12 leads the array to land at 12 o'clock like a real clock face, then 1–11 follow clockwise.
@@ -50,11 +51,6 @@ export interface TimePickerFieldProps {
   disabled?: boolean
   placeholder?: string
   className?: string
-  /** Which edge of the trigger the popover pins to. Defaults to "center" (symmetric, the safe
-   *  choice for a field that could sit anywhere). Pass "start"/"end" for fields paired side by
-   *  side — e.g. an opens-at/closes-at row — so each picker stays flush with its own field's
-   *  outer edge instead of drifting toward the middle of the row. */
-  align?: "start" | "center" | "end"
 }
 
 const DIAL_SIZE = 320
@@ -243,10 +239,17 @@ function ClockFace({ hour12, minute, activeHand, onPickHour, onPickMinute, onAct
 // opens one analog face with a single ring (just like a real clock) and both hands live at once.
 // Tap the hour or minute digit in the readout to choose which hand the ring currently controls —
 // the other hand stays exactly where it was, still visible.
-export function TimePickerField({ value, onChange, disabled, placeholder, className, align = "center" }: TimePickerFieldProps) {
+export function TimePickerField({ value, onChange, disabled, placeholder, className }: TimePickerFieldProps) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Draft>({})
   const [activeHand, setActiveHand] = useState<Hand>("hour")
+  // Where the clock portals to. This field only ever opens from inside a Sheet/Dialog panel
+  // (never bare on a page), so we target that panel's own content box — found via the
+  // `data-slot` shadcn already stamps on it — rather than document.body. Portaling as a plain
+  // child of the panel (itself always `position: fixed`) makes `absolute inset-0` on the
+  // overlay size to exactly that panel's visible bounds, so `items-center justify-center`
+  // centers the clock within the panel, not the full browser viewport.
+  const [panel, setPanel] = useState<Element | null>(null)
 
   function handleOpenChange(v: boolean) {
     if (disabled) return
@@ -263,6 +266,17 @@ export function TimePickerField({ value, onChange, disabled, placeholder, classN
       setActiveHand("hour")
     }
   }
+
+  useEffect(() => {
+    if (!open) return
+    setPanel(document.querySelector('[data-slot="sheet-content"], [data-slot="dialog-content"]'))
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") handleOpenChange(false)
+    }
+    document.addEventListener("keydown", onKeyDown)
+    return () => document.removeEventListener("keydown", onKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
 
   function pickHour(hour12: number) {
     setDraft((d) => ({ ...d, hour12 }))
@@ -356,30 +370,22 @@ export function TimePickerField({ value, onChange, disabled, placeholder, classN
     </div>
   )
 
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={disabled}
-          className={cn(
-            "w-full justify-start text-left font-normal h-10 text-base gap-0",
-            value ? "border-primary/30" : "text-muted-foreground",
-            className,
-          )}
-        >
-          <span className={cn(
-            "h-6 w-6 mr-2 shrink-0 rounded-md flex items-center justify-center",
-            value ? "bg-linear-to-br from-primary to-primary/60 text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground",
-          )}>
-            <Clock className="h-3.5 w-3.5" />
-          </span>
-          {value ? formatLabel(value) : (placeholder ?? "Select time")}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto border-none bg-transparent p-0 shadow-none ring-0" align={align} collisionPadding={12}>
-        <div className="flex flex-col items-center">
+  const overlay = (
+    // A hand-rolled overlay, portaled as a plain child of the enclosing Sheet/Dialog panel
+    // rather than to document.body — `absolute inset-0` on a direct child of that panel (always
+    // `position: fixed`) sizes to exactly the panel's own visible box, so `items-center
+    // justify-center` centers the clock within the panel itself, not the full browser viewport.
+    <div
+      className="absolute inset-0 z-50 flex items-center justify-center bg-black/40 animate-in fade-in-0"
+      onClick={() => handleOpenChange(false)}
+    >
+      <div
+        className="flex flex-col items-center animate-in zoom-in-95 fade-in-0"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={placeholder ?? "Select time"}
+      >
           {/* Fine minute adjuster, sitting on top of the case — a crown wouldn't make sense here
               (it belongs on the side, where you'd actually turn it), so on top this reads as a
               hand-bell instead: hanging loop, tapering dome body, flared rim, fused to the case
@@ -430,7 +436,31 @@ export function TimePickerField({ value, onChange, disabled, placeholder, classN
             center={centerReadout}
           />
         </div>
-      </PopoverContent>
-    </Popover>
+      </div>
+  )
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={disabled}
+        onClick={() => handleOpenChange(!open)}
+        className={cn(
+          "w-full justify-start text-left font-normal h-10 text-base gap-0",
+          value ? "border-primary/30" : "text-muted-foreground",
+          className,
+        )}
+      >
+        <span className={cn(
+          "h-6 w-6 mr-2 shrink-0 rounded-md flex items-center justify-center",
+          value ? "bg-linear-to-br from-primary to-primary/60 text-primary-foreground shadow-sm" : "bg-muted text-muted-foreground",
+        )}>
+          <Clock className="h-3.5 w-3.5" />
+        </span>
+        {value ? formatLabel(value) : (placeholder ?? "Select time")}
+      </Button>
+      {open && panel && createPortal(overlay, panel)}
+    </>
   )
 }

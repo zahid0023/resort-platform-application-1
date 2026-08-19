@@ -309,10 +309,13 @@
     "operatingHoursOpen24": "২৪ ঘণ্টা খোলা",
     "operatingHoursClosed": "সারাদিন বন্ধ",
     "operatingHoursOvernightHint": "মধ্যরাতের পর বন্ধ হয় — এই সময়সীমা পরের দিনে গড়িয়ে যায়।",
-    "operatingHoursRemovedToast": "চালু থাকার সময় সরানো হয়েছে।",
-    "errOperatingHoursTimes": "নির্দিষ্ট সময়ের জন্য খোলা এবং বন্ধের সময় আবশ্যক।",
-    "deleteOperatingHoursTitle": "এই চালু থাকার সময় সরাবেন?",
-    "deleteOperatingHoursDesc": "এই দিনের চালু থাকার সময় স্থায়ীভাবে সরানো হবে।"
+    "addWindow": "আরেকটি সময়সীমা যোগ করুন",
+    "sameHoursEveryDay": "প্রতিদিন একই সময় ব্যবহার করুন",
+    "applyToAllDays": "সব দিনে প্রয়োগ করুন",
+    "applyToAllDaysTitle": "এই সময়গুলো প্রতিদিনের জন্য প্রয়োগ করবেন?",
+    "applyToAllDaysDesc": "এটি অন্যান্য প্রতিটি দিনের চালু থাকার সময় এখানে নির্ধারিত সময় দিয়ে প্রতিস্থাপন করবে।",
+    "operatingHoursAppliedToAll": "চালু থাকার সময় প্রতিদিনের জন্য প্রয়োগ করা হয়েছে।",
+    "errOperatingHoursTimes": "নির্দিষ্ট সময়ের জন্য খোলা এবং বন্ধের সময় আবশ্যক।"
   },
   "basicInfo": {
     "pageTitle": "মৌলিক তথ্য",
@@ -595,6 +598,7 @@
     "search": "খুঁজুন",
     "change": "পরিবর্তন করুন",
     "description": "বিবরণ",
+    "notes": "নোট",
     "refresh": "রিফ্রেশ"
   },
   "apiFields": {

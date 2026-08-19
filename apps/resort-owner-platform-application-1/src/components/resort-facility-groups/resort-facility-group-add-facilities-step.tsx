@@ -6,9 +6,10 @@ import { useRouter } from "next/navigation"
 import { Button } from "@resort/shadcn-ui"
 import { CircleCheck, Loader2 } from "lucide-react"
 import { toast } from "sonner"
-import { resortFacilitiesService } from "@/services/resort-facilities"
+import { resortFacilitiesService, type CreateResortFacilityOperatingHoursEntry } from "@/services/resort-facilities"
 import type { IconType } from "@/services/resort-facility-groups"
 import { platformFacilitiesService, type PlatformFacilitySummary } from "@/services/platform-facilities"
+import { useDaysOfWeek } from "@/providers/days-of-week-provider"
 import { FacilityPicker, initCustomization, type FacilityCustomization } from "./resort-facility-group-facility-picker"
 
 export interface ResortFacilityGroupAddFacilitiesStepProps {
@@ -33,6 +34,7 @@ export function ResortFacilityGroupAddFacilitiesStep({
 }: ResortFacilityGroupAddFacilitiesStepProps) {
   const { t } = useTranslation()
   const router = useRouter()
+  const { daysOfWeek, loaded: daysOfWeekLoaded, refresh: refreshDaysOfWeek } = useDaysOfWeek()
 
   const [platformFacilities, setPlatformFacilities] = useState<PlatformFacilitySummary[]>([])
   const [platformFacilitiesLoading, setPlatformFacilitiesLoading] = useState(false)
@@ -116,6 +118,16 @@ export function ResortFacilityGroupAddFacilitiesStep({
     }
     setCreatingFacilities(true)
     try {
+      // The create endpoint requires a full weekly schedule; this bulk-add step has no per-day
+      // hours UI, so every facility starts closed all week — the owner fills in real hours
+      // afterward via the facility's own Operating Hours tab.
+      const days = daysOfWeekLoaded ? daysOfWeek : await refreshDaysOfWeek()
+      const closedAllWeek: CreateResortFacilityOperatingHoursEntry[] = days.map((d) => ({
+        day_of_week_id: d.id,
+        is_closed: true,
+        is_twenty_four_hours: false,
+        windows: [],
+      }))
       await Promise.all(
         toCreate.map((f) => {
           const custom = facilityCustomizations[f.id] ?? initCustomization(f)
@@ -134,6 +146,7 @@ export function ResortFacilityGroupAddFacilitiesStep({
               description: custom.locale.description.trim(),
               sort_order: Number(custom.locale.sort_order) || 0,
             },
+            operating_hours: closedAllWeek,
           })
         }),
       )

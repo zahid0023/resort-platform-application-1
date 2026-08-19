@@ -89,7 +89,7 @@ export function ResortFacilityGeneralInfo({
       icon_type: (f.icon_type ?? "") as ResortFacilityFormState["icon_type"],
       icon_value: f.icon_value ?? "",
       icon_color: String(f.icon_meta?.color ?? ""),
-      locale: { name: f.locale?.name ?? "", description: f.locale?.description ?? "", sort_order: 0 },
+      locale: { name: f.locale?.name ?? "", description: f.locale?.description ?? "", notes: "", sort_order: 0 },
     })
   }
 

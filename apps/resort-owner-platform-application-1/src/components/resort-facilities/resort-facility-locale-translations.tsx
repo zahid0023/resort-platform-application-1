@@ -103,6 +103,7 @@ export function ResortFacilityLocaleTranslations({
         locale: l.locale,
         name: l.name,
         description: l.description ?? "",
+        notes: l.notes ?? "",
         sort_order: l.sort_order,
       }))
       onFormChange({ ...form, locales: rows })
@@ -148,6 +149,7 @@ export function ResortFacilityLocaleTranslations({
           locale_id: Number(data.locale_id),
           name: data.name.trim(),
           description: data.description?.trim() ?? "",
+          notes: data.notes?.trim() ?? "",
           sort_order: Number(data.sort_order) || 0,
         })
         setNewLocaleRows((prev) => prev.filter((r) => r._rkey !== key))
@@ -155,6 +157,7 @@ export function ResortFacilityLocaleTranslations({
         await resortFacilitiesService.updateLocale(resortId, facilityId, row.id!, {
           name: data.name.trim(),
           description: data.description?.trim() ?? "",
+          notes: data.notes?.trim() ?? "",
           sort_order: Number(data.sort_order) || 0,
         })
       }
@@ -197,7 +200,7 @@ export function ResortFacilityLocaleTranslations({
     const nextLocale = availableLocales.find((l) => !usedIds.has(l.id))
     const _rkey = `n_${rKeyCounter.current++}`
     const newRow: NewLocaleRow = {
-      _rkey, locale_id: nextLocale?.id ?? "", name: "", description: "",
+      _rkey, locale_id: nextLocale?.id ?? "", name: "", description: "", notes: "",
       sort_order: existingRows.length + newLocaleRows.length + 1, _new: true,
     }
     setNewLocaleRows((prev) => [...prev, newRow])
@@ -292,6 +295,12 @@ export function ResortFacilityLocaleTranslations({
               <Label className="text-xs text-muted-foreground">{t("common.description")}</Label>
               <Textarea value={form.locale.description}
                 onChange={(e) => onFormChange({ ...form, locale: { ...form.locale, description: e.target.value } })}
+                rows={2} className="text-sm resize-none" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">{t("common.notes")}</Label>
+              <Textarea value={form.locale.notes}
+                onChange={(e) => onFormChange({ ...form, locale: { ...form.locale, notes: e.target.value } })}
                 rows={2} className="text-sm resize-none" />
             </div>
           </div>
@@ -407,6 +416,12 @@ export function ResortFacilityLocaleTranslations({
                       <Label className="text-xs text-muted-foreground">{t("common.description")}</Label>
                       <Textarea value={editData.description}
                         onChange={(e) => patchRowEdit(key, { description: e.target.value })}
+                        disabled={!rowEditing} rows={2} className="text-sm resize-none" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">{t("common.notes")}</Label>
+                      <Textarea value={editData.notes}
+                        onChange={(e) => patchRowEdit(key, { notes: e.target.value })}
                         disabled={!rowEditing} rows={2} className="text-sm resize-none" />
                     </div>
                   </div>

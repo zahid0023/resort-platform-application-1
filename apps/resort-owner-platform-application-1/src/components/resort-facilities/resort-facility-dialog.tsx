@@ -17,7 +17,7 @@ import type { Locale } from "@/services/locales"
 import type { DayOfWeek } from "@/services/days-of-week"
 import { toast } from "sonner"
 import type { ResortFacilityDialogMode, ResortFacilityFormState, FacilityMode } from "./types"
-import { emptyForm, toApiIconPayload } from "./types"
+import { emptyForm, emptyOperatingHoursDraft, toApiIconPayload, toApiTime } from "./types"
 import { ResortFacilityGeneralInfo } from "./resort-facility-general-info"
 import { ResortFacilityLocaleTranslations } from "./resort-facility-locale-translations"
 import { ResortFacilityOperatingHours } from "./resort-facility-operating-hours"
@@ -285,6 +285,18 @@ export function ResortFacilityDialog({
 	function isLocaleValid(): boolean {
 		return form.locale.name.trim() !== ""
 	}
+	// The API requires operating_hours to cover every active day of week exactly once — a day is
+	// "covered" once it's explicitly Closed/Open 24 Hours, or Custom with at least one fully
+	// filled-in window (a day can have several, e.g. a pool open 6AM-1PM and again 4PM-11PM).
+	function isOperatingHoursValid(): boolean {
+		if (mode !== "create") return true
+		if (availableDaysOfWeek.length === 0) return false
+		return availableDaysOfWeek.every((day) => {
+			const draft = form.operating_hours_draft[day.id] ?? emptyOperatingHoursDraft
+			if (draft.is_closed || draft.is_twenty_four_hours) return true
+			return draft.windows.length > 0 && draft.windows.every((w) => !!w.opens_at && !!w.closes_at)
+		})
+	}
 
 	// Same checks, but report which field is missing — used by both the Next buttons and submit.
 	function validateGeneral(): boolean {
@@ -301,6 +313,10 @@ export function ResortFacilityDialog({
 		if (!form.locale.name.trim()) { toast.error(t("locale.errName", { n: 1 })); return false }
 		return true
 	}
+	function validateOperatingHours(): boolean {
+		if (!isOperatingHoursValid()) { toast.error(t("resortFacility.errOperatingHoursTimes")); return false }
+		return true
+	}
 
 	function handleNextFromGeneral() {
 		if (!validateGeneral()) return
@@ -310,6 +326,11 @@ export function ResortFacilityDialog({
 	function handleNextFromIcon() {
 		if (!validateIcon()) return
 		setActiveTab("locales")
+	}
+
+	function handleNextFromLocales() {
+		if (!validateLocale()) return
+		setActiveTab("operating-hours")
 	}
 
 	// Manual refresh only — switching tabs never re-fetches on its own otherwise. Pulls whichever the
@@ -349,6 +370,7 @@ export function ResortFacilityDialog({
 		if (!validateGeneral()) { setActiveTab("general"); return }
 		if (!validateIcon()) { setActiveTab("icon"); return }
 		if (!validateLocale()) { setActiveTab("locales"); return }
+		if (!validateOperatingHours()) { setActiveTab("operating-hours"); return }
 		setSubmitting(true)
 		try {
 			await resortFacilitiesService.create(resortId, {
@@ -361,8 +383,23 @@ export function ResortFacilityDialog({
 				locale: {
 					name: form.locale.name.trim(),
 					description: form.locale.description.trim(),
+					notes: form.locale.notes.trim(),
 					sort_order: Number(form.locale.sort_order) || 0,
 				},
+				operating_hours: availableDaysOfWeek.map((day) => {
+					const draft = form.operating_hours_draft[day.id] ?? emptyOperatingHoursDraft
+					const isCustom = !draft.is_closed && !draft.is_twenty_four_hours
+					return {
+						day_of_week_id: day.id,
+						is_closed: draft.is_closed,
+						is_twenty_four_hours: draft.is_twenty_four_hours,
+						windows: isCustom
+							? draft.windows
+								.filter((w) => w.opens_at && w.closes_at)
+								.map((w) => ({ opens_at: toApiTime(w.opens_at)!, closes_at: toApiTime(w.closes_at)! }))
+							: [],
+					}
+				}),
 			})
 			clearDraft(resortId)
 			toast.success(t("resortFacility.created"))
@@ -412,9 +449,9 @@ export function ResortFacilityDialog({
 									<TabsTrigger value="locales" disabled={mode === "create" && !(isGeneralValid() && isIconValid())} className="cursor-pointer disabled:cursor-not-allowed">
 										{t("locale.translations")}
 									</TabsTrigger>
-									{/* Operating hours require an existing facility_id in the URL path — never reachable
-									    during create, unlike the other tabs which merely gate on partial validity. */}
-									<TabsTrigger value="operating-hours" disabled={mode === "create"} className="cursor-pointer disabled:cursor-not-allowed">
+									{/* create only: the API requires the full weekly schedule up front, so this tab is the
+									    last wizard step, gated the same way as the others — on partial validity. */}
+									<TabsTrigger value="operating-hours" disabled={mode === "create" && !(isGeneralValid() && isIconValid() && isLocaleValid())} className="cursor-pointer disabled:cursor-not-allowed">
 										{t("resortFacility.operatingHoursSection")}
 									</TabsTrigger>
 								</TabsList>
@@ -559,7 +596,21 @@ export function ResortFacilityDialog({
 						)}
 
 						{mode === "create" && activeTab === "locales" && (
-							<DialogCreateFooter submitting={submitting} onCancel={requestClose} disabled={!isLocaleValid()} indicator={draftIndicator} />
+							<div className={`shrink-0 px-6 py-4 border-t bg-muted/40 flex items-center gap-2 ${draftIndicator ? "justify-between" : "justify-end"}`}>
+								{draftIndicator}
+								<div className="flex items-center gap-2">
+									<Button type="button" variant="outline" size="sm" onClick={requestClose} className="gap-1.5">
+										<X className="h-3.5 w-3.5" /> {t("common.cancel")}
+									</Button>
+									<Button type="button" size="sm" onClick={handleNextFromLocales} disabled={!isLocaleValid()} className="gap-1.5">
+										{t("common.next")} <ArrowRight className="h-3.5 w-3.5" />
+									</Button>
+								</div>
+							</div>
+						)}
+
+						{mode === "create" && activeTab === "operating-hours" && (
+							<DialogCreateFooter submitting={submitting} onCancel={requestClose} disabled={!isOperatingHoursValid()} indicator={draftIndicator} />
 						)}
 
 					</form>

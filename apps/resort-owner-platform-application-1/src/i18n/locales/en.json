@@ -315,10 +315,13 @@
     "operatingHoursOpen24": "Open 24 hours",
     "operatingHoursClosed": "Closed all day",
     "operatingHoursOvernightHint": "Closes after midnight — this window rolls into the next day.",
-    "operatingHoursRemovedToast": "Operating hours removed.",
-    "errOperatingHoursTimes": "Opening and closing times are required for custom hours.",
-    "deleteOperatingHoursTitle": "Remove these operating hours?",
-    "deleteOperatingHoursDesc": "This day's operating hours will be permanently removed."
+    "addWindow": "Add another window",
+    "sameHoursEveryDay": "Use the same hours for every day",
+    "applyToAllDays": "Apply to all days",
+    "applyToAllDaysTitle": "Apply these hours to every day?",
+    "applyToAllDaysDesc": "This replaces every other day's operating hours with the ones set here.",
+    "operatingHoursAppliedToAll": "Operating hours applied to every day.",
+    "errOperatingHoursTimes": "Opening and closing times are required for custom hours."
   },
   "basicInfo": {
     "pageTitle": "Basic Information",
@@ -618,6 +621,7 @@
     "search": "Search",
     "change": "Change",
     "description": "Description",
+    "notes": "Notes",
     "refresh": "Refresh",
     "refreshed": "Refreshed"
   },

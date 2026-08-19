@@ -9,6 +9,7 @@ export interface ResortFacilityLocale {
   locale: Locale
   name: string
   description?: string
+  notes?: string
   sort_order: number
 }
 
@@ -49,6 +50,7 @@ export interface ResortFacilityLocaleListResponse {
 export interface CreateResortFacilityLocaleInput {
   name: string
   description?: string
+  notes?: string
   sort_order: number
 }
 
@@ -71,25 +73,48 @@ export interface ResortFacilityOperatingHoursListResponse {
   has_previous: boolean
 }
 
-export interface CreateOperatingHoursRequest {
-  day_of_week_id: number
-  opens_at?: string | null
-  closes_at?: string | null
-  is_closed: boolean
-  is_twenty_four_hours: boolean
-}
-
-export interface UpdateOperatingHoursRequest {
-  day_of_week_id: number
-  opens_at?: string | null
-  closes_at?: string | null
-  is_closed: boolean
-  is_twenty_four_hours: boolean
-}
-
 export interface ListOperatingHoursParams {
   page?: number
   size?: number
+}
+
+// There is no per-row create/update/delete for operating hours — the schedule is always read and
+// written as a complete week. `PUT .../operating-hours/schedule` atomically replaces every active
+// day of week's rows in one call; editing a single day still means resubmitting all seven.
+export interface SetOperatingHoursScheduleWindow {
+  opens_at: string
+  closes_at: string
+}
+
+export interface SetOperatingHoursScheduleDayRequest {
+  day_of_week_id: number
+  is_closed: boolean
+  is_twenty_four_hours: boolean
+  /** Empty when `is_closed`/`is_twenty_four_hours` is true; at least one entry otherwise. */
+  windows: SetOperatingHoursScheduleWindow[]
+}
+
+export interface SetOperatingHoursScheduleRequest {
+  /** Exactly one entry per active day of week — no duplicates, no unknown ids, none missing. */
+  days: SetOperatingHoursScheduleDayRequest[]
+}
+
+export interface SetOperatingHoursScheduleResponse {
+  /** Every row created by the replace, across all seven days — not paginated. */
+  data: ResortFacilityOperatingHours[]
+}
+
+export interface CreateResortFacilityOperatingHoursWindow {
+  opens_at: string
+  closes_at: string
+}
+
+export interface CreateResortFacilityOperatingHoursEntry {
+  day_of_week_id: number
+  is_closed: boolean
+  is_twenty_four_hours: boolean
+  /** Empty when `is_closed`/`is_twenty_four_hours` is true; at least one entry otherwise. */
+  windows: CreateResortFacilityOperatingHoursWindow[]
 }
 
 export interface CreateResortFacilityRequest {
@@ -103,6 +128,8 @@ export interface CreateResortFacilityRequest {
   icon_meta?: Record<string, unknown> | null
   /** Always resolved to the `en` locale server-side — no `locale_id` field. */
   locale: CreateResortFacilityLocaleInput
+  /** Required — must cover every active day of week exactly once. */
+  operating_hours: CreateResortFacilityOperatingHoursEntry[]
 }
 
 export interface UpdateResortFacilityRequest {
@@ -116,12 +143,14 @@ export interface CreateResortFacilityLocaleRequest {
   locale_id: number
   name: string
   description?: string
+  notes?: string
   sort_order: number
 }
 
 export interface UpdateResortFacilityLocaleRequest {
   name: string
   description?: string
+  notes?: string
   sort_order: number
 }
 
@@ -211,15 +240,7 @@ export const resortFacilitiesService = {
     return api.get<ResortFacilityOperatingHoursListResponse>(`${base(resortId)}/${facilityId}/operating-hours?${q}`)
   },
 
-  createOperatingHours(resortId: number, facilityId: number, body: CreateOperatingHoursRequest): Promise<MutationResponse> {
-    return api.post<MutationResponse>(`${base(resortId)}/${facilityId}/operating-hours`, body)
-  },
-
-  updateOperatingHours(resortId: number, facilityId: number, id: number, body: UpdateOperatingHoursRequest): Promise<MutationResponse> {
-    return api.put<MutationResponse>(`${base(resortId)}/${facilityId}/operating-hours/${id}`, body)
-  },
-
-  removeOperatingHours(resortId: number, facilityId: number, id: number): Promise<MutationResponse> {
-    return api.delete<MutationResponse>(`${base(resortId)}/${facilityId}/operating-hours/${id}`)
+  setOperatingHoursSchedule(resortId: number, facilityId: number, body: SetOperatingHoursScheduleRequest): Promise<SetOperatingHoursScheduleResponse> {
+    return api.put<SetOperatingHoursScheduleResponse>(`${base(resortId)}/${facilityId}/operating-hours/schedule`, body)
   },
 }
