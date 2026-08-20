@@ -445,6 +445,8 @@ export default function ResortFacilitiesPage() {
         onFormChange={setGroupForm}
         availableLocales={availableLocales}
         totalLocaleCount={totalLocaleCount}
+        availableDaysOfWeek={availableDaysOfWeek}
+        onOperatingHoursTabOpen={loadDaysOfWeek}
         onSaved={() => loadGroupPage(groupPage)}
       />
 

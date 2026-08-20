@@ -79,6 +79,11 @@ export interface ResortFacilityDialogProps {
 	onLocalesTabOpen?: () => void
 	/** Same as `onLocalesTabOpen`, but for the Operating Hours tab's day-of-week catalog. */
 	onOperatingHoursTabOpen?: () => void
+	/** Create mode only — when set, seeds the "selected platform facility" display state the moment
+	 * the dialog opens, so a facility already picked in an external list (e.g. the group-creation
+	 * add-facilities step) shows as selected instead of the empty picker prompt. The caller is still
+	 * responsible for pre-filling `form` itself (code/icon/locale/facility_id). */
+	initialSelectedPlatFacility?: PlatformFacilitySummary | null
 }
 
 export function ResortFacilityDialog({
@@ -98,6 +103,7 @@ export function ResortFacilityDialog({
 	platformFacilityGroupId,
 	onLocalesTabOpen,
 	onOperatingHoursTabOpen,
+	initialSelectedPlatFacility,
 }: ResortFacilityDialogProps) {
 	const { t } = useTranslation()
 	const [submitting, setSubmitting] = useState(false)
@@ -122,6 +128,14 @@ export function ResortFacilityDialog({
 
 	// Same idea, for the Operating Hours tab.
 	const [operatingHoursRefreshSignal, setOperatingHoursRefreshSignal] = useState(0)
+
+	// View/edit mode only — the Operating Hours tab reports how many days currently have an open
+	// (unsaved) draft, and whether its own save request is in flight, so this dialog's sticky
+	// header can show a Save button that stays reachable no matter how far the day list is
+	// scrolled. Bumping operatingHoursSaveSignal is how the header button tells that tab to save.
+	const [operatingHoursPendingDays, setOperatingHoursPendingDays] = useState(0)
+	const [operatingHoursSaving, setOperatingHoursSaving] = useState(false)
+	const [operatingHoursSaveSignal, setOperatingHoursSaveSignal] = useState(0)
 
 	// Owned here (not inside the Locales tab content) so it survives that tab unmounting on switch.
 	const [localeSearch, setLocaleSearch] = useState("")
@@ -157,6 +171,9 @@ export function ResortFacilityDialog({
 			setActiveTab("general")
 			setLocalesRefreshSignal(0)
 			setOperatingHoursRefreshSignal(0)
+			setOperatingHoursPendingDays(0)
+			setOperatingHoursSaving(false)
+			setOperatingHoursSaveSignal(0)
 			setLocaleSearch("")
 			setLocalesCatalogRequested(false)
 			setOperatingHoursCatalogRequested(false)
@@ -186,6 +203,16 @@ export function ResortFacilityDialog({
 	useEffect(() => {
 		if (open && mode === "create") setDraftPrompt(readDraft(resortId))
 	}, [open, mode, resortId])
+
+	// Seeds the "selected platform facility" display state from a facility the caller already
+	// picked externally (e.g. the group-creation add-facilities step) — `form` itself is expected
+	// to already be pre-filled by the caller before opening.
+	useEffect(() => {
+		if (open && mode === "create" && initialSelectedPlatFacility) {
+			setSelectedPlatFacility(initialSelectedPlatFacility)
+			setFacilityMode("platform")
+		}
+	}, [open, mode, initialSelectedPlatFacility])
 
 	// Debounced local autosave of the create form — skipped while the restore prompt is pending.
 	useEffect(() => {
@@ -420,6 +447,25 @@ export function ResortFacilityDialog({
 		? t("resortFacility.dialogDescCreate")
 		: (isEditing ? t("resortFacility.dialogDescEdit") : t("resortFacility.dialogDescView"))
 
+	// The Operating Hours tab's own Save action, surfaced in the sticky header instead of inline
+	// in that tab's scrollable content — after "Apply to all days" pre-fills every day for review,
+	// the day list can run well past one screen, so the action that actually commits everything
+	// needs to stay reachable without scrolling back down to find it.
+	const headerActions = mode !== "create" && activeTab === "operating-hours" && operatingHoursPendingDays > 0 ? (
+		<Button
+			type="button"
+			size="sm"
+			className="gap-1.5"
+			onClick={() => setOperatingHoursSaveSignal((n) => n + 1)}
+			disabled={operatingHoursSaving}
+		>
+			<Check className="h-3.5 w-3.5" />
+			{operatingHoursSaving
+				? t("common.saving")
+				: t("resortFacility.saveOperatingHoursBtn", { count: operatingHoursPendingDays })}
+		</Button>
+	) : undefined
+
 	return (
 		<>
 			<Sheet open={open} onOpenChange={(v) => { if (!v) requestClose() }}>
@@ -431,7 +477,7 @@ export function ResortFacilityDialog({
 				>
 					<form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
 
-						<DialogEntityHeader icon={<Layers className="h-4 w-4" />} title={headerTitle} description={headerDesc} />
+						<DialogEntityHeader icon={<Layers className="h-4 w-4" />} title={headerTitle} description={headerDesc} actions={headerActions} />
 
 						<Tabs
 							value={activeTab}
@@ -563,6 +609,9 @@ export function ResortFacilityDialog({
 									onEditingChange={setOperatingHoursEditing}
 									open={open}
 									refreshSignal={operatingHoursRefreshSignal}
+									onPendingDaysChange={setOperatingHoursPendingDays}
+									onSavingChange={setOperatingHoursSaving}
+									saveSignal={operatingHoursSaveSignal}
 								/>
 							</TabsContent>
 						</Tabs>

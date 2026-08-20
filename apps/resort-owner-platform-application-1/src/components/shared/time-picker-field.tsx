@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
+import { useTranslation } from "react-i18next"
 import { Clock, Plus } from "lucide-react"
 import { Button, cn } from "@resort/shadcn-ui"
 
@@ -38,10 +39,30 @@ function buildValue(d: Required<Draft>): string {
   return `${String(h24).padStart(2, "0")}:${d.minute}`
 }
 
-function formatLabel(v: string): string {
-  const parsed = parseValue(v)
-  if (!parsed) return ""
-  return `${parsed.hour12}:${parsed.minute} ${parsed.period}`
+// The active i18next language ("en"/"bn") — Intl resolves that BCP-47 tag into the actual
+// locale's digits/day-period text on its own, no per-locale format tables needed here.
+function useLocale(): string {
+  const { i18n } = useTranslation()
+  return i18n.resolvedLanguage ?? i18n.language ?? "en"
+}
+
+// Locale-aware digit rendering (e.g. Bengali numerals under "bn") for the two kinds of numbers
+// the dial shows: a bare hour (1-12) and a zero-padded minute (00-59). These only ever format for
+// *display* — every stored/compared value (hour12, minute, the "HH:mm" wire value) stays the
+// plain-ASCII digit strings built by parseValue/buildValue above.
+function useDigitFormatters(locale: string) {
+  const hour = useMemo(() => new Intl.NumberFormat(locale), [locale])
+  const minute = useMemo(() => new Intl.NumberFormat(locale, { minimumIntegerDigits: 2 }), [locale])
+  return { hour, minute }
+}
+
+// The AM/PM toggle's own labels — translated explicitly (field.periodAM/periodPM) rather than
+// pulled from Intl's CLDR day-period names, since the formal ICU terms (e.g. bn's
+// পূর্বাহ্ণ/অপরাহ্ণ) aren't the wording actually wanted per locale (bn uses the colloquial
+// দিন/রাত "day"/"night" pair instead).
+function usePeriodLabels(): Record<Period, string> {
+  const { t } = useTranslation()
+  return { AM: t("field.periodAM"), PM: t("field.periodPM") }
 }
 
 export interface TimePickerFieldProps {
@@ -78,6 +99,9 @@ function ClockFace({ hour12, minute, activeHand, onPickHour, onPickMinute, onAct
   onActivateHand: (h: Hand) => void
   center: React.ReactNode
 }) {
+  const { t } = useTranslation()
+  const locale = useLocale()
+  const digits = useDigitFormatters(locale)
   const hourIndex = hour12 != null ? HOURS.indexOf(hour12) : -1
   // A raw 0-59 value, not the 12-mark ring index — the +1-minute dial can land the hand between
   // marks, so the hand's angle can't depend on being exactly on one of the 12 ring positions.
@@ -159,7 +183,7 @@ function ClockFace({ hour12, minute, activeHand, onPickHour, onPickMinute, onAct
         {minuteValue >= 0 && (
           <button
             type="button"
-            aria-label="Set minute"
+            aria-label={t("field.setMinute")}
             onClick={() => onActivateHand("minute")}
             className={cn(
               "absolute left-1/2 top-1/2 bg-linear-to-t cursor-pointer transition-transform ease-out",
@@ -182,7 +206,7 @@ function ClockFace({ hour12, minute, activeHand, onPickHour, onPickMinute, onAct
         {hourIndex >= 0 && (
           <button
             type="button"
-            aria-label="Set hour"
+            aria-label={t("field.setHour")}
             onClick={() => onActivateHand("hour")}
             className={cn(
               "absolute left-1/2 top-1/2 bg-linear-to-t cursor-pointer transition-transform ease-out",
@@ -208,16 +232,20 @@ function ClockFace({ hour12, minute, activeHand, onPickHour, onPickMinute, onAct
           {center}
         </div>
 
-        {/* The single ring — relabeled per activeHand, clicks feed whichever hand is active. */}
+        {/* The single ring — relabeled per activeHand, clicks feed whichever hand is active.
+            `key`/`onClick` always use the plain-ASCII identity label (so selection comparisons
+            and the stored value stay locale-independent); only the rendered text goes through
+            the locale's own digit formatter. */}
         {ringItems.map((item, i) => {
           const { x, y } = polar(i / 12, RING_RADIUS)
-          const label = activeHand === "hour" ? String(item) : String(item).padStart(2, "0")
-          const isSelected = activeHand === "hour" ? item === hour12 : label === minute
+          const key = activeHand === "hour" ? String(item) : String(item).padStart(2, "0")
+          const displayLabel = activeHand === "hour" ? digits.hour.format(item) : digits.minute.format(item)
+          const isSelected = activeHand === "hour" ? item === hour12 : key === minute
           return (
             <button
               key={item}
               type="button"
-              onClick={() => (activeHand === "hour" ? onPickHour(item) : onPickMinute(label))}
+              onClick={() => (activeHand === "hour" ? onPickHour(item) : onPickMinute(key))}
               style={{ left: x, top: y }}
               className={cn(
                 "absolute -translate-x-1/2 -translate-y-1/2 h-12 w-12 rounded-full text-lg font-bold cursor-pointer transition-all flex items-center justify-center hover:scale-110 z-10",
@@ -226,7 +254,7 @@ function ClockFace({ hour12, minute, activeHand, onPickHour, onPickMinute, onAct
                   : "bg-linear-to-br from-card to-muted border border-border/60 shadow-sm hover:border-primary/50 hover:shadow-md hover:from-primary/10",
               )}
             >
-              {label}
+              {displayLabel}
             </button>
           )
         })}
@@ -240,6 +268,19 @@ function ClockFace({ hour12, minute, activeHand, onPickHour, onPickMinute, onAct
 // Tap the hour or minute digit in the readout to choose which hand the ring currently controls —
 // the other hand stays exactly where it was, still visible.
 export function TimePickerField({ value, onChange, disabled, placeholder, className }: TimePickerFieldProps) {
+  const { t } = useTranslation()
+  const locale = useLocale()
+  const digits = useDigitFormatters(locale)
+  const periodLabels = usePeriodLabels()
+  // The closed field's own display (the "Opens at"/"Closes at" value) always reads literal
+  // AM/PM regardless of locale — only the clock popup's interactive toggle/readout uses the
+  // translated দিন/রাত-style labels, via periodLabels below.
+  function formatDisplay(v: string): string {
+    const parsed = parseValue(v)
+    if (!parsed) return ""
+    return `${digits.hour.format(parsed.hour12)}:${digits.minute.format(Number(parsed.minute))} ${parsed.period}`
+  }
+
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Draft>({})
   const [activeHand, setActiveHand] = useState<Hand>("hour")
@@ -323,7 +364,7 @@ export function TimePickerField({ value, onChange, disabled, placeholder, classN
             : "bg-muted/60 text-foreground border-border/60 hover:border-primary/50 hover:bg-primary/10",
         )}
       >
-        {draft.hour12 ?? "--"}
+        {draft.hour12 != null ? digits.hour.format(draft.hour12) : "--"}
       </button>
       <span className="leading-none">:</span>
       <button
@@ -336,7 +377,7 @@ export function TimePickerField({ value, onChange, disabled, placeholder, classN
             : "bg-muted/60 text-foreground border-border/60 hover:border-primary/50 hover:bg-primary/10",
         )}
       >
-        {draft.minute ?? "--"}
+        {draft.minute != null ? digits.minute.format(Number(draft.minute)) : "--"}
       </button>
       {/* AM/PM as an always-visible two-way toggle (not a hidden dropdown) — both options are on
           screen at once with the active one highlighted, so it's obvious at a glance both what
@@ -352,7 +393,7 @@ export function TimePickerField({ value, onChange, disabled, placeholder, classN
               : "bg-muted/60 text-muted-foreground border-border/60 hover:border-primary/50 hover:bg-primary/10 hover:text-primary",
           )}
         >
-          AM
+          {periodLabels.AM}
         </button>
         <button
           type="button"
@@ -364,7 +405,7 @@ export function TimePickerField({ value, onChange, disabled, placeholder, classN
               : "bg-muted/60 text-muted-foreground border-border/60 hover:border-primary/50 hover:bg-primary/10 hover:text-primary",
           )}
         >
-          PM
+          {periodLabels.PM}
         </button>
       </div>
     </div>
@@ -384,8 +425,18 @@ export function TimePickerField({ value, onChange, disabled, placeholder, classN
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
-        aria-label={placeholder ?? "Select time"}
+        aria-label={placeholder ?? t("field.selectTime")}
       >
+          {/* Which field this clock is setting (e.g. "Opens at" vs "Closes at") — the popup covers
+              the whole panel once open, so without this the owner has no visual anchor back to
+              which of possibly several time fields on screen they're currently editing. */}
+          {placeholder && (
+            <div className="mb-4 flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-4 py-1.5 text-lg font-bold text-primary shadow-sm">
+              <Clock className="h-5 w-5" />
+              {placeholder}
+            </div>
+          )}
+
           {/* Fine minute adjuster, sitting on top of the case — a crown wouldn't make sense here
               (it belongs on the side, where you'd actually turn it), so on top this reads as a
               hand-bell instead: hanging loop, tapering dome body, flared rim, fused to the case
@@ -395,8 +446,8 @@ export function TimePickerField({ value, onChange, disabled, placeholder, classN
             <button
               type="button"
               onClick={incrementMinute}
-              aria-label="Increase minute by 1"
-              title="+1 minute"
+              aria-label={t("field.increaseMinute")}
+              title={t("field.increaseMinute")}
               className="relative z-10 flex shrink-0 flex-col items-center cursor-pointer transition-transform duration-150 hover:scale-110 active:scale-90"
             >
               {/* Hanging loop atop the bell. */}
@@ -458,7 +509,7 @@ export function TimePickerField({ value, onChange, disabled, placeholder, classN
         )}>
           <Clock className="h-3.5 w-3.5" />
         </span>
-        {value ? formatLabel(value) : (placeholder ?? "Select time")}
+        <span className="truncate">{value ? formatDisplay(value) : (placeholder ?? t("field.selectTime"))}</span>
       </Button>
       {open && panel && createPortal(overlay, panel)}
     </>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useTranslation } from "react-i18next"
-import { Check, Clock, Copy, Pencil, Plus, Trash2, X } from "lucide-react"
+import { Clock, Copy, Pencil, Plus, Trash2, X } from "lucide-react"
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -74,11 +74,21 @@ export interface ResortFacilityOperatingHoursProps {
   open: boolean
   /** Bumped by the parent dialog's manual Refresh button — any change re-fetches the full set. */
   refreshSignal?: number
+  /** How many days currently have an open (unsaved) draft — lets the parent dialog decide whether
+   * to show its own sticky-header Save button, and what count to put on it. */
+  onPendingDaysChange?: (count: number) => void
+  /** Whether the (single, whole-week) save request is currently in flight — lets the parent
+   * dialog's header Save button show a busy state too. */
+  onSavingChange?: (v: boolean) => void
+  /** Bumped by the parent dialog's sticky-header Save button — triggers saving every day
+   * currently open for edit, same as this component's own saveAllDays. */
+  saveSignal?: number
 }
 
 export function ResortFacilityOperatingHours({
   resortId, mode, form, onFormChange, facilityId, availableDaysOfWeek,
   onSaved, onEditingChange, open, refreshSignal,
+  onPendingDaysChange, onSavingChange, saveSignal,
 }: ResortFacilityOperatingHoursProps) {
   const { t } = useTranslation()
   const [rowsLoaded, setRowsLoaded] = useState(false)
@@ -87,7 +97,9 @@ export function ResortFacilityOperatingHours({
   // day it belongs to rather than by a synthetic row key. Holds every window for that day at once
   // (a day may have several, e.g. a pool open 6AM-1PM and again 4PM-11PM).
   const [rowEditData, setRowEditData] = useState<Record<number, OperatingHoursDraft>>({})
-  const [busyDayIds, setBusyDayIds] = useState<Set<number>>(new Set())
+  // A single save commits every day currently open for edit (however many that is) in one
+  // request — there's no per-day busy state anymore, just one in-flight flag for that request.
+  const [savingAll, setSavingAll] = useState(false)
   const [pendingApplyAllDayId, setPendingApplyAllDayId] = useState<number | null>(null)
   // Create-mode only — most facilities keep the same hours every day, so this starts checked and
   // drives a single shared editor instead of making the owner repeat themselves for all 7 days.
@@ -97,15 +109,18 @@ export function ResortFacilityOperatingHours({
     if (!open) {
       setRowsLoaded(false)
       setRowEditData({})
-      setBusyDayIds(new Set())
+      setSavingAll(false)
       setSameForAllDays(true)
     }
   }, [open])
 
   // A day is "being edited" whenever it has an open draft — no section-wide edit toggle, this is
-  // what drives isDirty upstream.
+  // what drives isDirty upstream, and also what the parent dialog's sticky-header Save button
+  // shows/counts against.
   useEffect(() => {
-    onEditingChange(Object.keys(rowEditData).length > 0)
+    const count = Object.keys(rowEditData).length
+    onEditingChange(count > 0)
+    onPendingDaysChange?.(count)
   }, [rowEditData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Lazy-load the full set once, the first time it's needed.
@@ -120,6 +135,17 @@ export function ResortFacilityOperatingHours({
     if (!refreshSignal || !rowsLoaded) return
     fetchRows()
   }, [refreshSignal]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Manual save, triggered by the parent dialog's sticky-header Save button.
+  useEffect(() => {
+    if (!saveSignal) return
+    saveAllDays()
+  }, [saveSignal]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Mirrors the in-flight save state out to the parent dialog's own header Save button.
+  useEffect(() => {
+    onSavingChange?.(savingAll)
+  }, [savingAll]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function mapRows(data: { id: number; day_of_week: DayOfWeek; opens_at: string | null; closes_at: string | null; is_closed: boolean; is_twenty_four_hours: boolean }[]): OperatingHoursRow[] {
     return data.map((r) => ({
@@ -155,7 +181,6 @@ export function ResortFacilityOperatingHours({
   }
 
   function isDayEditing(dayId: number) { return dayId in rowEditData }
-  function isDayBusy(dayId: number) { return busyDayIds.has(dayId) }
 
   function startEdit(dayId: number) {
     setRowEditData((prev) => ({ ...prev, [dayId]: draftFromRows(rowsForDay(dayId)) }))
@@ -185,15 +210,10 @@ export function ResortFacilityOperatingHours({
   function patchWindow(dayId: number, index: number, patch: Partial<OperatingHoursWindowDraft>) {
     patchEdit(dayId, (prev) => ({ windows: prev.windows.map((w, i) => (i === index ? { ...w, ...patch } : w)) }))
   }
-  function setBusy(dayId: number, busy: boolean) {
-    setBusyDayIds((prev) => { const n = new Set(prev); busy ? n.add(dayId) : n.delete(dayId); return n })
-  }
-
   // There's no per-day write endpoint — the schedule is always replaced as a complete week. This
   // builds that full `days[]` payload: the day(s) actually being changed use the given override
   // draft(s), every other day is resubmitted unchanged from whatever `form.operating_hours`
-  // already holds. Callers never see this — from the owner's side, editing one day just saves
-  // that one day; the full-week resend is an implementation detail of the API, not the UI.
+  // already holds.
   function buildScheduleDays(overrides: Record<number, OperatingHoursDraft>): SetOperatingHoursScheduleDayRequest[] {
     return availableDaysOfWeek.map((day) => {
       const draft = overrides[day.id] ?? draftFromRows(rowsForDay(day.id))
@@ -201,27 +221,29 @@ export function ResortFacilityOperatingHours({
     })
   }
 
-  async function saveDay(dayId: number) {
+  // A single Save commits every day currently open for edit — however many that is, from one
+  // manually-edited day up to all seven after "Apply to all days" — in one request.
+  async function saveAllDays() {
     if (facilityId == null) return
-    const draft = rowEditData[dayId]
-    if (!draft) return
-    if (!isDraftValid(draft)) {
+    const editedDayIds = Object.keys(rowEditData).map(Number)
+    if (editedDayIds.length === 0) return
+    if (editedDayIds.some((id) => !isDraftValid(rowEditData[id]))) {
       toast.error(t("resortFacility.errOperatingHoursTimes"))
       return
     }
-    setBusy(dayId, true)
+    setSavingAll(true)
     try {
       const res = await resortFacilitiesService.setOperatingHoursSchedule(resortId, facilityId, {
-        days: buildScheduleDays({ [dayId]: draft }),
+        days: buildScheduleDays(rowEditData),
       })
       onFormChange({ ...form, operating_hours: mapRows(res.data) })
-      cancelEdit(dayId)
+      setRowEditData({})
       toast.success(t("common.saved"))
       await onSaved?.()
     } catch (err) {
       toast.error((err as Error).message)
     } finally {
-      setBusy(dayId, false)
+      setSavingAll(false)
     }
   }
 
@@ -234,29 +256,26 @@ export function ResortFacilityOperatingHours({
     setPendingApplyAllDayId(dayId)
   }
 
-  // Copies the day currently being edited to every other day, in the same single schedule write.
-  async function applyToAllDays() {
-    if (facilityId == null || pendingApplyAllDayId == null) return
+  // Copies the day currently being edited into every other day's own local draft, opening each
+  // of them into edit mode too — nothing is sent to the API here. Each day still only gets saved
+  // (and only then calls setOperatingHoursSchedule) when the owner explicitly clicks that day's
+  // own Save button, so "apply to all" is just a fast way to pre-fill every day for review, not
+  // an immediate bulk write.
+  function applyToAllDays() {
+    if (pendingApplyAllDayId == null) return
     const dayId = pendingApplyAllDayId
     const draft = rowEditData[dayId]
     setPendingApplyAllDayId(null)
     if (!draft) return
-    const overrides: Record<number, OperatingHoursDraft> = {}
-    for (const day of availableDaysOfWeek) overrides[day.id] = draft
-    setBusyDayIds(new Set(availableDaysOfWeek.map((d) => d.id)))
-    try {
-      const res = await resortFacilitiesService.setOperatingHoursSchedule(resortId, facilityId, {
-        days: buildScheduleDays(overrides),
-      })
-      onFormChange({ ...form, operating_hours: mapRows(res.data) })
-      cancelEdit(dayId)
-      toast.success(t("resortFacility.operatingHoursAppliedToAll"))
-      await onSaved?.()
-    } catch (err) {
-      toast.error((err as Error).message)
-    } finally {
-      setBusyDayIds(new Set())
-    }
+    setRowEditData((prev) => {
+      const next = { ...prev }
+      for (const day of availableDaysOfWeek) {
+        if (day.id === dayId) continue
+        next[day.id] = { ...draft, windows: draft.windows.map((w) => ({ ...w })) }
+      }
+      return next
+    })
+    toast.success(t("resortFacility.operatingHoursAppliedToAll"))
   }
 
   // Create-mode drafts — the API requires the whole weekly schedule up front, so every day is
@@ -381,12 +400,12 @@ export function ResortFacilityOperatingHours({
                               <div className="grid grid-cols-2 gap-3 flex-1">
                                 <div className="space-y-1.5">
                                   <Label className="text-xs text-muted-foreground">{t("field.opensAt")} *</Label>
-                                  <TimePickerField value={w.opens_at}
+                                  <TimePickerField value={w.opens_at} placeholder={t("field.dayFieldLabel", { day: dayLabel(day), field: t("field.opensAt") })}
                                     onChange={(v) => onPatchWindow(i, { opens_at: v })} />
                                 </div>
                                 <div className="space-y-1.5">
                                   <Label className="text-xs text-muted-foreground">{t("field.closesAt")} *</Label>
-                                  <TimePickerField value={w.closes_at}
+                                  <TimePickerField value={w.closes_at} placeholder={t("field.dayFieldLabel", { day: dayLabel(day), field: t("field.closesAt") })}
                                     onChange={(v) => onPatchWindow(i, { closes_at: v })} />
                                 </div>
                               </div>
@@ -423,7 +442,6 @@ export function ResortFacilityOperatingHours({
             {sortedDays.map((day) => {
               const rows = rowsForDay(day.id)
               const rowEditing = isDayEditing(day.id)
-              const busy = isDayBusy(day.id)
               const configured = rows.length > 0
               const draft = rowEditData[day.id] ?? draftFromRows(rows)
               const state = deriveState(draft)
@@ -444,7 +462,7 @@ export function ResortFacilityOperatingHours({
                     <div className="flex items-center gap-1">
                       {!rowEditing && (
                         <Button type="button" size="icon" variant="ghost" className="h-7 w-7"
-                          onClick={() => startEdit(day.id)} disabled={busy}>
+                          onClick={() => startEdit(day.id)} disabled={savingAll}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
                       )}
@@ -452,18 +470,13 @@ export function ResortFacilityOperatingHours({
                         <>
                           <Button type="button" size="sm" variant="outline"
                             className="h-7 text-xs px-2.5 gap-1.5"
-                            onClick={() => requestApplyToAllDays(day.id)} disabled={busy}>
+                            onClick={() => requestApplyToAllDays(day.id)} disabled={savingAll}>
                             <Copy className="h-3.5 w-3.5" /> {t("resortFacility.applyToAllDays")}
                           </Button>
                           <Button type="button" size="icon" variant="ghost"
                             className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                            onClick={() => cancelEdit(day.id)} disabled={busy}>
+                            onClick={() => cancelEdit(day.id)} disabled={savingAll}>
                             <X className="h-3.5 w-3.5" />
-                          </Button>
-                          <Button type="button" size="icon" variant="ghost"
-                            className="h-7 w-7 text-primary"
-                            onClick={() => saveDay(day.id)} disabled={busy}>
-                            <Check className="h-3.5 w-3.5" />
                           </Button>
                         </>
                       )}
@@ -498,13 +511,13 @@ export function ResortFacilityOperatingHours({
                                   <div className="grid grid-cols-2 gap-3 flex-1">
                                     <div className="space-y-1.5">
                                       <Label className="text-xs text-muted-foreground">{t("field.opensAt")} *</Label>
-                                      <TimePickerField value={w.opens_at}
+                                      <TimePickerField value={w.opens_at} placeholder={t("field.dayFieldLabel", { day: dayLabel(day), field: t("field.opensAt") })}
                                         onChange={(v) => patchWindow(day.id, i, { opens_at: v })}
                                         disabled={!rowEditing} />
                                     </div>
                                     <div className="space-y-1.5">
                                       <Label className="text-xs text-muted-foreground">{t("field.closesAt")} *</Label>
-                                      <TimePickerField value={w.closes_at}
+                                      <TimePickerField value={w.closes_at} placeholder={t("field.dayFieldLabel", { day: dayLabel(day), field: t("field.closesAt") })}
                                         onChange={(v) => patchWindow(day.id, i, { closes_at: v })}
                                         disabled={!rowEditing} />
                                     </div>
@@ -539,6 +552,15 @@ export function ResortFacilityOperatingHours({
           </div>
         )}
       </Card>
+
+      {/* The actual Save action lives in the parent dialog's sticky header (always reachable
+          without scrolling, see saveSignal/onPendingDaysChange above) — this is just a status
+          line confirming what it'll commit. */}
+      {mode !== "create" && Object.keys(rowEditData).length > 0 && (
+        <p className="text-xs text-muted-foreground">
+          {t("resortFacility.pendingDaysCount", { count: Object.keys(rowEditData).length })}
+        </p>
+      )}
 
       <AlertDialog open={pendingApplyAllDayId != null} onOpenChange={(o) => !o && setPendingApplyAllDayId(null)}>
         <AlertDialogContent>

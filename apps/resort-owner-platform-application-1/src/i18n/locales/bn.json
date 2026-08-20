@@ -212,15 +212,12 @@
     "namePlaceholder": "যেমন: ডাইনিং ও পানীয়",
     "description": "বিবরণ",
     "addFacilitiesStep": "ফ্যাসিলিটি যোগ করুন",
-    "addFacilitiesDesc": "আপনার নতুন গ্রুপে যোগ করতে প্ল্যাটফর্ম ফ্যাসিলিটি নির্বাচন করুন।",
-    "addFacilitiesBtn": "{{count}}টি ফ্যাসিলিটি তৈরি করুন",
+    "addFacilitiesDesc": "আপনার নতুন গ্রুপের জন্য তৈরি করতে নিচে থেকে একটি প্ল্যাটফর্ম ফ্যাসিলিটি নির্বাচন করুন।",
     "addFacilitiesSkip": "এখনই না",
+    "addFacilitiesDone": "সম্পন্ন",
     "facilitiesAdded": "{{count}}টি ফ্যাসিলিটি যোগ হয়েছে।",
+    "facilityAdded": "যোগ হয়েছে",
     "noFacilitiesInGroup": "এই প্ল্যাটফর্ম গ্রুপে কোনো ফ্যাসিলিটি পাওয়া যায়নি।",
-    "facilitiesSelected": "নির্বাচিত",
-    "selectAll": "সব নির্বাচন করুন",
-    "deselectAll": "সব বাতিল করুন",
-    "creatingFacilities": "তৈরি হচ্ছে…",
     "stepGroup": "গ্রুপ তৈরি করুন",
     "stepFacilities": "ফ্যাসিলিটি যোগ করুন",
     "createdTitle": "সুবিধা গ্রুপ তৈরি হয়েছে!",
@@ -313,8 +310,10 @@
     "sameHoursEveryDay": "প্রতিদিন একই সময় ব্যবহার করুন",
     "applyToAllDays": "সব দিনে প্রয়োগ করুন",
     "applyToAllDaysTitle": "এই সময়গুলো প্রতিদিনের জন্য প্রয়োগ করবেন?",
-    "applyToAllDaysDesc": "এটি অন্যান্য প্রতিটি দিনের চালু থাকার সময় এখানে নির্ধারিত সময় দিয়ে প্রতিস্থাপন করবে।",
-    "operatingHoursAppliedToAll": "চালু থাকার সময় প্রতিদিনের জন্য প্রয়োগ করা হয়েছে।",
+    "applyToAllDaysDesc": "এটি অন্যান্য প্রতিটি দিনের এডিটরে এখানে নির্ধারিত সময় পূরণ করে দেবে — এখনও কিছু সংরক্ষণ হয়নি, যেকোনো দিন পর্যালোচনা বা পরিবর্তন করে একবারে সংরক্ষণ করুন।",
+    "operatingHoursAppliedToAll": "প্রতিদিনের জন্য সময় কপি করা হয়েছে — পরিবর্তন রাখতে সংরক্ষণ করুন।",
+    "pendingDaysCount": "{{count}}টি দিনে অসংরক্ষিত পরিবর্তন",
+    "saveOperatingHoursBtn": "{{count}}টি দিন সংরক্ষণ করুন",
     "errOperatingHoursTimes": "নির্দিষ্ট সময়ের জন্য খোলা এবং বন্ধের সময় আবশ্যক।"
   },
   "basicInfo": {
@@ -385,7 +384,14 @@
     "sort": "সাজানোর ক্রম",
     "language": "ভাষা",
     "opensAt": "খোলার সময়",
-    "closesAt": "বন্ধের সময়"
+    "closesAt": "বন্ধের সময়",
+    "selectTime": "সময় নির্বাচন করুন",
+    "setHour": "ঘণ্টা নির্ধারণ করুন",
+    "setMinute": "মিনিট নির্ধারণ করুন",
+    "increaseMinute": "১ মিনিট বাড়ান",
+    "periodAM": "দিন",
+    "periodPM": "রাত",
+    "dayFieldLabel": "{{day}} — {{field}}"
   },
   "dialog": {
     "discardChanges": {

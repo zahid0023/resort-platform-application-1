@@ -14,10 +14,12 @@ import { DialogCreateFooter } from "@/components/shared/dialog-create-footer"
 import { resortFacilityGroupsService } from "@/services/resort-facility-groups"
 import type { PlatformFacilityGroupSummary } from "@/services/platform-facility-groups"
 import { resortFacilitiesService, type ResortFacilitySummary } from "@/services/resort-facilities"
+import type { PlatformFacilitySummary } from "@/services/platform-facilities"
 import { ResortFacilityCard } from "@/components/resort-facilities/resort-facility-card"
 import { ResortFacilityDialog, emptyResortFacilityForm } from "@/components/resort-facilities/resort-facility-dialog"
 import type { ResortFacilityFormState } from "@/components/resort-facilities/types"
 import type { Locale } from "@/services/locales"
+import type { DayOfWeek } from "@/services/days-of-week"
 import { toast } from "sonner"
 import type { ResortFacilityGroupDialogMode, ResortFacilityGroupFormState } from "./types"
 import { emptyForm, toApiIconPayload } from "./types"
@@ -72,6 +74,10 @@ export interface ResortFacilityGroupDialogProps {
   onFormChange: (form: ResortFacilityGroupFormState) => void
   availableLocales: Locale[]
   totalLocaleCount: number | null
+  availableDaysOfWeek: DayOfWeek[]
+  /** Called the first time the nested create-facility dialog's Operating Hours tab is selected in a
+   * given session — lets the owning page lazy-load the shared day-of-week catalog only once needed. */
+  onOperatingHoursTabOpen?: () => void
   onSaved?: () => void | Promise<void>
 }
 
@@ -85,6 +91,8 @@ export function ResortFacilityGroupDialog({
   onFormChange,
   availableLocales,
   totalLocaleCount,
+  availableDaysOfWeek,
+  onOperatingHoursTabOpen,
   onSaved,
 }: ResortFacilityGroupDialogProps) {
   const { t } = useTranslation()
@@ -115,10 +123,17 @@ export function ResortFacilityGroupDialog({
   const [facilitiesLoading, setFacilitiesLoading] = useState(false)
   const [groupName, setGroupName] = useState("")
 
-  // View/edit mode only — creates a new ResortFacility scoped to this group via the
-  // standalone facility-create dialog, reused rather than duplicating its create flow here.
+  // Creates a new ResortFacility scoped to this group via the standalone facility-create dialog,
+  // reused (in both create and view/edit mode) rather than duplicating its create flow here.
   const [facilityCreateOpen, setFacilityCreateOpen] = useState(false)
   const [facilityCreateForm, setFacilityCreateForm] = useState<ResortFacilityFormState>(emptyResortFacilityForm)
+  // The platform facility (if any) the current facilityCreateForm was pre-filled from — threaded
+  // into the nested dialog so its General Info tab shows it as already selected.
+  const [facilityCreatePlatFacility, setFacilityCreatePlatFacility] = useState<PlatformFacilitySummary | null>(null)
+
+  // Create mode only — facilities created for the new group so far in this dialog session, so the
+  // Add Facilities step can mark them done and disable re-selecting them.
+  const [addedFacilityIds, setAddedFacilityIds] = useState<Set<number>>(new Set())
 
   // View/edit mode only — the Locale Translations section loads/refetches its own data
   // internally, so a manual refresh signals it by incrementing this counter rather than
@@ -156,6 +171,8 @@ export function ResortFacilityGroupDialog({
       setGroupName("")
       setFacilityCreateOpen(false)
       setFacilityCreateForm(emptyResortFacilityForm)
+      setFacilityCreatePlatFacility(null)
+      setAddedFacilityIds(new Set())
       setLocalesRefreshSignal(0)
       setLocaleSearch("")
       setSelectedPlatGroup(null)
@@ -332,10 +349,45 @@ export function ResortFacilityGroupDialog({
     }
   }
 
-  function openCreateFacility() {
-    if (groupId == null) return
-    setFacilityCreateForm({ ...emptyResortFacilityForm, resort_facility_group_id: groupId })
+  // Maps a picked platform facility onto the create-form's auto-fillable fields — same fields
+  // ResortFacilityGeneralInfo's own platform-facility picker sets when chosen from inside the dialog.
+  function platFacilityToFormPatch(f: PlatformFacilitySummary): Partial<ResortFacilityFormState> {
+    return {
+      facility_id: f.id,
+      code: f.code,
+      sort_order: f.sort_order ?? 0,
+      icon_type: (f.icon_type ?? "") as ResortFacilityFormState["icon_type"],
+      icon_value: f.icon_value ?? "",
+      icon_color: String(f.icon_meta?.color ?? ""),
+      locale: { name: f.locale?.name ?? "", description: f.locale?.description ?? "", notes: "", sort_order: 0 },
+    }
+  }
+
+  // `platFacility` set means this was opened from a picked-facility row (create mode's Add
+  // Facilities step, or the view/edit Facilities tab's picker) — pre-fills the whole form so the
+  // owner only needs to review/adjust rather than re-enter what they already picked.
+  function openCreateFacility(platFacility?: PlatformFacilitySummary) {
+    const gid = mode === "create" ? newGroupId : groupId
+    if (gid == null) return
+    setFacilityCreatePlatFacility(platFacility ?? null)
+    setFacilityCreateForm({
+      ...emptyResortFacilityForm,
+      resort_facility_group_id: gid,
+      ...(platFacility ? platFacilityToFormPatch(platFacility) : {}),
+    })
     setFacilityCreateOpen(true)
+  }
+
+  // create mode only — records a just-created facility as "added" for the Add Facilities step;
+  // view/edit mode instead refetches the group's facility list (see fetchGroupFacilities above).
+  async function handleFacilityCreateSaved() {
+    if (mode === "create") {
+      if (facilityCreatePlatFacility) {
+        setAddedFacilityIds((prev) => new Set(prev).add(facilityCreatePlatFacility.id))
+      }
+      return
+    }
+    await fetchGroupFacilities()
   }
 
   // View/edit mode only — lazy-loaded once, the first time the Facilities tab is selected.
@@ -558,12 +610,13 @@ export function ResortFacilityGroupDialog({
                   groupCreated && (
                     <ResortFacilityGroupAddFacilitiesStep
                       resortId={resortId}
-                      newGroupId={newGroupId}
                       platformGroupId={form.facility_group_id}
                       step={addFacStep}
                       onStepChange={setAddFacStep}
                       onOpenChange={onOpenChange}
                       onSaved={onSaved}
+                      addedFacilityIds={addedFacilityIds}
+                      onSelectFacility={openCreateFacility}
                     />
                   )
                 ) : (
@@ -575,7 +628,7 @@ export function ResortFacilityGroupDialog({
                           {t("resortFacilityGroup.facilitiesSectionTitle")}
                         </h3>
                       </div>
-                      <Button type="button" size="sm" variant="outline" onClick={openCreateFacility} className="h-7 text-xs px-2.5 gap-1.5">
+                      <Button type="button" size="sm" variant="outline" onClick={() => openCreateFacility()} className="h-7 text-xs px-2.5 gap-1.5">
                         <Plus className="h-3.5 w-3.5" /> {t("resortFacility.new")}
                       </Button>
                     </div>
@@ -633,7 +686,7 @@ export function ResortFacilityGroupDialog({
         </SheetContent>
       </Sheet>
 
-      {mode !== "create" && groupId != null && (
+      {(mode === "create" ? groupCreated : groupId != null) && (
         <ResortFacilityDialog
           resortId={resortId}
           open={facilityCreateOpen}
@@ -643,13 +696,12 @@ export function ResortFacilityGroupDialog({
           onFormChange={setFacilityCreateForm}
           availableLocales={availableLocales}
           totalLocaleCount={totalLocaleCount}
-          // Always mode="create" here (a quick-create-facility flow launched from within a group) —
-          // the Operating Hours tab is disabled for the entire lifetime of create mode, so it never
-          // needs a real catalog.
-          availableDaysOfWeek={[]}
-          onSaved={fetchGroupFacilities}
-          lockedGroupName={groupName || `Group #${groupId}`}
+          availableDaysOfWeek={availableDaysOfWeek}
+          onOperatingHoursTabOpen={onOperatingHoursTabOpen}
+          onSaved={handleFacilityCreateSaved}
+          lockedGroupName={mode === "create" ? (form.locale.name.trim() || `Group #${newGroupId}`) : (groupName || `Group #${groupId}`)}
           platformFacilityGroupId={typeof form.facility_group_id === "number" ? form.facility_group_id : undefined}
+          initialSelectedPlatFacility={facilityCreatePlatFacility}
         />
       )}
 

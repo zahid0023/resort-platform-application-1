@@ -212,15 +212,12 @@
     "namePlaceholder": "e.g. Dining & Beverages",
     "description": "Description",
     "addFacilitiesStep": "Add Facilities",
-    "addFacilitiesDesc": "Select platform facilities to add to your new group.",
-    "addFacilitiesBtn": "Create {{count}} Facilities",
+    "addFacilitiesDesc": "Select a platform facility below to create it for your new group.",
     "addFacilitiesSkip": "Skip for now",
+    "addFacilitiesDone": "Done",
     "facilitiesAdded": "{{count}} facilities added.",
+    "facilityAdded": "Added",
     "noFacilitiesInGroup": "No facilities found in this platform group.",
-    "facilitiesSelected": "selected",
-    "selectAll": "Select all",
-    "deselectAll": "Deselect all",
-    "creatingFacilities": "Creating…",
     "stepGroup": "Create Group",
     "stepFacilities": "Facilities",
     "createdTitle": "Facility Group Created!",
@@ -319,8 +316,10 @@
     "sameHoursEveryDay": "Use the same hours for every day",
     "applyToAllDays": "Apply to all days",
     "applyToAllDaysTitle": "Apply these hours to every day?",
-    "applyToAllDaysDesc": "This replaces every other day's operating hours with the ones set here.",
-    "operatingHoursAppliedToAll": "Operating hours applied to every day.",
+    "applyToAllDaysDesc": "This fills in every other day's editor with the hours set here — nothing is saved yet, review or adjust any day, then save once to keep the changes.",
+    "operatingHoursAppliedToAll": "Hours copied to every day — save to keep the changes.",
+    "pendingDaysCount": "{{count}} day(s) with unsaved changes",
+    "saveOperatingHoursBtn": "Save {{count}} day(s)",
     "errOperatingHoursTimes": "Opening and closing times are required for custom hours."
   },
   "basicInfo": {
@@ -391,7 +390,14 @@
     "sort": "Sort order",
     "language": "Language",
     "opensAt": "Opens at",
-    "closesAt": "Closes at"
+    "closesAt": "Closes at",
+    "selectTime": "Select time",
+    "setHour": "Set hour",
+    "setMinute": "Set minute",
+    "increaseMinute": "Increase minute by 1",
+    "periodAM": "AM",
+    "periodPM": "PM",
+    "dayFieldLabel": "{{day}} — {{field}}"
   },
   "dialog": {
     "discardChanges": {
